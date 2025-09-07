@@ -41,7 +41,7 @@ It overcomes traditional AI limits by letting borgs evolve freely in markets—o
 
 ## Getting Started
 
-- Read the [Whitepaper](https://docsend.com/view/7h4vrxh3ity42aaw) for details.
+- Read the [Whitepaper](https://docsend.com/view/7h4vrxh3ity42aaw) for details (continuously updated - ping me if you need a copy to download).
 - Jump in via [CONTRIBUTING.md](CONTRIBUTING.md)
 - **Setup**:
   ```bash
