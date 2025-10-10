@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  borglife-mcp:
+    build: .
+    ports:
+      - "8051:8051"
+    command: python archon_integration.py
+    environment:
+      - PYTHONPATH=/app
+    volumes:
+      - .:/app
+
+  borglife-ui:
+    build: .
+    ports:
+      - "8501:8501"
+    command: streamlit run sponsor_ui.py --server.port 8501 --server.address 0.0.0.0
+    environment:
+      - PYTHONPATH=/app
+    volumes:
+      - .:/app
+    depends_on:
+      - borglife-mcp
+
+  borglife-agent:
+    build: .
+    command: python proto_borg.py
+    environment:
+      - PYTHONPATH=/app
+    volumes:
+      - .:/app
+    depends_on:
+      - borglife-mcp
+
+networks:
+  default:
+    driver: bridge
