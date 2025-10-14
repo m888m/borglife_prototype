@@ -2797,6 +2797,1465 @@ class DockerMCPMonitor:
         
         self.health_history[organ_name].append({
             'timestamp': datetime.utcnow(),
+
+#### 4.4.4 Streamlit UI Components for Reputation Display
+
+```python
+# borglife_prototype/borg_designer_ui.py - Add reputation tab
+
+def reputation_tab(self):
+    """Display borg reputation and feedback"""
+    st.header("⭐ Borg Reputation & Feedback")
+    
+    # Borg selection
+    borg_id = st.selectbox(
+        "Select Borg",
+        options=self._get_available_borgs(),
+        format_func=lambda x: f"{x} ({self._get_borg_name(x)})"
+    )
+    
+    if not borg_id:
+        st.warning("No borgs available")
+        return
+    
+    # Get reputation data
+    reputation = asyncio.run(
+        self.reputation_scorer.calculate_reputation(borg_id)
+    )
+    
+    # Display overall score prominently
+    st.subheader("Overall Reputation")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        # Score with color coding
+        score = reputation['overall_score']
+        if score >= 80:
+            st.success(f"🌟 {score:.1f}/100")
+        elif score >= 60:
+            st.info(f"⭐ {score:.1f}/100")
+        else:
+            st.warning(f"⚠️ {score:.1f}/100")
+    
+    with col2:
+        st.metric("Rank", f"#{reputation['rank']}")
+    
+    with col3:
+        st.metric("Percentile", f"{reputation['percentile']:.1f}%")
+    
+    # Component scores breakdown
+    st.subheader("Score Breakdown")
+    
+    scores_data = {
+        'Performance': reputation['performance_score'],
+        'Utility': reputation['utility_score'],
+        'Economic': reputation['economic_score'],
+        'Community': reputation['community_score']
+    }
+    
+    # Radar chart for component scores
+    import plotly.graph_objects as go
+    
+    fig = go.Figure(data=go.Scatterpolar(
+        r=list(scores_data.values()),
+        theta=list(scores_data.keys()),
+        fill='toself',
+        name='Reputation'
+    ))
+    
+    fig.update_layout(
+        polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+        showlegend=False,
+        title="Reputation Components"
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Detailed metrics
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.metric("Performance", f"{reputation['performance_score']:.1f}/100")
+        st.caption("Speed, reliability, consistency")
+        
+        st.metric("Utility", f"{reputation['utility_score']:.1f}/100")
+        st.caption("Sponsor satisfaction ratings")
+    
+    with col2:
+        st.metric("Economic", f"{reputation['economic_score']:.1f}/100")
+        st.caption("Wealth generation (Δ(W) > 0)")
+        
+        st.metric("Community", f"{reputation['community_score']:.1f}/100")
+        st.caption("Adoption and usage")
+    
+    st.divider()
+    
+    # Recent feedback
+    st.subheader("Recent Sponsor Feedback")
+    
+    feedback_data = asyncio.run(
+        self._get_borg_feedback(borg_id, limit=5)
+    )
+    
+    if feedback_data:
+        for feedback in feedback_data:
+            with st.expander(
+                f"⭐ {feedback['overall_rating']}/5 - {feedback['created_at'][:10]}"
+            ):
+                # Rating breakdown
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    if feedback.get('speed_rating'):
+                        st.write(f"Speed: {'⭐' * feedback['speed_rating']}")
+                with col2:
+                    if feedback.get('accuracy_rating'):
+                        st.write(f"Accuracy: {'⭐' * feedback['accuracy_rating']}")
+                with col3:
+                    if feedback.get('value_rating'):
+                        st.write(f"Value: {'⭐' * feedback['value_rating']}")
+                
+                # Comment
+                if feedback.get('comment'):
+                    st.write(f"💬 {feedback['comment']}")
+                
+                # Tags
+                if feedback.get('tags'):
+                    st.write(f"🏷️ {', '.join(feedback['tags'])}")
+    else:
+        st.info("No feedback yet. Be the first to rate this borg!")
+    
+    st.divider()
+    
+    # Submit feedback (if sponsor has used this borg)
+    if self._sponsor_can_rate(borg_id):
+        st.subheader("Submit Your Feedback")
+        
+        with st.form("feedback_form"):
+            overall = st.slider("Overall Rating", 1, 5, 3)
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                speed = st.slider("Speed", 1, 5, 3)
+            with col2:
+                accuracy = st.slider("Accuracy", 1, 5, 3)
+            with col3:
+                value = st.slider("Value for Money", 1, 5, 3)
+            
+            comment = st.text_area("Comment (optional)", max_chars=500)
+            
+            tags = st.multiselect(
+                "Tags (optional)",
+                options=['fast', 'slow', 'accurate', 'inaccurate', 
+                        'expensive', 'good-value', 'reliable', 'unreliable']
+            )
+            
+            submitted = st.form_submit_button("Submit Feedback")
+            
+            if submitted:
+                # Submit via API
+                result = asyncio.run(
+                    self._submit_feedback(
+                        borg_id=borg_id,
+                        overall_rating=overall,
+                        speed_rating=speed,
+                        accuracy_rating=accuracy,
+                        value_rating=value,
+                        comment=comment,
+                        tags=tags
+                    )
+                )
+                
+                if result['success']:
+                    st.success("✅ Feedback submitted! Thank you.")
+                    st.rerun()
+                else:
+                    st.error(f"❌ Failed to submit: {result.get('error')}")
+
+def leaderboard_tab(self):
+    """Display borg leaderboard"""
+    st.header("🏆 Borg Leaderboard")
+    
+    # Filters
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        sort_by = st.selectbox(
+            "Sort by",
+            options=['Overall Score', 'Performance', 'Utility', 'Economic', 'Community']
+        )
+    
+    with col2:
+        limit = st.slider("Show top", 5, 50, 10)
+    
+    # Get leaderboard data
+    leaderboard = asyncio.run(
+        self._get_leaderboard(limit=limit, sort_by=sort_by)
+    )
+    
+    if not leaderboard:
+        st.info("No borgs in leaderboard yet")
+        return
+    
+    # Display leaderboard table
+    st.subheader(f"Top {len(leaderboard)} Borgs")
+    
+    for i, borg in enumerate(leaderboard, 1):
+        with st.container():
+            col1, col2, col3, col4, col5 = st.columns([1, 3, 2, 2, 2])
+            
+            with col1:
+                # Rank with medal for top 3
+                if i == 1:
+                    st.write("🥇")
+                elif i == 2:
+                    st.write("🥈")
+                elif i == 3:
+                    st.write("🥉")
+                else:
+                    st.write(f"#{i}")
+            
+            with col2:
+                st.write(f"**{borg['borg_id']}**")
+                st.caption(f"Sponsor: {borg['sponsor_id'][:8]}...")
+            
+            with col3:
+                score = borg['overall_score']
+                if score >= 80:
+                    st.success(f"⭐ {score:.1f}")
+                elif score >= 60:
+                    st.info(f"⭐ {score:.1f}")
+                else:
+                    st.warning(f"⭐ {score:.1f}")
+            
+            with col4:
+                st.metric("Wealth", f"{borg['total_wealth']:.4f} DOT")
+            
+            with col5:
+                st.metric("Ratings", borg['total_ratings'])
+            
+            st.divider()
+
+def borg_comparison_tab(self):
+    """Compare multiple borgs side-by-side"""
+    st.header("⚖️ Compare Borgs")
+    
+    # Select borgs to compare
+    available_borgs = self._get_available_borgs()
+    
+    selected_borgs = st.multiselect(
+        "Select borgs to compare (2-4)",
+        options=available_borgs,
+        max_selections=4
+    )
+    
+    if len(selected_borgs) < 2:
+        st.info("Select at least 2 borgs to compare")
+        return
+    
+    # Get reputation data for all selected borgs
+    comparison_data = {}
+    for borg_id in selected_borgs:
+        reputation = asyncio.run(
+            self.reputation_scorer.calculate_reputation(borg_id)
+        )
+        comparison_data[borg_id] = reputation
+    
+    # Comparison table
+    st.subheader("Score Comparison")
+    
+    metrics = ['overall_score', 'performance_score', 'utility_score', 
+               'economic_score', 'community_score']
+    
+    comparison_table = []
+    for metric in metrics:
+        row = {'Metric': metric.replace('_', ' ').title()}
+        for borg_id in selected_borgs:
+            row[borg_id[:12]] = f"{comparison_data[borg_id][metric]:.1f}"
+        comparison_table.append(row)
+    
+    st.table(comparison_table)
+    
+    # Radar chart comparison
+    st.subheader("Visual Comparison")
+    
+    fig = go.Figure()
+    
+    for borg_id in selected_borgs:
+        scores = comparison_data[borg_id]
+        fig.add_trace(go.Scatterpolar(
+            r=[scores['performance_score'], scores['utility_score'],
+               scores['economic_score'], scores['community_score']],
+            theta=['Performance', 'Utility', 'Economic', 'Community'],
+            fill='toself',
+            name=borg_id[:12]
+        ))
+    
+    fig.update_layout(
+        polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+        showlegend=True
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Recommendation
+    st.subheader("Recommendation")
+    
+    best_borg = max(
+        selected_borgs,
+        key=lambda b: comparison_data[b]['overall_score']
+    )
+    
+    st.success(f"🏆 Recommended: **{best_borg}** with score {comparison_data[best_borg]['overall_score']:.1f}/100")
+```
+
+#### 4.4.5 Anti-Gaming Mechanisms
+
+**Gaming Prevention Strategies**:
+
+1. **Verified Sponsors Only**: Feedback requires connected wallet
+2. **Weighted Ratings**: Larger funders have more weight (logarithmic to prevent whale dominance)
+3. **One Rating Per Task**: Prevents spam ratings
+4. **Objective Metrics**: 60% of score from automated performance data
+5. **Temporal Decay**: Old feedback has less weight
+6. **Outlier Detection**: Flag suspicious rating patterns
+
+```python
+# borglife_prototype/reputation/anti_gaming.py
+from typing import List, Dict, Any
+from datetime import datetime, timedelta
+import statistics
+
+class AntiGamingValidator:
+    """Detect and prevent reputation gaming"""
+    
+    def __init__(self, supabase_client):
+        self.supabase = supabase_client
+        self.suspicious_patterns = []
+    
+    async def validate_feedback(
+        self, 
+        borg_id: str,
+        sponsor_id: str,
+        rating: int
+    ) -> tuple[bool, str]:
+        """
+        Validate feedback submission for gaming attempts
+        
+        Returns:
+            (is_valid: bool, reason: str)
+        """
+        # Check 1: Sponsor has actually funded this borg
+        has_funded = await self._verify_sponsor_funding(borg_id, sponsor_id)
+        if not has_funded:
+            return False, "Sponsor has not funded this borg"
+        
+        # Check 2: Not rating too frequently
+        recent_ratings = await self._get_recent_ratings(sponsor_id, hours=24)
+        if len(recent_ratings) > 10:
+            return False, "Too many ratings in 24 hours (max 10)"
+        
+        # Check 3: Rating pattern not suspicious
+        is_suspicious = await self._detect_suspicious_pattern(sponsor_id, rating)
+        if is_suspicious:
+            return False, "Suspicious rating pattern detected"
+        
+        # Check 4: Sponsor account age
+        account_age = await self._get_sponsor_account_age(sponsor_id)
+        if account_age < timedelta(days=1):
+            return False, "Account too new (min 1 day)"
+        
+        return True, "Valid"
+    
+    async def _verify_sponsor_funding(
+        self, 
+        borg_id: str, 
+        sponsor_id: str
+    ) -> bool:
+        """Verify sponsor has funded this borg"""
+        transactions = await self.supabase.table('borg_transactions')\
+            .select('id')\
+            .eq('borg_id', borg_id)\
+            .eq('transaction_type', 'revenue')\
+            .execute()
+        
+        # In production, would check if sponsor_id matches transaction
+        return len(transactions.data) > 0
+    
+    async def _get_recent_ratings(
+        self, 
+        sponsor_id: str, 
+        hours: int = 24
+    ) -> List[Dict]:
+        """Get sponsor's recent ratings"""
+        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        
+        ratings = await self.supabase.table('borg_feedback')\
+            .select('*')\
+            .eq('sponsor_id', sponsor_id)\
+            .gte('created_at', cutoff.isoformat())\
+            .execute()
+        
+        return ratings.data
+    
+    async def _detect_suspicious_pattern(
+        self, 
+        sponsor_id: str, 
+        new_rating: int
+    ) -> bool:
+        """
+        Detect suspicious rating patterns
+        
+        Patterns:
+        - All 5-star or all 1-star ratings
+        - Ratings always at extremes (no middle ratings)
+        - Coordinated rating campaigns
+        """
+        # Get sponsor's rating history
+        history = await self.supabase.table('borg_feedback')\
+            .select('overall_rating')\
+            .eq('sponsor_id', sponsor_id)\
+            .execute()
+        
+        if not history.data or len(history.data) < 5:
+            return False  # Not enough data
+        
+        ratings = [r['overall_rating'] for r in history.data]
+        
+        # Check for all extremes
+        if all(r in [1, 5] for r in ratings):
+            return True  # Only 1-star or 5-star ratings
+        
+        # Check for no variance
+        if len(set(ratings)) == 1:
+            return True  # All identical ratings
+        
+        # Check for abnormal distribution
+        if len(ratings) >= 10:
+            variance = statistics.variance(ratings)
+            if variance < 0.1:  # Too consistent
+                return True
+        
+        return False
+    
+    async def _get_sponsor_account_age(self, sponsor_id: str) -> timedelta:
+        """Get sponsor account age"""
+        # Would query sponsor registration date
+        # For now, return safe default
+        return timedelta(days=30)
+    
+    async def flag_suspicious_activity(
+        self, 
+        sponsor_id: str, 
+        borg_id: str,
+        reason: str
+    ):
+        """Flag suspicious activity for review"""
+        await self.supabase.table('reputation_flags').insert({
+            'sponsor_id': sponsor_id,
+            'borg_id': borg_id,
+            'reason': reason,
+            'flagged_at': datetime.utcnow().isoformat(),
+            'reviewed': False
+        }).execute()
+        
+        self.suspicious_patterns.append({
+            'sponsor_id': sponsor_id,
+            'borg_id': borg_id,
+            'reason': reason,
+            'timestamp': datetime.utcnow()
+        })
+```
+
+#### 4.4.6 Integration with Wealth Tracking and Lifecycle
+
+**Unified Borg Dashboard**:
+
+```python
+# borg_designer_ui.py - Enhanced borg overview tab
+
+def borg_overview_tab(self):
+    """Unified borg overview with wealth, reputation, and lifecycle"""
+    st.header("🤖 Borg Overview")
+    
+    borg_id = st.selectbox("Select Borg", self._get_available_borgs())
+    
+    if not borg_id:
+        return
+    
+    # Get all data
+    wealth_data = asyncio.run(self._get_borg_wealth(borg_id))
+    reputation_data = asyncio.run(self.reputation_scorer.calculate_reputation(borg_id))
+    lifecycle_data = asyncio.run(self._get_borg_lifecycle(borg_id))
+    
+    # Top-level metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            "Reputation",
+            f"{reputation_data['overall_score']:.1f}/100",
+            delta=f"Rank #{reputation_data['rank']}"
+        )
+    
+    with col2:
+        st.metric(
+            "Wealth",
+            f"{wealth_data['total_wealth']:.4f} DOT",
+            delta=f"{wealth_data['total_revenue'] - wealth_data['total_costs']:.4f} DOT"
+        )
+    
+    with col3:
+        state = lifecycle_data['state']
+        state_emoji = {
+            'active': '🟢',
+            'paused': '🟡',
+            'terminated': '🔴'
+        }.get(state, '⚪')
+        st.metric("Status", f"{state_emoji} {state.title()}")
+    
+    with col4:
+        st.metric(
+            "Sponsors",
+            reputation_data.get('unique_sponsors', 0)
+        )
+    
+    st.divider()
+    
+    # Tabs for detailed views
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "📊 Performance", "💰 Economics", "⭐ Reputation", "🔧 Configuration"
+    ])
+    
+    with tab1:
+        self._render_performance_details(borg_id)
+    
+    with tab2:
+        self._render_economic_details(borg_id, wealth_data)
+    
+    with tab3:
+        self._render_reputation_details(borg_id, reputation_data)
+    
+    with tab4:
+        self._render_configuration_details(borg_id)
+
+def _render_reputation_details(self, borg_id: str, reputation_data: Dict):
+    """Render detailed reputation information"""
+    st.subheader("Reputation Breakdown")
+    
+    # Component scores with explanations
+    components = [
+        ('Performance', reputation_data['performance_score'], 
+         'Speed, reliability, and consistency of task execution'),
+        ('Utility', reputation_data['utility_score'],
+         'Sponsor satisfaction and value delivered'),
+        ('Economic', reputation_data['economic_score'],
+         'Wealth generation and cost efficiency'),
+        ('Community', reputation_data['community_score'],
+         'Adoption, usage, and activity levels')
+    ]
+    
+    for name, score, description in components:
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.write(f"**{name}**: {description}")
+        with col2:
+            st.metric("", f"{score:.1f}/100")
+    
+    st.divider()
+    
+    # Reputation trend (if historical data available)
+    st.subheader("Reputation Trend")
+    
+    # Would show line chart of reputation over time
+    st.info("Reputation tracking started. Trend data will appear after 7 days.")
+    
+    st.divider()
+    
+    # Improvement suggestions
+    st.subheader("💡 Improvement Suggestions")
+    
+    if reputation_data['performance_score'] < 70:
+        st.warning("⚡ Performance: Consider optimizing organ usage or upgrading cells")
+    
+    if reputation_data['utility_score'] < 70:
+        st.warning("🎯 Utility: Review sponsor feedback to understand pain points")
+    
+    if reputation_data['economic_score'] < 70:
+        st.warning("💰 Economic: Reduce costs or increase revenue per task")
+    
+    if reputation_data['community_score'] < 70:
+        st.warning("👥 Community: Increase marketing or improve borg capabilities")
+```
+
+#### 4.4.7 Evolutionary Data Collection for Phase 2
+
+**Fitness Function Preparation**:
+
+```python
+# borglife_prototype/evolution/fitness.py
+from typing import Dict, Any
+from decimal import Decimal
+
+class FitnessEvaluator:
+    """
+    Evaluate borg fitness for evolutionary selection (Phase 2)
+    
+    Combines reputation data with wealth tracking to create
+    comprehensive fitness score for genetic algorithm selection
+    """
+    
+    def __init__(self, reputation_scorer, wealth_tracker):
+        self.reputation_scorer = reputation_scorer
+        self.wealth_tracker = wealth_tracker
+    
+    async def calculate_fitness(self, borg_id: str) -> Dict[str, Any]:
+        """
+        Calculate comprehensive fitness score
+        
+        Fitness = α·Reputation + β·Δ(W) + γ·Survival
+        
+        Where:
+        α = 0.4 (reputation weight)
+        β = 0.4 (economic weight)
+        γ = 0.2 (survival/longevity weight)
+        
+        Returns:
+            {
+                'fitness_score': float (0-100),
+                'reputation_component': float,
+                'economic_component': float,
+                'survival_component': float,
+                'selection_probability': float
+            }
+        """
+        # Get reputation
+        reputation = await self.reputation_scorer.calculate_reputation(borg_id)
+        reputation_component = reputation['overall_score']
+        
+        # Get economic performance
+        wealth = await self.wealth_tracker.get_wealth(borg_id)
+        if wealth['total_costs'] > 0:
+            profit_margin = (
+                (wealth['total_revenue'] - wealth['total_costs']) / 
+                wealth['total_costs']
+            ) * 100
+            economic_component = min(100.0, max(0.0, 50 + profit_margin))
+        else:
+            economic_component = 50.0
+        
+        # Get survival metric (how long borg has been active)
+        lifecycle = await self._get_lifecycle_data(borg_id)
+        age_days = (datetime.utcnow() - lifecycle['created_at']).days
+        survival_component = min(100.0, age_days * 5)  # 20 days = 100 points
+        
+        # Calculate weighted fitness
+        fitness = (
+            0.4 * reputation_component +
+            0.4 * economic_component +
+            0.2 * survival_component
+        )
+        
+        # Calculate selection probability (softmax over population)
+        selection_prob = await self._calculate_selection_probability(
+            borg_id, fitness
+        )
+        
+        return {
+            'fitness_score': round(fitness, 2),
+            'reputation_component': round(reputation_component, 2),
+            'economic_component': round(economic_component, 2),
+            'survival_component': round(survival_component, 2),
+            'selection_probability': round(selection_prob, 4),
+            'calculated_at': datetime.utcnow().isoformat()
+        }
+    
+    async def _calculate_selection_probability(
+        self, 
+        borg_id: str, 
+        fitness: float
+    ) -> float:
+        """
+        Calculate probability of being selected for reproduction (Phase 2)
+        
+        Uses softmax to convert fitness to probability
+        """
+        # Get all active borg fitness scores
+        all_borgs = await self.supabase.table('borg_lifecycle')\
+            .select('borg_id')\
+            .eq('state', 'active')\
+            .execute()
+        
+        if not all_borgs.data:
+            return 1.0
+        
+        # Calculate fitness for all (would be cached)
+        fitness_scores = []
+        for borg in all_borgs.data:
+            if borg['borg_id'] == borg_id:
+                fitness_scores.append(fitness)
+            else:
+                # Would use cached fitness
+                fitness_scores.append(50.0)  # Placeholder
+        
+        # Softmax
+        import math
+        exp_scores = [math.exp(f / 10) for f in fitness_scores]  # Temperature = 10
+        total = sum(exp_scores)
+        
+        my_index = next(
+            i for i, b in enumerate(all_borgs.data) 
+            if b['borg_id'] == borg_id
+        )
+        
+        probability = exp_scores[my_index] / total
+        
+        return probability
+```
+
+**Integration with Sponsor Funding Decisions**:
+
+```python
+# borg_designer_ui.py - Enhanced funding tab
+
+def funding_tab(self):
+    """Fund borgs with reputation-informed decisions"""
+    st.header("💰 Fund a Borg")
+    
+    # Show top-rated borgs
+    st.subheader("Recommended Borgs (Top Rated)")
+    
+    top_borgs = asyncio.run(self._get_leaderboard(limit=5))
+    
+    for borg in top_borgs:
+        with st.expander(
+            f"⭐ {borg['overall_score']:.1f} - {borg['borg_id']}"
+        ):
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("Reputation", f"{borg['overall_score']:.1f}/100")
+                st.metric("Rank", f"#{borg['rank']}")
+            
+            with col2:
+                st.metric("Wealth", f"{borg['total_wealth']:.4f} DOT")
+                st.metric("Net Profit", f"{borg['net_profit']:.4f} DOT")
+            
+            with col3:
+                st.metric("Ratings", borg['total_ratings'])
+                st.metric("Sponsors", borg['unique_sponsors'])
+            
+            # Fund button
+            funding_amount = st.number_input(
+                "Funding Amount (DOT)",
+                min_value=0.01,
+                max_value=10.0,
+                value=0.1,
+                step=0.01,
+                key=f"fund_{borg['borg_id']}"
+            )
+            
+            if st.button(f"Fund {funding_amount} DOT", key=f"btn_{borg['borg_id']}"):
+                result = asyncio.run(
+                    self._fund_borg(borg['borg_id'], funding_amount)
+                )
+                if result['success']:
+                    st.success(f"✅ Funded {borg['borg_id']} with {funding_amount} DOT")
+                else:
+                    st.error(f"❌ Funding failed: {result.get('error')}")
+    
+    st.divider()
+    
+    # Browse all borgs
+    st.subheader("Browse All Borgs")
+    
+    # Filters
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        min_reputation = st.slider("Min Reputation", 0, 100, 50)
+    
+    with col2:
+        min_wealth = st.number_input("Min Wealth (DOT)", 0.0, 10.0, 0.0)
+    
+    with col3:
+        sort_by = st.selectbox(
+            "Sort by",
+            ['Reputation', 'Wealth', 'Ratings', 'Recent Activity']
+        )
+    
+    # Get filtered borgs
+    filtered_borgs = asyncio.run(
+        self._get_filtered_borgs(
+            min_reputation=min_reputation,
+            min_wealth=min_wealth,
+            sort_by=sort_by
+        )
+    )
+    
+    # Display results
+    if filtered_borgs:
+        st.write(f"Found {len(filtered_borgs)} borgs matching criteria")
+        # Display in table or cards
+    else:
+        st.info("No borgs match your criteria. Try adjusting filters.")
+```
+
+**Reputation-Weighted Funding Allocation**:
+
+The reputation system creates natural selection pressure:
+- **High-reputation borgs** attract more funding → more resources → better performance
+- **Low-reputation borgs** receive less funding → must improve or terminate
+- **Feedback loop** drives continuous improvement and evolution
+- **Phase 2 readiness**: Reputation scores feed directly into GP fitness functions
+
+
+### 4.4 Borg Reputation and Feedback System
+
+**Strategic Purpose**: Enable sponsors to discriminate between borgs based on utility and performance, creating selection pressure that drives evolutionary improvement in Phase 2+.
+
+**Design Principles**:
+- **Lightweight**: Minimal user burden (1-click ratings, automatic metrics)
+- **Quantitative**: Objective performance data + subjective utility ratings
+- **Anti-Gaming**: Verified sponsor feedback, weighted by funding amount
+- **Evolutionary**: Data feeds directly into Phase 2 fitness functions
+- **Transparent**: Public reputation scores, private detailed feedback
+
+#### 4.4.1 Reputation Scoring Algorithm
+
+**Multi-Dimensional Reputation Score (R)**:
+
+```
+R = w₁·P + w₂·U + w₃·E + w₄·C
+
+Where:
+P = Performance Score (0-100): Objective metrics (speed, reliability, cost-efficiency)
+U = Utility Score (0-100): Sponsor ratings (task completion, value delivered)
+E = Economic Score (0-100): Wealth generation (Δ(W) > 0 consistency)
+C = Community Score (0-100): Adoption metrics (unique sponsors, task volume)
+
+Weights (calibrated for Phase 1):
+w₁ = 0.3 (Performance)
+w₂ = 0.4 (Utility - most important for bootstrap)
+w₃ = 0.2 (Economic)
+w₄ = 0.1 (Community)
+```
+
+**Component Calculations**:
+
+```python
+# borglife_prototype/reputation/scoring.py
+from typing import Dict, Any, List
+from decimal import Decimal
+from datetime import datetime, timedelta
+import statistics
+
+class ReputationScorer:
+    """Calculate multi-dimensional reputation scores for borgs"""
+    
+    # Scoring weights
+    WEIGHTS = {
+        'performance': 0.3,
+        'utility': 0.4,
+        'economic': 0.2,
+        'community': 0.1
+    }
+    
+    def __init__(self, supabase_client):
+        self.supabase = supabase_client
+    
+    async def calculate_reputation(self, borg_id: str) -> Dict[str, float]:
+        """
+        Calculate comprehensive reputation score
+        
+        Returns:
+            {
+                'overall_score': float (0-100),
+                'performance_score': float (0-100),
+                'utility_score': float (0-100),
+                'economic_score': float (0-100),
+                'community_score': float (0-100),
+                'rank': int,
+                'percentile': float
+            }
+        """
+        # Get component scores
+        performance = await self._calculate_performance_score(borg_id)
+        utility = await self._calculate_utility_score(borg_id)
+        economic = await self._calculate_economic_score(borg_id)
+        community = await self._calculate_community_score(borg_id)
+        
+        # Calculate weighted overall score
+        overall = (
+            self.WEIGHTS['performance'] * performance +
+            self.WEIGHTS['utility'] * utility +
+            self.WEIGHTS['economic'] * economic +
+            self.WEIGHTS['community'] * community
+        )
+        
+        # Get rank and percentile
+        rank, percentile = await self._calculate_rank(borg_id, overall)
+        
+        return {
+            'overall_score': round(overall, 2),
+            'performance_score': round(performance, 2),
+            'utility_score': round(utility, 2),
+            'economic_score': round(economic, 2),
+            'community_score': round(community, 2),
+            'rank': rank,
+            'percentile': round(percentile, 2)
+        }
+    
+    async def _calculate_performance_score(self, borg_id: str) -> float:
+        """
+        Performance Score (0-100): Objective technical metrics
+        
+        Metrics:
+        - Average task execution time (lower is better)
+        - Success rate (higher is better)
+        - Organ reliability (fewer fallbacks is better)
+        - Response consistency (lower variance is better)
+        """
+        # Get performance data from last 30 days
+        cutoff = datetime.utcnow() - timedelta(days=30)
+        
+        # Query organ usage for execution times
+        usage_records = await self.supabase.table('organ_usage')\
+            .select('execution_time', 'success')\
+            .eq('borg_id', borg_id)\
+            .gte('timestamp', cutoff.isoformat())\
+            .execute()
+        
+        if not usage_records.data:
+            return 50.0  # Neutral score for new borgs
+        
+        # Calculate metrics
+        execution_times = [r['execution_time'] for r in usage_records.data if r['execution_time']]
+        successes = [r['success'] for r in usage_records.data]
+        
+        # Speed score (0-100, lower time = higher score)
+        avg_time = statistics.mean(execution_times) if execution_times else 5.0
+        speed_score = max(0, 100 - (avg_time * 10))  # 10s = 0 points, 0s = 100 points
+        
+        # Reliability score (0-100, success rate)
+        success_rate = sum(successes) / len(successes) if successes else 0.5
+        reliability_score = success_rate * 100
+        
+        # Consistency score (0-100, lower variance = higher score)
+        if len(execution_times) > 1:
+            variance = statistics.variance(execution_times)
+            consistency_score = max(0, 100 - (variance * 20))
+        else:
+            consistency_score = 50.0
+        
+        # Weighted average
+        performance = (
+            0.4 * speed_score +
+            0.4 * reliability_score +
+            0.2 * consistency_score
+        )
+        
+        return min(100.0, max(0.0, performance))
+    
+    async def _calculate_utility_score(self, borg_id: str) -> float:
+        """
+        Utility Score (0-100): Sponsor satisfaction ratings
+        
+        Based on:
+        - Direct sponsor ratings (1-5 stars)
+        - Task completion ratings
+        - Value-for-money ratings
+        - Weighted by sponsor funding amount (larger sponsors = more weight)
+        """
+        # Get sponsor feedback
+        feedback_records = await self.supabase.table('borg_feedback')\
+            .select('*')\
+            .eq('borg_id', borg_id)\
+            .execute()
+        
+        if not feedback_records.data:
+            return 50.0  # Neutral score for new borgs
+        
+        # Calculate weighted average rating
+        total_weight = Decimal('0')
+        weighted_sum = Decimal('0')
+        
+        for feedback in feedback_records.data:
+            rating = Decimal(str(feedback['rating']))  # 1-5 stars
+            weight = Decimal(str(feedback.get('sponsor_weight', 1.0)))  # Based on funding
+            
+            weighted_sum += rating * weight
+            total_weight += weight
+        
+        if total_weight == 0:
+            return 50.0
+        
+        # Convert 1-5 star rating to 0-100 score
+        avg_rating = weighted_sum / total_weight
+        utility_score = ((avg_rating - 1) / 4) * 100  # 1 star = 0, 5 stars = 100
+        
+        return float(utility_score)
+    
+    async def _calculate_economic_score(self, borg_id: str) -> float:
+        """
+        Economic Score (0-100): Wealth generation consistency
+        
+        Based on:
+        - Δ(W) > 0 frequency (profitable tasks)
+        - Revenue growth trend
+        - Cost efficiency (revenue/cost ratio)
+        """
+        # Get wealth data
+        wealth_record = await self.supabase.table('borg_wealth')\
+            .select('*')\
+            .eq('borg_id', borg_id)\
+            .single()
+        
+        if not wealth_record.data:
+            return 50.0
+        
+        total_revenue = Decimal(str(wealth_record.data['total_revenue']))
+        total_costs = Decimal(str(wealth_record.data['total_costs']))
+        
+        # Profitability score (0-100)
+        if total_costs == 0:
+            profitability = 50.0
+        else:
+            profit_margin = ((total_revenue - total_costs) / total_costs) * 100
+            profitability = min(100.0, max(0.0, 50 + profit_margin))
+        
+        # Consistency score (percentage of profitable tasks)
+        transactions = await self.supabase.table('borg_transactions')\
+            .select('amount', 'transaction_type')\
+            .eq('borg_id', borg_id)\
+            .execute()
+        
+        if transactions.data:
+            revenues = [t for t in transactions.data if t['transaction_type'] == 'revenue']
+            costs = [t for t in transactions.data if t['transaction_type'] == 'cost']
+            
+            # Simple heuristic: if revenue transactions > cost transactions, likely profitable
+            consistency = (len(revenues) / (len(revenues) + len(costs))) * 100 if (len(revenues) + len(costs)) > 0 else 50.0
+        else:
+            consistency = 50.0
+        
+        # Weighted average
+        economic = 0.6 * profitability + 0.4 * consistency
+        
+        return min(100.0, max(0.0, economic))
+    
+    async def _calculate_community_score(self, borg_id: str) -> float:
+        """
+        Community Score (0-100): Adoption and usage metrics
+        
+        Based on:
+        - Number of unique sponsors
+        - Total task volume
+        - Active usage (recent activity)
+        """
+        # Get unique sponsors
+        feedback_records = await self.supabase.table('borg_feedback')\
+            .select('sponsor_id')\
+            .eq('borg_id', borg_id)\
+            .execute()
+        
+        unique_sponsors = len(set(r['sponsor_id'] for r in feedback_records.data)) if feedback_records.data else 0
+        
+        # Get task volume (last 30 days)
+        cutoff = datetime.utcnow() - timedelta(days=30)
+        usage_records = await self.supabase.table('organ_usage')\
+            .select('id')\
+            .eq('borg_id', borg_id)\
+            .gte('timestamp', cutoff.isoformat())\
+            .execute()
+        
+        task_volume = len(usage_records.data) if usage_records.data else 0
+        
+        # Adoption score (0-100, logarithmic scale)
+        import math
+        adoption_score = min(100.0, math.log10(unique_sponsors + 1) * 50)  # 10 sponsors = 50 points
+        
+        # Activity score (0-100, logarithmic scale)
+        activity_score = min(100.0, math.log10(task_volume + 1) * 25)  # 100 tasks = 50 points
+        
+        # Recency score (0-100, based on last activity)
+        if usage_records.data:
+            last_activity = max(
+                datetime.fromisoformat(r['timestamp']) 
+                for r in usage_records.data
+            )
+            days_since = (datetime.utcnow() - last_activity).days
+            recency_score = max(0, 100 - (days_since * 5))  # -5 points per day
+        else:
+            recency_score = 0.0
+        
+        # Weighted average
+        community = (
+            0.4 * adoption_score +
+            0.3 * activity_score +
+            0.3 * recency_score
+        )
+        
+        return min(100.0, max(0.0, community))
+    
+    async def _calculate_rank(self, borg_id: str, overall_score: float) -> tuple[int, float]:
+        """
+        Calculate borg rank and percentile
+        
+        Returns:
+            (rank: int, percentile: float)
+        """
+        # Get all borg scores
+        all_borgs = await self.supabase.table('borg_lifecycle')\
+            .select('borg_id')\
+            .eq('state', 'active')\
+            .execute()
+        
+        if not all_borgs.data:
+            return 1, 100.0
+        
+        # Calculate scores for all borgs (cached for performance)
+        scores = []
+        for borg in all_borgs.data:
+            other_id = borg['borg_id']
+            if other_id == borg_id:
+                scores.append((other_id, overall_score))
+            else:
+                # Would use cached scores in production
+                other_score = await self.calculate_reputation(other_id)
+                scores.append((other_id, other_score['overall_score']))
+        
+        # Sort by score (descending)
+        scores.sort(key=lambda x: x[1], reverse=True)
+        
+        # Find rank
+        rank = next(i + 1 for i, (bid, _) in enumerate(scores) if bid == borg_id)
+        
+        # Calculate percentile
+        percentile = ((len(scores) - rank + 1) / len(scores)) * 100
+        
+        return rank, percentile
+```
+
+#### 4.4.2 Database Schema for Feedback and Reputation
+
+```sql
+-- borglife_prototype/migrations/002_reputation_system.sql
+-- Reputation and feedback system tables
+
+-- Sponsor feedback on borg performance
+CREATE TABLE IF NOT EXISTS borg_feedback (
+    id SERIAL PRIMARY KEY,
+    borg_id TEXT NOT NULL REFERENCES borg_wealth(borg_id),
+    sponsor_id TEXT NOT NULL,
+    task_id TEXT,  -- Optional: link to specific task
+    
+    -- Ratings (1-5 stars each)
+    overall_rating INTEGER NOT NULL CHECK (overall_rating BETWEEN 1 AND 5),
+    speed_rating INTEGER CHECK (speed_rating BETWEEN 1 AND 5),
+    accuracy_rating INTEGER CHECK (accuracy_rating BETWEEN 1 AND 5),
+    value_rating INTEGER CHECK (value_rating BETWEEN 1 AND 5),
+    
+    -- Qualitative feedback
+    comment TEXT,
+    tags TEXT[],  -- e.g., ['fast', 'accurate', 'expensive']
+    
+    -- Anti-gaming metadata
+    sponsor_weight DECIMAL(18, 8) NOT NULL DEFAULT 1.0,  -- Based on funding amount
+    verified BOOLEAN NOT NULL DEFAULT FALSE,  -- Verified sponsor
+    
+    -- Timestamps
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    
+    -- Prevent duplicate feedback per task
+    UNIQUE(borg_id, sponsor_id, task_id)
+);
+
+-- Computed reputation scores (cached for performance)
+CREATE TABLE IF NOT EXISTS borg_reputation (
+    borg_id TEXT PRIMARY KEY REFERENCES borg_wealth(borg_id),
+    
+    -- Component scores (0-100)
+    overall_score DECIMAL(5, 2) NOT NULL DEFAULT 50.0,
+    performance_score DECIMAL(5, 2) NOT NULL DEFAULT 50.0,
+    utility_score DECIMAL(5, 2) NOT NULL DEFAULT 50.0,
+    economic_score DECIMAL(5, 2) NOT NULL DEFAULT 50.0,
+    community_score DECIMAL(5, 2) NOT NULL DEFAULT 50.0,
+    
+    -- Rankings
+    rank INTEGER,
+    percentile DECIMAL(5, 2),
+    
+    -- Metadata
+    total_ratings INTEGER NOT NULL DEFAULT 0,
+    unique_sponsors INTEGER NOT NULL DEFAULT 0,
+    last_calculated TIMESTAMP NOT NULL DEFAULT NOW(),
+    
+    -- Timestamps
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Borg performance metrics (auto-collected)
+CREATE TABLE IF NOT EXISTS borg_performance_metrics (
+    id SERIAL PRIMARY KEY,
+    borg_id TEXT NOT NULL REFERENCES borg_wealth(borg_id),
+    
+    -- Performance data
+    avg_execution_time FLOAT,
+    success_rate FLOAT,
+    error_rate FLOAT,
+    fallback_rate FLOAT,
+    
+    -- Cost efficiency
+    avg_cost_per_task DECIMAL(18, 8),
+    cost_variance FLOAT,
+    
+    -- Time window
+    window_start TIMESTAMP NOT NULL,
+    window_end TIMESTAMP NOT NULL,
+    sample_size INTEGER NOT NULL,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for performance
+CREATE INDEX idx_feedback_borg ON borg_feedback(borg_id);
+CREATE INDEX idx_feedback_sponsor ON borg_feedback(sponsor_id);
+CREATE INDEX idx_feedback_rating ON borg_feedback(overall_rating);
+CREATE INDEX idx_feedback_created ON borg_feedback(created_at);
+CREATE INDEX idx_reputation_score ON borg_reputation(overall_score DESC);
+CREATE INDEX idx_reputation_rank ON borg_reputation(rank);
+CREATE INDEX idx_performance_borg ON borg_performance_metrics(borg_id);
+CREATE INDEX idx_performance_window ON borg_performance_metrics(window_end DESC);
+
+-- Row Level Security
+ALTER TABLE borg_feedback ENABLE ROW LEVEL SECURITY;
+ALTER TABLE borg_reputation ENABLE ROW LEVEL SECURITY;
+ALTER TABLE borg_performance_metrics ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Anyone can read reputation (public)
+CREATE POLICY public_reputation_read ON borg_reputation
+    FOR SELECT
+    USING (true);
+
+-- Policy: Only sponsors can write feedback
+CREATE POLICY sponsor_feedback_write ON borg_feedback
+    FOR INSERT
+    WITH CHECK (sponsor_id = current_user);
+
+-- Policy: Sponsors can read their own feedback
+CREATE POLICY sponsor_feedback_read ON borg_feedback
+    FOR SELECT
+    USING (sponsor_id = current_user OR true);  -- Public feedback
+
+-- Views for leaderboards
+CREATE OR REPLACE VIEW borg_leaderboard AS
+SELECT 
+    br.borg_id,
+    bl.sponsor_id,
+    br.overall_score,
+    br.rank,
+    br.percentile,
+    bw.total_wealth,
+    (bw.total_revenue - bw.total_costs) as net_profit,
+    br.total_ratings,
+    br.unique_sponsors,
+    bl.created_at
+FROM borg_reputation br
+JOIN borg_lifecycle bl ON br.borg_id = bl.borg_id
+JOIN borg_wealth bw ON br.borg_id = bw.borg_id
+WHERE bl.state = 'active'
+ORDER BY br.overall_score DESC;
+
+-- Trigger to update reputation on new feedback
+CREATE OR REPLACE FUNCTION update_reputation_on_feedback()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Increment total ratings
+    UPDATE borg_reputation
+    SET total_ratings = total_ratings + 1,
+        updated_at = NOW()
+    WHERE borg_id = NEW.borg_id;
+    
+    -- Trigger reputation recalculation (async job)
+    PERFORM pg_notify('reputation_update', NEW.borg_id);
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER feedback_reputation_trigger
+AFTER INSERT ON borg_feedback
+FOR EACH ROW
+EXECUTE FUNCTION update_reputation_on_feedback();
+```
+
+#### 4.4.3 API Endpoints for Feedback and Reputation
+
+```python
+# borglife_prototype/api/reputation_api.py
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, Field
+from typing import List, Optional
+from datetime import datetime
+
+router = APIRouter(prefix="/api/reputation", tags=["reputation"])
+
+class FeedbackSubmission(BaseModel):
+    """Sponsor feedback submission"""
+    borg_id: str
+    task_id: Optional[str] = None
+    overall_rating: int = Field(..., ge=1, le=5)
+    speed_rating: Optional[int] = Field(None, ge=1, le=5)
+    accuracy_rating: Optional[int] = Field(None, ge=1, le=5)
+    value_rating: Optional[int] = Field(None, ge=1, le=5)
+    comment: Optional[str] = Field(None, max_length=500)
+    tags: Optional[List[str]] = None
+
+class ReputationResponse(BaseModel):
+    """Borg reputation data"""
+    borg_id: str
+    overall_score: float
+    performance_score: float
+    utility_score: float
+    economic_score: float
+    community_score: float
+    rank: int
+    percentile: float
+    total_ratings: int
+    unique_sponsors: int
+    last_updated: datetime
+
+@router.post("/feedback")
+async def submit_feedback(
+    feedback: FeedbackSubmission,
+    sponsor_id: str = Depends(get_current_sponsor)
+):
+    """
+    Submit feedback for a borg
+    
+    Anti-gaming measures:
+    - One feedback per sponsor per task
+    - Sponsor weight based on funding amount
+    - Verified sponsors only (connected wallet)
+    """
+    # Get sponsor funding amount for weighting
+    funding = await get_sponsor_funding(sponsor_id, feedback.borg_id)
+    sponsor_weight = calculate_sponsor_weight(funding)
+    
+    # Insert feedback
+    try:
+        result = await supabase.table('borg_feedback').insert({
+            'borg_id': feedback.borg_id,
+            'sponsor_id': sponsor_id,
+            'task_id': feedback.task_id,
+            'overall_rating': feedback.overall_rating,
+            'speed_rating': feedback.speed_rating,
+            'accuracy_rating': feedback.accuracy_rating,
+            'value_rating': feedback.value_rating,
+            'comment': feedback.comment,
+            'tags': feedback.tags,
+            'sponsor_weight': str(sponsor_weight),
+            'verified': True  # Verified via wallet connection
+        }).execute()
+        
+        return {"success": True, "feedback_id": result.data[0]['id']}
+        
+    except Exception as e:
+        if 'duplicate key' in str(e):
+            raise HTTPException(
+                status_code=400,
+                detail="You have already provided feedback for this task"
+            )
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/borg/{borg_id}", response_model=ReputationResponse)
+async def get_borg_reputation(borg_id: str):
+    """Get reputation data for a borg"""
+    scorer = ReputationScorer(supabase)
+    reputation = await scorer.calculate_reputation(borg_id)
+    
+    # Get additional metadata
+    rep_record = await supabase.table('borg_reputation')\
+        .select('*')\
+        .eq('borg_id', borg_id)\
+        .single()
+    
+    if not rep_record.data:
+        raise HTTPException(status_code=404, detail="Borg not found")
+    
+    return ReputationResponse(
+        borg_id=borg_id,
+        **reputation,
+        total_ratings=rep_record.data['total_ratings'],
+        unique_sponsors=rep_record.data['unique_sponsors'],
+        last_updated=rep_record.data['last_calculated']
+    )
+
+@router.get("/leaderboard")
+async def get_leaderboard(
+    limit: int = 10,
+    category: Optional[str] = None
+):
+    """
+    Get borg leaderboard
+    
+    Args:
+        limit: Number of borgs to return
+        category: Filter by use case category (optional)
+    """
+    query = supabase.from_('borg_leaderboard').select('*')
+    
+    if category:
+        # Would filter by category if we had that metadata
+        pass
+    
+    result = await query.limit(limit).execute()
+    
+    return {
+        'leaderboard': result.data,
+        'updated_at': datetime.utcnow().isoformat()
+    }
+
+@router.get("/feedback/{borg_id}")
+async def get_borg_feedback(
+    borg_id: str,
+    limit: int = 20,
+    offset: int = 0
+):
+    """Get recent feedback for a borg"""
+    feedback = await supabase.table('borg_feedback')\
+        .select('*')\
+        .eq('borg_id', borg_id)\
+        .order('created_at', desc=True)\
+        .range(offset, offset + limit - 1)\
+        .execute()
+    
+    return {
+        'feedback': feedback.data,
+        'total': len(feedback.data)
+    }
+
+def calculate_sponsor_weight(funding_amount: Decimal) -> Decimal:
+    """
+    Calculate sponsor weight based on funding amount
+    
+    Logarithmic scale to prevent whale dominance:
+    - 0.1 DOT = 1.0x weight
+    - 1.0 DOT = 2.0x weight
+    - 10 DOT = 3.0x weight
+    """
+    import math
+    if funding_amount <= 0:
+        return Decimal('1.0')
+    
+    # Logarithmic weighting
+    weight = 1.0 + math.log10(float(funding_amount) * 10)
+    return Decimal(str(min(5.0, max(1.0, weight))))  # Cap at 5x
+```
+
             'healthy': is_healthy
         })
         
