@@ -1,12 +1,17 @@
 """
-JAM Mock Module for BorgLife Phase 1
+JAM Mock Interface
 
-Provides mock implementations of JAM (Join-Accumulate Machine) functionality
-for development and testing before real JAM deployment.
+Mock implementation of JAM on-chain storage for Phase 1 prototyping.
 """
 
 from .interface import JAMInterface
-from .local_mock import LocalJAMMock
 from .kusama_adapter import KusamaAdapter
+from .local_mock import LocalMock
+from .recovery import OnChainRecovery
 
-__all__ = ['JAMInterface', 'LocalJAMMock', 'KusamaAdapter']
+__all__ = [
+    'JAMInterface',
+    'KusamaAdapter',
+    'LocalMock',
+    'OnChainRecovery'
+]

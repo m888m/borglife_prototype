@@ -1,126 +1,240 @@
+# borglife_prototype/synthesis/dna_parser.py
 """
-DNA Parser for BorgLife Phase 1
+DNA Parser - Parse Borg DNA from YAML/PVM formats.
 
-Handles DNA encoding/decoding between YAML and PVM formats.
-D = (H, C, O, M) where:
-- H: Header (gas limits, service index)
-- C: Cells (GP-evolved subroutines)
-- O: Organs (MCP pointers)
-- M: Hash of Universal Principles manifesto
+Handles conversion between YAML representation and structured BorgDNA objects,
+with validation and integrity checking.
 """
 
+from typing import Dict, Any, Optional, List
 import yaml
 import hashlib
-from typing import Dict, Any, List, Optional
-from pydantic import BaseModel, Field
+import logging
+from pydantic import BaseModel, Field, validator
 
+# from ..archon_adapter.exceptions import DNAParsingError  # Temporarily commented for testing
+
+logger = logging.getLogger(__name__)
 
 class DNAHeader(BaseModel):
-    """DNA header (H) containing execution parameters."""
-    code_length: int = Field(..., description="Total length of DNA code")
-    gas_limit: int = Field(..., description="Maximum gas for execution")
-    service_index: str = Field(..., description="Unique service identifier")
+    """DNA header structure (H) - contains metadata and constraints."""
 
+    code_length: int = Field(..., gt=0, description="Total code length in bytes")
+    gas_limit: int = Field(..., gt=0, description="Maximum gas units for execution")
+    service_index: str = Field(..., min_length=1, description="Unique service identifier")
+
+    @validator('service_index')
+    def validate_service_index(cls, v):
+        """Validate service index format."""
+        if not v.replace('-', '').replace('_', '').isalnum():
+            raise ValueError('Service index must contain only alphanumeric characters, hyphens, and underscores')
+        return v
 
 class Cell(BaseModel):
-    """Cell definition (C) - GP-evolved subroutine."""
-    name: str = Field(..., description="Cell identifier")
-    logic_type: str = Field(..., description="Type of logic (data_processing, decision_making, etc.)")
-    parameters: Dict[str, Any] = Field(default_factory=dict, description="Cell-specific parameters")
-    cost_estimate: float = Field(default=0.0, description="Estimated execution cost in DOT")
+    """Cell definition (C) - individual logic units."""
 
+    name: str = Field(..., min_length=1, description="Unique cell name")
+    logic_type: str = Field(..., description="Type of logic (rag_agent, decision_maker, etc.)")
+    parameters: Dict[str, Any] = Field(default_factory=dict, description="Cell-specific parameters")
+    cost_estimate: float = Field(default=0.0, ge=0, description="Estimated execution cost")
+
+    @validator('name')
+    def validate_name(cls, v):
+        """Validate cell name format."""
+        if not v.replace('_', '').isalnum():
+            raise ValueError('Cell name must contain only alphanumeric characters and underscores')
+        return v
 
 class Organ(BaseModel):
-    """Organ pointer (O) - MCP tool reference."""
-    name: str = Field(..., description="Organ identifier")
-    mcp_tool: str = Field(..., description="MCP tool name (e.g., archon:perform_rag_query)")
-    url: str = Field(..., description="MCP server URL")
-    abi_version: str = Field(default="1.0", description="ABI version for compatibility")
-    price_cap: float = Field(default=0.0, description="Maximum price in DOT")
+    """Organ definition (O) - external capability pointers."""
 
+    name: str = Field(..., min_length=1, description="Unique organ name")
+    mcp_tool: str = Field(..., description="MCP tool identifier")
+    url: str = Field(..., description="Service endpoint URL")
+    abi_version: str = Field(..., description="ABI version for compatibility")
+    price_cap: float = Field(default=0.0, ge=0, description="Maximum price per call")
+
+    @validator('name')
+    def validate_name(cls, v):
+        """Validate organ name format."""
+        if not v.replace('_', '').isalnum():
+            raise ValueError('Organ name must contain only alphanumeric characters and underscores')
+        return v
+
+    @validator('url')
+    def validate_url(cls, v):
+        """Validate URL format."""
+        if not v.startswith(('http://', 'https://')):
+            raise ValueError('URL must start with http:// or https://')
+        return v
+
+class BorgReputation(BaseModel):
+    """Reputation data integrated into DNA for evolution substrate."""
+
+    average_rating: float = Field(default=0.0, ge=0.0, le=5.0, description="Average rating (1-5 stars)")
+    total_ratings: int = Field(default=0, ge=0, description="Total number of ratings received")
+    rating_distribution: Dict[int, int] = Field(
+        default_factory=lambda: {1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
+        description="Distribution of ratings by star level"
+    )
+    last_rated: Optional[str] = Field(default=None, description="ISO timestamp of last rating")
 
 class BorgDNA(BaseModel):
-    """Complete DNA structure D = (H, C, O, M)."""
+    """Complete DNA structure (D = (H, C, O, M, R))."""
+
     header: DNAHeader
     cells: List[Cell] = Field(default_factory=list)
     organs: List[Organ] = Field(default_factory=list)
-    manifesto_hash: str = Field(..., description="Blake2 hash of Universal Principles (M)")
+    manifesto_hash: str = Field(..., description="Hash of Universal Principles manifesto")
+    reputation: BorgReputation = Field(default_factory=BorgReputation, description="User satisfaction ratings")
 
     def compute_hash(self) -> str:
-        """Compute DNA hash H(D) for integrity verification."""
+        """
+        Compute DNA hash H(D) for integrity verification.
+
+        Returns:
+            BLAKE2b hash of the DNA structure
+        """
         # Serialize to canonical form for consistent hashing
         dna_dict = self.dict(exclude_unset=True)
-        dna_yaml = yaml.dump(dna_dict, sort_keys=True, default_flow_style=False)
-        return hashlib.blake2b(dna_yaml.encode('utf-8')).hexdigest()
 
-    def verify_integrity(self, expected_hash: Optional[str] = None) -> bool:
-        """Verify DNA integrity: H(D') = H(D)."""
-        computed_hash = self.compute_hash()
-        if expected_hash:
-            return computed_hash == expected_hash
-        # If no expected hash provided, verify against stored manifesto_hash
-        return computed_hash == self.manifesto_hash
+        # Sort keys for deterministic serialization
+        canonical_yaml = yaml.dump(
+            dna_dict,
+            default_flow_style=False,
+            sort_keys=True,
+            allow_unicode=True
+        )
 
+        # Compute hash
+        hash_obj = hashlib.blake2b(digest_size=32)
+        hash_obj.update(canonical_yaml.encode('utf-8'))
+
+        return hash_obj.hexdigest()
+
+    def validate_integrity(self) -> bool:
+        """
+        Validate DNA integrity by checking structure and manifesto compliance.
+
+        Returns:
+            True if DNA is valid and compliant
+        """
+        from .dna_validator import DNAValidator
+
+        # Structural validation
+        structure_errors = DNAValidator.validate_structure(self)
+        if structure_errors:
+            logger.warning(f"DNA structure validation failed: {structure_errors}")
+            return False
+
+        # Manifesto hash validation
+        if self.manifesto_hash != DNAValidator.UNIVERSAL_PRINCIPLES_HASH:
+            logger.warning(f"Manifesto hash mismatch: {self.manifesto_hash} != {DNAValidator.UNIVERSAL_PRINCIPLES_HASH}")
+            return False
+
+        return True
+
+    def get_cell_names(self) -> List[str]:
+        """Get list of cell names."""
+        return [cell.name for cell in self.cells]
+
+    def get_organ_names(self) -> List[str]:
+        """Get list of organ names."""
+        return [organ.name for organ in self.organs]
+
+    def get_cell_by_name(self, name: str) -> Optional[Cell]:
+        """Get cell by name."""
+        for cell in self.cells:
+            if cell.name == name:
+                return cell
+        return None
+
+    def get_organ_by_name(self, name: str) -> Optional[Organ]:
+        """Get organ by name."""
+        for organ in self.organs:
+            if organ.name == name:
+                return organ
+        return None
 
 class DNAParser:
-    """
-    Parser for DNA encoding/decoding between formats.
-
-    Phase 1: YAML ↔ BorgDNA (PVM conversion is placeholder)
-    Phase 2: Full PVM bytecode support
-    """
+    """Parser for DNA in various formats."""
 
     @staticmethod
     def from_yaml(yaml_str: str) -> BorgDNA:
         """
-        Parse YAML DNA to BorgDNA object.
+        Parse DNA from YAML string.
 
         Args:
-            yaml_str: YAML string containing DNA structure
+            yaml_str: YAML representation of DNA
 
         Returns:
             BorgDNA object
 
         Raises:
-            ValueError: If YAML is invalid or missing required fields
+            DNAParsingError: If parsing fails
         """
         try:
+            # Parse YAML
             data = yaml.safe_load(yaml_str)
             if not isinstance(data, dict):
-                raise ValueError("Invalid YAML: expected dictionary")
+                raise DNAParsingError("yaml", "Root must be a dictionary", None)
 
             # Validate required fields
-            if 'header' not in data:
-                raise ValueError("DNA missing required 'header' field")
-            if 'manifesto_hash' not in data:
-                raise ValueError("DNA missing required 'manifesto_hash' field")
+            required_fields = ['header', 'manifesto_hash']
+            for field in required_fields:
+                if field not in data:
+                    raise DNAParsingError("yaml", f"Missing required field: {field}", None)
 
-            return BorgDNA(**data)
+            # Handle optional fields
+            if 'cells' not in data:
+                data['cells'] = []
+            if 'organs' not in data:
+                data['organs'] = []
+
+            # Create BorgDNA object (validation happens in Pydantic)
+            dna = BorgDNA(**data)
+
+            # Additional validation
+            if not dna.validate_integrity():
+                raise DNAParsingError("yaml", "DNA integrity validation failed", None)
+
+            logger.info(f"Successfully parsed DNA for service: {dna.header.service_index}")
+            return dna
 
         except yaml.YAMLError as e:
-            raise ValueError(f"Invalid YAML format: {e}")
+            line = getattr(e, 'problem_mark', None)
+            line_num = line.line if line else None
+            # raise DNAParsingError("yaml", str(e), line_num)  # Temporarily commented
+            raise ValueError(f"YAML parsing error: {e}")
+        except Exception as e:
+            # raise DNAParsingError("yaml", f"Unexpected error: {e}", None)  # Temporarily commented
+            raise ValueError(f"DNA parsing error: {e}")
 
     @staticmethod
     def to_yaml(dna: BorgDNA) -> str:
         """
-        Serialize BorgDNA to YAML string.
+        Serialize DNA to YAML string.
 
         Args:
             dna: BorgDNA object
 
         Returns:
-            YAML string representation
+            YAML representation
         """
         dna_dict = dna.dict(exclude_unset=True)
-        return yaml.dump(dna_dict, default_flow_style=False, sort_keys=False)
+
+        return yaml.dump(
+            dna_dict,
+            default_flow_style=False,
+            sort_keys=True,
+            allow_unicode=True,
+            indent=2
+        )
 
     @staticmethod
     def from_pvm(bytecode: bytes) -> BorgDNA:
         """
-        Parse PVM bytecode to BorgDNA (Phase 2).
-
-        Placeholder implementation for Phase 1.
-        In Phase 2, this will disassemble PVM bytecode into DNA structure.
+        Parse DNA from PVM bytecode (Phase 2).
 
         Args:
             bytecode: PVM bytecode
@@ -131,16 +245,12 @@ class DNAParser:
         Raises:
             NotImplementedError: PVM parsing not implemented in Phase 1
         """
-        # Phase 1 placeholder - would implement PVM disassembly
-        raise NotImplementedError("PVM parsing implemented in Phase 2")
+        raise NotImplementedError("PVM bytecode parsing implemented in Phase 2")
 
     @staticmethod
     def to_pvm(dna: BorgDNA) -> bytes:
         """
-        Compile BorgDNA to PVM bytecode (Phase 2).
-
-        Placeholder implementation for Phase 1.
-        In Phase 2, this will compile DNA structure to PVM bytecode.
+        Compile DNA to PVM bytecode (Phase 2).
 
         Args:
             dna: BorgDNA object
@@ -151,77 +261,75 @@ class DNAParser:
         Raises:
             NotImplementedError: PVM compilation not implemented in Phase 1
         """
-        # Phase 1 placeholder - would implement PVM assembly
-        raise NotImplementedError("PVM compilation implemented in Phase 2")
+        raise NotImplementedError("PVM bytecode compilation implemented in Phase 2")
 
     @staticmethod
-    def validate_dna(dna: BorgDNA) -> List[str]:
+    def validate_round_trip(dna: BorgDNA) -> bool:
         """
-        Validate DNA structure and return list of issues.
+        Validate DNA round-trip integrity: DNA → YAML → DNA.
 
         Args:
-            dna: BorgDNA object to validate
+            dna: Original DNA object
 
         Returns:
-            List of validation error messages (empty if valid)
+            True if H(D') = H(D)
         """
-        issues = []
+        try:
+            # Serialize to YAML
+            yaml_str = DNAParser.to_yaml(dna)
 
-        # Validate header
-        if dna.header.code_length <= 0:
-            issues.append("Header code_length must be positive")
-        if dna.header.gas_limit <= 0:
-            issues.append("Header gas_limit must be positive")
-        if not dna.header.service_index:
-            issues.append("Header service_index cannot be empty")
+            # Parse back
+            parsed_dna = DNAParser.from_yaml(yaml_str)
 
-        # Validate cells
-        cell_names = set()
-        for cell in dna.cells:
-            if cell.name in cell_names:
-                issues.append(f"Duplicate cell name: {cell.name}")
-            cell_names.add(cell.name)
+            # Compare hashes
+            original_hash = dna.compute_hash()
+            parsed_hash = parsed_dna.compute_hash()
 
-            if not cell.logic_type:
-                issues.append(f"Cell {cell.name} missing logic_type")
+            return original_hash == parsed_hash
 
-            if cell.cost_estimate < 0:
-                issues.append(f"Cell {cell.name} has negative cost_estimate")
-
-        # Validate organs
-        organ_names = set()
-        for organ in dna.organs:
-            if organ.name in organ_names:
-                issues.append(f"Duplicate organ name: {organ.name}")
-            organ_names.add(organ.name)
-
-            if not organ.mcp_tool:
-                issues.append(f"Organ {organ.name} missing mcp_tool")
-
-            if organ.price_cap < 0:
-                issues.append(f"Organ {organ.name} has negative price_cap")
-
-        # Validate manifesto hash
-        if not dna.manifesto_hash:
-            issues.append("Manifesto hash cannot be empty")
-
-        # Check for name conflicts between cells and organs
-        name_conflicts = cell_names & organ_names
-        if name_conflicts:
-            issues.append(f"Name conflicts between cells and organs: {name_conflicts}")
-
-        return issues
+        except Exception as e:
+            logger.error(f"Round-trip validation failed: {e}")
+            return False
 
     @staticmethod
-    def create_example_dna(service_index: str = "borg-001") -> BorgDNA:
+    def merge_dna(base_dna: BorgDNA, updates: Dict[str, Any]) -> BorgDNA:
         """
-        Create an example DNA structure for testing.
+        Merge updates into existing DNA (for evolution).
 
         Args:
-            service_index: Service identifier for the borg
+            base_dna: Original DNA
+            updates: Updates to apply
 
         Returns:
-            Example BorgDNA object
+            Updated DNA object
+        """
+        # Create copy of base DNA
+        merged_data = base_dna.dict(exclude_unset=True)
+
+        # Apply updates
+        def deep_update(base_dict, updates_dict):
+            for key, value in updates_dict.items():
+                if isinstance(value, dict) and key in base_dict and isinstance(base_dict[key], dict):
+                    deep_update(base_dict[key], value)
+                else:
+                    base_dict[key] = value
+
+        deep_update(merged_data, updates)
+
+        # Create new DNA object
+        return BorgDNA(**merged_data)
+
+    @staticmethod
+    def create_minimal_dna(service_index: str, manifesto_hash: str) -> BorgDNA:
+        """
+        Create minimal viable DNA for bootstrapping.
+
+        Args:
+            service_index: Unique service identifier
+            manifesto_hash: Hash of manifesto
+
+        Returns:
+            Minimal BorgDNA object
         """
         return BorgDNA(
             header=DNAHeader(
@@ -229,35 +337,7 @@ class DNAParser:
                 gas_limit=1000000,
                 service_index=service_index
             ),
-            cells=[
-                Cell(
-                    name="data_processor",
-                    logic_type="data_processing",
-                    parameters={"model": "gpt-4", "max_tokens": 500},
-                    cost_estimate=0.001
-                ),
-                Cell(
-                    name="decision_maker",
-                    logic_type="decision_making",
-                    parameters={"strategy": "utility_maximization"},
-                    cost_estimate=0.0005
-                )
-            ],
-            organs=[
-                Organ(
-                    name="knowledge_retrieval",
-                    mcp_tool="archon:perform_rag_query",
-                    url="http://archon-mcp:8051",
-                    abi_version="1.0",
-                    price_cap=0.0001
-                ),
-                Organ(
-                    name="task_manager",
-                    mcp_tool="archon:create_task",
-                    url="http://archon-mcp:8051",
-                    abi_version="1.0",
-                    price_cap=0.0002
-                )
-            ],
-            manifesto_hash="blake2_hash_of_universal_principles"
+            cells=[],
+            organs=[],
+            manifesto_hash=manifesto_hash
         )

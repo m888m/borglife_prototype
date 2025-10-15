@@ -1,324 +1,525 @@
+# borglife_prototype/archon_adapter/adapter.py
 """
-Main Archon Service Adapter
+Archon Service Adapter - Main integration point between Borglife and Archon
 
-Provides unified interface to Archon services with resilience and monitoring.
+This adapter provides a stable interface to Archon's services while isolating
+Borglife from Archon implementation changes. It implements the adapter pattern
+with circuit breakers, retry logic, and graceful degradation.
 """
 
-import asyncio
-import aiohttp
-import json
 from typing import Dict, Any, Optional, List
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from .config import ArchonConfig
-from .exceptions import (
-    ArchonError, ArchonConnectionError, ArchonTimeoutError,
-    ArchonServiceUnavailableError, ArchonVersionError
-)
+import asyncio
+import httpx
+from tenacity import retry, stop_after_attempt, wait_exponential
+import logging
 
+from .config import ArchonConfig
+from .exceptions import ArchonError, ServiceUnavailableError
+from .health import HealthChecker
+from .version import VersionCompatibility
+from .fallback_manager import OrganFallbackManager
+from .cache_manager import CacheManager
+# from .rate_limiter import OrganRateLimiter  # Not implemented yet
+from .docker_mcp_billing import DockerMCPBilling
+
+logger = logging.getLogger(__name__)
 
 class ArchonServiceAdapter:
     """
-    Unified adapter for Archon services.
+    Main adapter for Archon services integration.
 
-    Provides resilient access to:
+    Provides unified interface to:
     - Archon Server (RAG, knowledge, projects, tasks)
     - Archon MCP (tool invocation)
     - Archon Agents (PydanticAI execution)
-
-    Features:
-    - Circuit breaker pattern
-    - Retry logic with exponential backoff
-    - Health monitoring
-    - Version compatibility checks
+    - Docker MCP Organs (fallback and extended capabilities)
     """
 
     def __init__(self, config: Optional[ArchonConfig] = None):
-        """
-        Initialize adapter with configuration.
-
-        Args:
-            config: ArchonConfig instance, uses defaults if None
-        """
         self.config = config or ArchonConfig()
-        self.session: Optional[aiohttp.ClientSession] = None
-        self.circuit_breaker_failures = 0
-        self.circuit_breaker_open = False
-        self.last_failure_time = 0
-        self.health_status = {
-            'archon_server': False,
-            'archon_mcp': False,
-            'archon_agents': False
+        self.client = httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0, connect=10.0),
+            limits=httpx.Limits(max_keepalive_connections=20, max_connections=100)
+        )
+
+        # Initialize components
+        self.health_checker = HealthChecker(self.client, self.config)
+        self.version_compat = VersionCompatibility()
+        self.fallback_manager = OrganFallbackManager(self)
+        self.cache_manager = CacheManager()
+        # self.rate_limiter = OrganRateLimiter()  # Not implemented yet
+        self.rate_limiter = None
+        self.billing_manager = DockerMCPBilling(self.config.supabase_client)
+
+        # Service endpoints
+        self.endpoints = {
+            'server': self.config.archon_server_url,
+            'mcp': self.config.archon_mcp_url,
+            'agents': self.config.archon_agents_url
         }
 
-    async def initialize(self) -> None:
-        """Initialize HTTP session and perform health checks."""
-        if self.session is None:
-            timeout = aiohttp.ClientTimeout(total=self.config.request_timeout)
-            self.session = aiohttp.ClientSession(timeout=timeout)
+        # Circuit breaker state
+        self.circuit_breaker = {
+            'server': {'failures': 0, 'last_failure': None, 'open': False},
+            'mcp': {'failures': 0, 'last_failure': None, 'open': False},
+            'agents': {'failures': 0, 'last_failure': None, 'open': False}
+        }
 
-        # Perform initial health checks
-        await self.check_health()
+    async def initialize(self) -> bool:
+        """
+        Initialize adapter and verify service connectivity.
 
-    async def close(self) -> None:
-        """Close HTTP session."""
-        if self.session:
-            await self.session.close()
-            self.session = None
+        Returns:
+            True if all services are accessible
+        """
+        try:
+            # Check service health
+            health = await self.check_health()
+            if not health['overall']:
+                logger.warning("Some Archon services unavailable during initialization")
+                return False
+
+            # Initialize cache
+            await self.cache_manager.initialize()
+            # Rate limiter not implemented yet
+
+            logger.info("Archon adapter initialized successfully")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to initialize Archon adapter: {e}")
+            return False
 
     async def check_health(self) -> Dict[str, Any]:
         """
         Check health of all Archon services.
 
         Returns:
-            Dict with health status for each service
+            {
+                'overall': bool,
+                'server': bool,
+                'mcp': bool,
+                'agents': bool,
+                'details': {...}
+            }
         """
-        if self.circuit_breaker_open:
-            # Check if recovery timeout has passed
-            if asyncio.get_event_loop().time() - self.last_failure_time > self.config.circuit_breaker_recovery_timeout:
-                self.circuit_breaker_open = False
-                self.circuit_breaker_failures = 0
-            else:
-                return {
-                    'circuit_breaker': 'open',
-                    'status': 'degraded'
-                }
-
-        health_results = {}
-
-        # Check each service
-        services = {
-            'archon_server': f"{self.config.archon_server_url}/health",
-            'archon_mcp': f"{self.config.archon_mcp_url}/health",
-            'archon_agents': f"{self.config.archon_agents_url}/health"
-        }
-
-        for service_name, health_url in services.items():
-            try:
-                async with self.session.get(health_url, timeout=self.config.health_check_timeout) as response:
-                    health_results[service_name] = response.status == 200
-            except Exception:
-                health_results[service_name] = False
-
-        # Update circuit breaker
-        all_healthy = all(health_results.values())
-        if not all_healthy:
-            self.circuit_breaker_failures += 1
-            self.last_failure_time = asyncio.get_event_loop().time()
-
-            if self.circuit_breaker_failures >= self.config.circuit_breaker_failure_threshold:
-                self.circuit_breaker_open = True
-
-        self.health_status.update(health_results)
-        health_results.update({
-            'circuit_breaker': 'open' if self.circuit_breaker_open else 'closed',
-            'status': 'healthy' if all_healthy else 'degraded'
-        })
-
-        return health_results
+        return await self.health_checker.check_all_services()
 
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type((ArchonConnectionError, ArchonTimeoutError))
+        retry=lambda exc: isinstance(exc, (httpx.TimeoutException, httpx.HTTPError))
     )
-    async def _make_request(self, method: str, url: str, **kwargs) -> Dict[str, Any]:
+    async def perform_rag_query(
+        self,
+        query: str,
+        context: Optional[Dict[str, Any]] = None,
+        use_cache: bool = True
+    ) -> Dict[str, Any]:
         """
-        Make HTTP request with retry logic.
-
-        Args:
-            method: HTTP method
-            url: Request URL
-            **kwargs: Additional request parameters
-
-        Returns:
-            Response data as dict
-
-        Raises:
-            ArchonConnectionError: Connection failed
-            ArchonTimeoutError: Request timed out
-            ArchonServiceUnavailableError: Service unavailable
-        """
-        if self.circuit_breaker_open:
-            raise ArchonServiceUnavailableError("Circuit breaker is open")
-
-        try:
-            async with self.session.request(method, url, **kwargs) as response:
-                if response.status == 200:
-                    return await response.json()
-                elif response.status >= 500:
-                    raise ArchonServiceUnavailableError(f"Server error: {response.status}")
-                elif response.status == 429:
-                    raise ArchonServiceUnavailableError("Rate limited")
-                else:
-                    error_text = await response.text()
-                    raise ArchonError(f"Request failed: {response.status} - {error_text}")
-
-        except asyncio.TimeoutError:
-            raise ArchonTimeoutError(f"Request to {url} timed out")
-        except aiohttp.ClientError as e:
-            raise ArchonConnectionError(f"Connection failed: {e}")
-
-    async def perform_rag_query(self, query: str, **kwargs) -> Dict[str, Any]:
-        """
-        Perform RAG query using Archon server.
+        Perform RAG query via Archon server.
 
         Args:
             query: Search query
-            **kwargs: Additional parameters
+            context: Additional context for query
+            use_cache: Whether to use cached results
 
         Returns:
-            RAG results
+            RAG results with sources and relevance scores
         """
-        if not self.config.enable_rag:
-            raise ArchonError("RAG queries are disabled")
+        # Check circuit breaker
+        if self._is_circuit_open('server'):
+            raise ServiceUnavailableError("Archon server circuit breaker is open")
 
-        url = f"{self.config.archon_server_url}/api/knowledge/rag"
-        data = {'query': query, **kwargs}
+        # Check cache first
+        if use_cache:
+            cache_key = f"rag:{hash(query)}"
+            cached = await self.cache_manager.get_cached_result('rag', 'query', {'query': query})
+            if cached:
+                return cached['result']
 
-        return await self._make_request('POST', url, json=data)
+        try:
+            url = f"{self.endpoints['server']}/api/knowledge/rag"
+            payload = {'query': query}
+            if context:
+                payload.update(context)
 
-    async def call_mcp_tool(self, tool_name: str, parameters: Dict[str, Any]) -> Any:
+            response = await self.client.post(url, json=payload)
+            response.raise_for_status()
+
+            result = response.json()
+
+            # Cache successful results
+            if use_cache:
+                await self.cache_manager.cache_result('rag', 'query', {'query': query}, result, ttl=300)
+
+            # Reset circuit breaker
+            self._reset_circuit('server')
+
+            return result
+
+        except Exception as e:
+            self._record_circuit_failure('server')
+            logger.error(f"RAG query failed: {e}")
+            raise ArchonError(f"RAG query failed: {e}")
+
+    async def create_task(
+        self,
+        title: str,
+        description: str,
+        project_id: Optional[str] = None,
+        assignee: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
-        Call MCP tool through Archon MCP server.
-
-        Args:
-            tool_name: Name of the tool to call
-            parameters: Tool parameters
-
-        Returns:
-            Tool execution result
-        """
-        url = f"{self.config.archon_mcp_url}/tools/{tool_name}"
-        data = {'parameters': parameters}
-
-        result = await self._make_request('POST', url, json=data)
-        return result.get('result')
-
-    async def run_agent(self, agent_type: str, prompt: str, parameters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Run PydanticAI agent through Archon agents service.
-
-        Args:
-            agent_type: Type of agent (RagAgent, DocumentAgent, etc.)
-            prompt: Agent prompt
-            parameters: Additional parameters
-
-        Returns:
-            Agent execution result
-        """
-        url = f"{self.config.archon_agents_url}/agents/run"
-        data = {
-            'agent_type': agent_type,
-            'prompt': prompt,
-            'parameters': parameters or {}
-        }
-
-        return await self._make_request('POST', url, json=data)
-
-    async def create_task(self, title: str, description: str, **kwargs) -> Dict[str, Any]:
-        """
-        Create task using Archon server.
+        Create a task via Archon.
 
         Args:
             title: Task title
             description: Task description
-            **kwargs: Additional task parameters
+            project_id: Optional project ID
+            assignee: Optional assignee
 
         Returns:
-            Task creation result
+            Created task details
         """
-        if not self.config.enable_tasks:
-            raise ArchonError("Task management is disabled")
+        if self._is_circuit_open('server'):
+            raise ServiceUnavailableError("Archon server circuit breaker is open")
 
-        url = f"{self.config.archon_server_url}/api/tasks"
-        data = {
-            'title': title,
-            'description': description,
-            **kwargs
-        }
+        try:
+            url = f"{self.endpoints['server']}/api/tasks"
+            payload = {
+                'title': title,
+                'description': description,
+                'project_id': project_id,
+                'assignee': assignee
+            }
 
-        return await self._make_request('POST', url, json=data)
+            response = await self.client.post(url, json=payload)
+            response.raise_for_status()
 
-    async def list_tasks(self, **kwargs) -> List[Dict[str, Any]]:
+            result = response.json()
+            self._reset_circuit('server')
+
+            return result
+
+        except Exception as e:
+            self._record_circuit_failure('server')
+            logger.error(f"Task creation failed: {e}")
+            raise ArchonError(f"Task creation failed: {e}")
+
+    async def list_tasks(
+        self,
+        project_id: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: int = 50
+    ) -> List[Dict[str, Any]]:
         """
-        List tasks from Archon server.
+        List tasks from Archon.
 
         Args:
-            **kwargs: Query parameters
+            project_id: Filter by project
+            status: Filter by status
+            limit: Maximum number of tasks
 
         Returns:
             List of tasks
         """
-        if not self.config.enable_tasks:
-            raise ArchonError("Task management is disabled")
+        if self._is_circuit_open('server'):
+            raise ServiceUnavailableError("Archon server circuit breaker is open")
 
-        url = f"{self.config.archon_server_url}/api/tasks"
-        result = await self._make_request('GET', url, params=kwargs)
-        return result.get('tasks', [])
+        try:
+            url = f"{self.endpoints['server']}/api/tasks"
+            params = {}
+            if project_id:
+                params['project_id'] = project_id
+            if status:
+                params['status'] = status
+            params['limit'] = limit
 
-    async def create_project(self, name: str, description: str, **kwargs) -> Dict[str, Any]:
+            response = await self.client.get(url, params=params)
+            response.raise_for_status()
+
+            result = response.json()
+            self._reset_circuit('server')
+
+            return result.get('tasks', [])
+
+        except Exception as e:
+            self._record_circuit_failure('server')
+            logger.error(f"Task listing failed: {e}")
+            raise ArchonError(f"Task listing failed: {e}")
+
+    async def call_mcp_tool(
+        self,
+        tool_name: str,
+        parameters: Dict[str, Any],
+        timeout: float = 30.0
+    ) -> Any:
         """
-        Create project using Archon server.
+        Call MCP tool via Archon MCP server.
 
         Args:
-            name: Project name
-            description: Project description
-            **kwargs: Additional project parameters
+            tool_name: Name of the tool to call
+            parameters: Tool parameters
+            timeout: Request timeout in seconds
 
         Returns:
-            Project creation result
+            Tool execution result
         """
-        url = f"{self.config.archon_server_url}/api/projects"
-        data = {
-            'name': name,
-            'description': description,
-            **kwargs
-        }
+        if self._is_circuit_open('mcp'):
+            raise ServiceUnavailableError("Archon MCP circuit breaker is open")
 
-        return await self._make_request('POST', url, json=data)
+        try:
+            url = f"{self.endpoints['mcp']}/tools/{tool_name}/call"
 
-    async def search_code_examples(self, query: str, **kwargs) -> Dict[str, Any]:
+            response = await self.client.post(
+                url,
+                json=parameters,
+                timeout=timeout
+            )
+            response.raise_for_status()
+
+            result = response.json()
+            self._reset_circuit('mcp')
+
+            return result
+
+        except Exception as e:
+            self._record_circuit_failure('mcp')
+            logger.error(f"MCP tool call failed: {e}")
+            raise ArchonError(f"MCP tool call failed: {e}")
+
+    async def run_agent(
+        self,
+        agent_type: str,
+        prompt: str,
+        context: Optional[Dict[str, Any]] = None,
+        streaming: bool = False
+    ) -> Dict[str, Any]:
         """
-        Search code examples using Archon MCP.
+        Run PydanticAI agent via Archon agents service.
 
         Args:
-            query: Search query
-            **kwargs: Additional parameters
+            agent_type: Type of agent (e.g., 'rag', 'document')
+            prompt: Agent prompt
+            context: Additional context
+            streaming: Whether to use streaming response
 
         Returns:
-            Code search results
+            Agent execution result
         """
-        return await self.call_mcp_tool('archon:search_code_examples', {'query': query, **kwargs})
+        if self._is_circuit_open('agents'):
+            raise ServiceUnavailableError("Archon agents circuit breaker is open")
 
-    async def get_service_info(self) -> Dict[str, Any]:
-        """
-        Get information about connected Archon services.
+        try:
+            if streaming:
+                url = f"{self.endpoints['agents']}/agents/{agent_type}/stream"
+            else:
+                url = f"{self.endpoints['agents']}/agents/run"
 
-        Returns:
-            Service information and capabilities
-        """
-        health = await self.check_health()
-
-        return {
-            'services': self.config.get_service_urls(),
-            'health': health,
-            'config': {
-                'timeout': self.config.request_timeout,
-                'max_retries': self.config.max_retries,
-                'features': {
-                    'rag': self.config.enable_rag,
-                    'tasks': self.config.enable_tasks,
-                    'crawling': self.config.enable_crawling
-                }
-            },
-            'circuit_breaker': {
-                'open': self.circuit_breaker_open,
-                'failures': self.circuit_breaker_failures,
-                'last_failure': self.last_failure_time
+            payload = {
+                'agent_type': agent_type,
+                'prompt': prompt,
+                'context': context or {}
             }
-        }
 
-    # Context manager support
+            response = await self.client.post(url, json=payload)
+            response.raise_for_status()
+
+            result = response.json()
+            self._reset_circuit('agents')
+
+            return result
+
+        except Exception as e:
+            self._record_circuit_failure('agents')
+            logger.error(f"Agent execution failed: {e}")
+            raise ArchonError(f"Agent execution failed: {e}")
+
+    async def call_organ(
+        self,
+        borg_id: str,
+        organ_name: str,
+        tool: str,
+        params: Dict[str, Any],
+        wealth: Optional[float] = None,
+        use_fallbacks: bool = True
+    ) -> Any:
+        """
+        Call Docker MCP organ with fallback support.
+
+        Args:
+            borg_id: Borg identifier
+            organ_name: Docker MCP organ name
+            tool: Tool/operation to execute
+            params: Tool parameters
+            wealth: Current borg wealth for billing
+            use_fallbacks: Whether to use fallback strategies
+
+        Returns:
+            Tool execution result
+        """
+        # Check rate limit (disabled for now)
+        # allowed, current_usage, limit = await self.rate_limiter.check_limit(
+        #     borg_id, organ_name, wealth
+        # )
+        allowed = True
+        current_usage = 0
+        limit = 100
+
+        if not allowed:
+            raise ArchonError(
+                f"Rate limit exceeded for {organ_name}. "
+                f"Used {current_usage}/{limit} requests"
+            )
+
+        # Execute with fallbacks
+        try:
+            result, level, description = await self.fallback_manager.execute_with_fallback(
+                borg_id, organ_name, tool, params, max_fallbacks=3 if use_fallbacks else 0
+            )
+
+            # Track billing
+            if wealth is not None:
+                cost = await self.billing_manager.track_organ_usage(
+                    borg_id=borg_id,
+                    organ_name=organ_name,
+                    operation=tool,
+                    response_size=len(str(result)),
+                    execution_time=0.0  # Would be measured
+                )
+
+                # Deduct from wealth
+                success = await self.billing_manager.deduct_from_borg_wealth(
+                    borg_id, cost, f"{organ_name}:{tool}"
+                )
+
+                if not success:
+                    logger.warning(f"Failed to deduct {cost} DOT from borg {borg_id}")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Organ call failed for {organ_name}:{tool}: {e}")
+            raise
+
+    async def call_organ(
+        self,
+        borg_id: str,
+        organ_name: str,
+        tool: str,
+        params: Dict[str, Any],
+        wealth: Optional[float] = None,
+        use_fallbacks: bool = True
+    ) -> Any:
+        """
+        Call Docker MCP organ with fallback support.
+
+        Args:
+            borg_id: Borg identifier
+            organ_name: Docker MCP organ name
+            tool: Tool/operation to execute
+            params: Tool parameters
+            wealth: Current borg wealth for billing
+            use_fallbacks: Whether to use fallback strategies
+
+        Returns:
+            Tool execution result
+        """
+        # Check rate limit
+        allowed, current_usage, limit = await self.rate_limiter.check_limit(
+            borg_id, organ_name, wealth
+        )
+
+        if not allowed:
+            raise ArchonError(
+                f"Rate limit exceeded for {organ_name}. "
+                f"Used {current_usage}/{limit} requests"
+            )
+
+        # Execute with fallbacks
+        try:
+            result, level, description = await self.fallback_manager.execute_with_fallback(
+                borg_id, organ_name, tool, params, max_fallbacks=3 if use_fallbacks else 0
+            )
+
+            # Track billing
+            if wealth is not None:
+                cost = await self.billing_manager.track_organ_usage(
+                    borg_id=borg_id,
+                    organ_name=organ_name,
+                    operation=tool,
+                    response_size=len(str(result)),
+                    execution_time=0.0  # Would be measured
+                )
+
+                # Deduct from wealth
+                success = await self.billing_manager.deduct_from_borg_wealth(
+                    borg_id, cost, f"{organ_name}:{tool}"
+                )
+
+                if not success:
+                    logger.warning(f"Failed to deduct {cost} DOT from borg {borg_id}")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Organ call failed for {organ_name}:{tool}: {e}")
+            raise
+
+    async def call_archon_tool(
+        self,
+        tool_name: str,
+        params: Dict[str, Any]
+    ) -> Any:
+        """
+        Call native Archon MCP tool (used by fallback manager).
+
+        Args:
+            tool_name: Archon tool name
+            params: Tool parameters
+
+        Returns:
+            Tool execution result
+        """
+        return await self.call_mcp_tool(tool_name, params)
+
+    def _is_circuit_open(self, service: str) -> bool:
+        """Check if circuit breaker is open for service."""
+        breaker = self.circuit_breaker[service]
+        if breaker['open']:
+            # Check if we should attempt reset
+            if breaker['last_failure']:
+                from datetime import datetime, timedelta
+                if datetime.utcnow() - breaker['last_failure'] > timedelta(minutes=5):
+                    breaker['open'] = False
+                    breaker['failures'] = 0
+                    return False
+            return True
+        return False
+
+    def _record_circuit_failure(self, service: str):
+        """Record circuit breaker failure."""
+        breaker = self.circuit_breaker[service]
+        breaker['failures'] += 1
+        breaker['last_failure'] = datetime.utcnow()
+
+        # Open circuit after 5 failures
+        if breaker['failures'] >= 5:
+            breaker['open'] = True
+            logger.warning(f"Circuit breaker opened for {service}")
+
+    def _reset_circuit(self, service: str):
+        """Reset circuit breaker on success."""
+        breaker = self.circuit_breaker[service]
+        breaker['failures'] = 0
+        breaker['open'] = False
+
+    async def close(self):
+        """Clean up resources."""
+        await self.client.aclose()
+        await self.cache_manager.close()
+
     async def __aenter__(self):
         await self.initialize()
         return self
