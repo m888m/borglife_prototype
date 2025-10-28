@@ -163,22 +163,23 @@ _Before writing this PRP, validate: "If someone knew nothing about this codebase
 
 ```bash
 ../borglife/borglife_proto_private/code/
+├── .env.test                       # Test environment configuration
 ├── tests/
 │   ├── __init__.py
-│   ├── e2e_test_suite.py           # Main test orchestrator
-│   ├── test_demo_scenarios.py      # Individual demo scenario tests
-│   ├── test_dna_integrity.py       # DNA round-trip validation
-│   ├── test_economic_model.py      # Wealth tracking and cost validation
+│   ├── e2e_test_suite.py           # Main test orchestrator (funding → creation → execution → encoding → storage → decoding)
 │   ├── test_service_integration.py # Archon/BorgLife integration tests
-│   ├── test_performance.py         # Performance benchmarks
+│   ├── test_dna_integrity.py       # DNA round-trip validation H(D') = H(D)
+│   ├── test_economic_model.py      # Wealth tracking and cost validation (within 0.001 DOT)
+│   ├── test_error_handling.py      # Circuit breaker recovery, timeouts, async context management
 │   ├── fixtures/
-│   │   ├── test_dna_samples.yaml   # Test DNA configurations
-│   │   ├── demo_tasks.json         # Test task scenarios
-│   │   └── expected_results.json   # Expected test outcomes
-│   └── conftest.py                 # Pytest fixtures and configuration
+│   │   ├── test_dna_samples.yaml   # Test DNA configurations (minimal, complex, edge cases)
+│   │   ├── demo_tasks.json         # Test task scenarios with expected outcomes
+│   │   └── expected_results.json   # Expected test outcomes and validation criteria
+│   └── conftest.py                 # Pytest fixtures (existing - enhanced with test-specific setup)
 ├── scripts/
-│   ├── run_e2e_tests.sh           # Test execution script
-│   └── validate_demo_readiness.sh # Pre-demo validation
+│   ├── run_e2e_tests.sh           # Test execution script with service management
+│   └── validate_demo_readiness.sh # Pre-demo validation with comprehensive checks
+└── tests/README.md                # Test documentation and troubleshooting guide
 ```
 
 ### Known Gotchas of our codebase & Library Quirks
@@ -269,82 +270,64 @@ test_dna_complex:
   manifesto_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 ```
 
-### Implementation Tasks (ordered by dependencies)
+### Implementation Tasks (Complete - 9 Tasks with Proper Dependencies)
+
+**Infrastructure Already Available:**
+- ✅ Supabase database (via Archon)
+- ✅ Docker Compose services (archon-server, archon-mcp, archon-agents)
+- ✅ Test framework setup (pytest, existing conftest.py)
+- ✅ Service health checks and startup scripts
 
 ```yaml
-Task 1: CREATE tests/conftest.py
-  - IMPLEMENT: Pytest fixtures for Archon services, BorgLife components, test data
-  - FOLLOW pattern: Standard pytest fixture patterns with async support
-  - NAMING: fixture names like archon_adapter, borg_agent, test_dna
-  - PLACEMENT: tests/conftest.py for global test configuration
+Task 1: Environment Setup
+  - IMPLEMENT: .env.test file with E2E_TEST_TIMEOUT=300, E2E_TEST_PARALLEL=false
+  - VALIDATE: Python dependencies and required packages
+  - PLACEMENT: Root directory
+  - DEPENDS: None (critical prerequisite)
 
-Task 2: CREATE tests/fixtures/test_dna_samples.yaml
-  - IMPLEMENT: YAML DNA configurations for different test scenarios
-  - FOLLOW pattern: Existing borg_dna.yaml structure with validation
-  - NAMING: test_dna_minimal, test_dna_complex, test_dna_edge_cases
-  - PLACEMENT: tests/fixtures/ for test data organization
+Task 2: Infrastructure Verification
+  - VERIFY: Docker services running (archon-server:8181, archon-mcp:8051, archon-agents:8052)
+  - VALIDATE: Supabase connectivity and .env configuration
+  - CHECK: BorgLife dependencies available
+  - DEPENDS: Task 1 (environment setup)
 
-Task 3: CREATE tests/fixtures/demo_tasks.json
-  - IMPLEMENT: JSON test scenarios with expected outcomes
-  - FOLLOW pattern: Task structure from demo_scenarios.py
-  - NAMING: scenarios array with name, task, expected_cell, cost_range
-  - PLACEMENT: tests/fixtures/ alongside DNA samples
+Task 3: Test Fixtures & Data
+  - IMPLEMENT: test_dna_samples.yaml, demo_tasks.json, expected_results.json
+  - FOLLOW: Existing borg_dna.yaml and demo_scenarios.py patterns
+  - PLACEMENT: tests/fixtures/
+  - DEPENDS: Task 2 (infrastructure verified)
 
-Task 4: CREATE tests/test_service_integration.py
-  - IMPLEMENT: Tests for Archon adapter connectivity and health
-  - FOLLOW pattern: Existing demo_scenarios.py test patterns
-  - NAMING: test_archon_health, test_adapter_initialization, test_mcp_tools
-  - DEPENDENCIES: conftest.py fixtures
-  - PLACEMENT: tests/ for integration validation
+Task 4: Core Test Modules
+  - IMPLEMENT: test_service_integration.py, test_dna_integrity.py, test_economic_model.py
+  - INCLUDE: Circuit breaker reset logic, async initialization patterns, decimal precision
+  - LEVERAGE: Existing conftest.py Supabase mocking
+  - DEPENDS: Task 3 (fixtures available)
 
-Task 5: CREATE tests/test_dna_integrity.py
-  - IMPLEMENT: DNA parsing, validation, and round-trip integrity tests
-  - FOLLOW pattern: dna_parser.py validation methods
-  - NAMING: test_dna_parsing, test_dna_validation, test_round_trip_integrity
-  - DEPENDENCIES: DNA parser, test fixtures
-  - PLACEMENT: tests/ for core functionality validation
+Task 5: Error Handling & Recovery Tests
+  - IMPLEMENT: test_error_handling.py for circuit breaker recovery, timeouts, async context
+  - ADDRESS: All gotchas from PRP (circuit breakers, async init, decimal precision)
+  - DEPENDS: Task 4 (core modules exist)
 
-Task 6: CREATE tests/test_economic_model.py
-  - IMPLEMENT: Wealth tracking, cost calculation, and billing validation
-  - FOLLOW pattern: proto_borg.py wealth management
-  - NAMING: test_wealth_tracking, test_cost_calculation, test_billing_accuracy
-  - DEPENDENCIES: JAM mock interface, borg agent
-  - PLACEMENT: tests/ for economic model validation
+Task 6: E2E Orchestrator
+  - IMPLEMENT: e2e_test_suite.py with complete demo flow (funding → creation → execution → encoding → storage → decoding)
+  - INTEGRATE: With existing Docker Compose setup and Supabase mocking
+  - DEPENDS: Task 5 (error handling implemented)
 
-Task 7: CREATE tests/test_demo_scenarios.py
-  - IMPLEMENT: End-to-end demo scenario execution tests
-  - FOLLOW pattern: demo_scenarios.py execution flow
-  - NAMING: test_basic_demo_flow, test_complex_demo_flow, test_error_recovery
-  - DEPENDENCIES: All previous test components
-  - PLACEMENT: tests/ for complete flow validation
+Task 7: Execution Scripts
+  - IMPLEMENT: run_e2e_tests.sh and validate_demo_readiness.sh
+  - INCLUDE: Comprehensive health checks, service validation, error reporting
+  - LEVERAGE: docker-compose.yml already handles services
+  - DEPENDS: Task 6 (orchestrator complete)
 
-Task 8: CREATE tests/test_performance.py
-  - IMPLEMENT: Performance benchmarks for demo scenarios
-  - FOLLOW pattern: Standard performance testing patterns
-  - NAMING: test_execution_performance, test_memory_usage, test_concurrent_load
-  - DEPENDENCIES: Demo scenarios, timing measurements
-  - PLACEMENT: tests/ for performance validation
+Task 8: Documentation
+  - IMPLEMENT: tests/README.md with structure, execution instructions, troubleshooting
+  - FOLLOW: Existing codebase documentation patterns
+  - DEPENDS: Task 7 (all components exist)
 
-Task 9: CREATE tests/e2e_test_suite.py
-  - IMPLEMENT: Main test orchestrator that runs all test suites
-  - FOLLOW pattern: Test suite aggregation patterns
-  - NAMING: E2ETestSuite class with run_all_tests method
-  - DEPENDENCIES: All individual test modules
-  - PLACEMENT: tests/ for unified test execution
-
-Task 10: CREATE scripts/run_e2e_tests.sh
-  - IMPLEMENT: Bash script to execute complete test suite with service management
-  - FOLLOW pattern: Existing script patterns in codebase
-  - NAMING: run_e2e_tests.sh with service startup, test execution, cleanup
-  - DEPENDENCIES: Docker Compose, pytest, test suite
-  - PLACEMENT: scripts/ for automated test execution
-
-Task 11: CREATE scripts/validate_demo_readiness.sh
-  - IMPLEMENT: Pre-demo validation script to ensure system readiness
-  - FOLLOW pattern: Health check and validation patterns
-  - NAMING: validate_demo_readiness.sh with comprehensive checks
-  - DEPENDENCIES: Service health checks, test suite
-  - PLACEMENT: scripts/ for demo preparation
+Task 9: Final Validation
+  - EXECUTE: Complete validation loop with all PRP success criteria
+  - VALIDATE: DNA integrity H(D')=H(D), economic accuracy within 0.001 DOT, 5-minute execution
+  - DEPENDS: Tasks 1-8 (all components complete)
 ```
 
 ### Implementation Patterns & Key Details
@@ -430,118 +413,64 @@ async def execute_demo_flow(borg_id: str, dna_config: dict, task: str) -> dict:
     }
 ```
 
-### Integration Points
+### Integration Points (Leveraging Existing Infrastructure)
 
 ```yaml
-SERVICES:
-  - archon-server: Required for RAG queries and task management
-  - archon-mcp: Required for MCP tool execution
-  - archon-agents: Required for PydanticAI cell execution
+SERVICES (Already Running):
+  - archon-server: REST API (port 8181) - handles all data operations
+  - archon-mcp: MCP protocol (port 8051) - AI assistant tools
+  - archon-agents: PydanticAI (port 8052) - cell execution
+  - supabase: Database (via Archon) - all data persistence
 
-CONFIG:
-  - add to: .env
-  - pattern: "E2E_TEST_TIMEOUT=300"
-  - pattern: "E2E_TEST_PARALLEL=false"
-
-TEST_DATA:
-  - fixtures: tests/fixtures/ - Test DNA and task scenarios
-  - results: tests/results/ - Test execution artifacts
+DOCKER_COMPOSE: Use existing docker-compose.yml
+TEST_FRAMEWORK: Leverage existing conftest.py with Supabase mocking
 ```
 
-## Validation Loop
+## Validation Loop (Complete - 9 Tasks)
 
-### Level 1: Syntax & Style (Immediate Feedback)
+### Level 1: Environment & Dependencies (Task 1 Complete)
 
 ```bash
-# Run after each file creation - fix before proceeding
 cd ../borglife/borglife_proto_private/code
-python -m ruff check tests/ --fix     # Auto-format and fix linting issues
-python -m mypy tests/                 # Type checking with specific files
-python -m ruff format tests/          # Ensure consistent formatting
-
-# Project-wide validation
-python -m ruff check . --fix
-python -m mypy .
-python -m ruff format . --check
-
-# Expected: Zero errors. If errors exist, READ output and fix before proceeding.
+# Verify .env.test exists and dependencies installed
+python -c "import pytest, yaml, archon_adapter, synthesis; print('✅ Dependencies OK')"
 ```
 
-### Level 2: Unit Tests (Component Validation)
+### Level 2: Infrastructure Verification (Task 2 Complete)
 
 ```bash
-# Test each component as it's created
+# Services should be running via Docker Compose
+curl -f http://localhost:8181/health && echo "✅ Archon Server OK"
+curl -f http://localhost:8051/health && echo "✅ Archon MCP OK"
+curl -f http://localhost:8052/health && echo "✅ Archon Agents OK"
+```
+
+### Level 3: Component Testing (Tasks 3-5 Complete)
+
+```bash
 cd ../borglife/borglife_proto_private/code
 python -m pytest tests/test_service_integration.py -v
 python -m pytest tests/test_dna_integrity.py -v
 python -m pytest tests/test_economic_model.py -v
-
-# Full test suite for affected areas
-python -m pytest tests/ -v
-
-# Coverage validation
-python -m pytest tests/ --cov=tests --cov-report=term-missing
-
-# Expected: All tests pass. If failing, debug root cause and fix implementation.
+python -m pytest tests/test_error_handling.py -v
 ```
 
-### Level 3: Integration Testing (System Validation)
+### Level 4: Integration Testing (Tasks 6-7 Complete)
 
 ```bash
-# Service startup validation
 cd ../borglife/borglife_proto_private
-docker compose up -d
-sleep 10  # Allow full startup time
-
-# Health check validation
-curl -f http://localhost:8181/health || echo "Archon server health check failed"
-curl -f http://localhost:8051/health || echo "Archon MCP health check failed"
-
-# E2E test execution
+# Run complete E2E test suite
 ./code/scripts/run_e2e_tests.sh
+```
 
-# Demo readiness validation
+### Level 5: Demo Readiness & Documentation (Tasks 8-9 Complete)
+
+```bash
+# Final validation before demos
 ./code/scripts/validate_demo_readiness.sh
 
-# Expected: All integrations working, proper responses, no connection errors
-```
-
-### Level 4: Creative & Domain-Specific Validation
-
-```bash
-# BorgLife-specific validation
-
-# DNA integrity stress testing
-cd ../borglife/borglife_proto_private/code
-python -c "
-import asyncio
-from tests.test_dna_integrity import *
-asyncio.run(test_dna_stress_round_trip())
-"
-
-# Economic model fuzz testing
-python -c "
-import asyncio
-from tests.test_economic_model import *
-asyncio.run(test_economic_fuzz_testing())
-"
-
-# Performance regression testing
-python -c "
-import asyncio
-from tests.test_performance import *
-asyncio.run(test_performance_regression())
-"
-
-# Multi-borg concurrent execution testing
-python -c "
-import asyncio
-from tests.e2e_test_suite import E2ETestSuite
-suite = E2ETestSuite()
-asyncio.run(suite.test_concurrent_borg_execution())
-"
-
-# Expected: All creative validations pass, performance meets requirements
+# Verify documentation
+test -f ./code/tests/README.md && echo "✅ Documentation complete"
 ```
 
 ## Final Validation Checklist
