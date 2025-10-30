@@ -1,0 +1,24 @@
+# BorgLife Configuration File
+# This file contains default configuration values for BorgLife.
+# Values can be overridden by environment variables.
+
+# Path configuration (auto-detected if not set)
+# BORGLIFE_ROOT=/path/to/borglife
+# ARCHON_ROOT=/path/to/archon
+
+# Service configuration
+ARCHON_SERVER_URL=http://localhost:8181
+ARCHON_MCP_URL=http://localhost:8051
+ARCHON_AGENTS_URL=http://localhost:8052
+
+# Test configuration
+E2E_TEST_TIMEOUT=300
+E2E_TEST_PARALLEL=false
+LOG_LEVEL=INFO
+
+# Docker configuration
+DOCKER_COMPOSE_TIMEOUT=60
+
+# Feature flags
+ENABLE_ADVANCED_LOGGING=false
+ENABLE_PERFORMANCE_MONITORING=true

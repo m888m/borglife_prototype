@@ -13,10 +13,9 @@
 
 set -e  # Exit on any error
 
-# Configuration
+# Configuration - Load dynamic path resolution
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-DOCKER_COMPOSE_FILE="$PROJECT_ROOT/docker-compose.yml"
+source "$SCRIPT_DIR/path_config.sh"
 TEST_TIMEOUT=300  # 5 minutes
 START_TIME=$(date +%s)
 
