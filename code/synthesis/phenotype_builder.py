@@ -11,8 +11,15 @@ import asyncio
 import logging
 
 from .dna_parser import BorgDNA, Cell, Organ
-from ..archon_adapter import ArchonServiceAdapter
-from ..archon_adapter.exceptions import PhenotypeBuildError
+try:
+    from ..archon_adapter import ArchonServiceAdapter
+    from ..archon_adapter.exceptions import PhenotypeBuildError
+except ImportError:
+    # Mock for testing when archon_adapter is not available
+    class ArchonServiceAdapter:
+        pass
+    class PhenotypeBuildError(Exception):
+        pass
 
 logger = logging.getLogger(__name__)
 

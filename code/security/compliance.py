@@ -1,3 +1,5 @@
+from typing import Dict, Any
+
 class ComplianceMonitor:
     """Monitor compliance with Universal Principles (Ψ(E))"""
 

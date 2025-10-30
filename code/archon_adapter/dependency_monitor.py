@@ -1,3 +1,6 @@
+from typing import Dict, Any
+import httpx
+
 class ArchonDependencyMonitor:
     """Monitor Archon's external dependencies"""
 

@@ -13,9 +13,10 @@ import json
 import os
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, Optional
+from typing import Any, Dict, Optional
 
 import pytest
+import pytest_asyncio
 import yaml
 from dotenv import load_dotenv
 
@@ -124,26 +125,26 @@ def expected_results(fixtures_dir: Path) -> Dict[str, Any]:
 # SERVICE FIXTURES
 # ============================================================================
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def archon_adapter(test_config: Dict[str, Any]):
     """Initialize Archon service adapter."""
     try:
         from archon_adapter import ArchonServiceAdapter
-        
+
         adapter = ArchonServiceAdapter(
             server_url=test_config["archon_server_url"],
             mcp_url=test_config["archon_mcp_url"],
             agents_url=test_config["archon_agents_url"],
         )
         await adapter.initialize()
-        
+
         # Verify health
         health = await adapter.check_health()
         if not health.get("overall"):
             pytest.skip(f"Archon services not healthy: {health}")
-        
-        yield adapter
-        
+
+        return adapter
+
         # Cleanup
         await adapter.close()
     except ImportError:
@@ -152,23 +153,23 @@ async def archon_adapter(test_config: Dict[str, Any]):
         pytest.skip(f"Failed to initialize Archon adapter: {e}")
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def borg_agent(test_config: Dict[str, Any]):
     """Initialize ProtoBorgAgent for testing."""
     try:
         from proto_borg import ProtoBorgAgent, BorgConfig
-        
+
         config = BorgConfig(
             service_index="test-borg-001",
             initial_wealth=Decimal("1.0"),
             kusama_endpoint=os.getenv("KUSAMA_RPC_URL", "wss://kusama-rpc.polkadot.io"),
         )
-        
+
         borg = ProtoBorgAgent(config)
         await borg.initialize()
-        
-        yield borg
-        
+
+        return borg
+
         # Cleanup
         await borg.shutdown()
     except ImportError:
@@ -177,7 +178,7 @@ async def borg_agent(test_config: Dict[str, Any]):
         pytest.skip(f"Failed to initialize ProtoBorgAgent: {e}")
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def dna_parser():
     """Initialize DNA parser."""
     try:
@@ -187,7 +188,7 @@ async def dna_parser():
         pytest.skip("DNA parser not available")
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def phenotype_builder(archon_adapter):
     """Initialize phenotype builder."""
     try:
@@ -197,20 +198,20 @@ async def phenotype_builder(archon_adapter):
         pytest.skip("Phenotype builder not available")
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def jam_interface(test_config: Dict[str, Any]):
     """Initialize JAM mock interface."""
     try:
         from jam_mock import JAMInterface
-        
+
         jam = JAMInterface(
             rpc_url=os.getenv("KUSAMA_RPC_URL", "wss://kusama-rpc.polkadot.io"),
             mock_mode=os.getenv("JAM_MOCK_MODE", "true").lower() == "true",
         )
         await jam.initialize()
-        
-        yield jam
-        
+
+        return jam
+
         # Cleanup
         await jam.close()
     except ImportError:
@@ -223,16 +224,16 @@ async def jam_interface(test_config: Dict[str, Any]):
 # HEALTH CHECK FIXTURES
 # ============================================================================
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def service_health_check(archon_adapter):
     """Verify all services are healthy before test."""
     health = await archon_adapter.check_health()
-    
+
     if not health.get("archon_server"):
         pytest.skip("Archon server not healthy")
     if not health.get("archon_mcp"):
         pytest.skip("Archon MCP not healthy")
-    
+
     return health
 
 

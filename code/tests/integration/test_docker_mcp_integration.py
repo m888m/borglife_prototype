@@ -1,4 +1,5 @@
 import pytest
+from typing import Dict
 from archon_adapter import DockerMCPDiscovery, DockerMCPCompatibilityMatrix
 from security import OrganRateLimiter
 from billing import DockerMCPBilling

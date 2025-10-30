@@ -1,5 +1,6 @@
 from typing import Dict, Any
 from .dna_parser import BorgDNA, DNAHeader, Cell, Organ
+from .phenotype_builder import BorgPhenotype
 
 class PhenotypeEncoder:
     """Encode working phenotype back to DNA structure"""

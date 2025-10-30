@@ -12,16 +12,19 @@ import pytest
 from decimal import Decimal, getcontext, ROUND_HALF_UP
 from typing import Dict, Any, List
 from unittest.mock import MagicMock, AsyncMock
+from typing import Dict
 
 # Test imports - these will be available in Docker environment
 try:
     from proto_borg import ProtoBorg
     from jam_mock.interface import JAMInterface
+    from synthesis import BorgPhenotype
     IMPORTS_AVAILABLE = True
 except ImportError:
     # Mock for development environment
     ProtoBorg = MagicMock
     JAMInterface = MagicMock
+    BorgPhenotype = MagicMock
     IMPORTS_AVAILABLE = False
 
 

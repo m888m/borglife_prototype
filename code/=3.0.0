@@ -1,0 +1,6 @@
+Defaulting to user installation because normal site-packages is not writeable
+Collecting semver
+  Downloading semver-3.0.4-py3-none-any.whl.metadata (6.8 kB)
+Downloading semver-3.0.4-py3-none-any.whl (17 kB)
+Installing collected packages: semver
+Successfully installed semver-3.0.4
