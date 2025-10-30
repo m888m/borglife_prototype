@@ -243,3 +243,56 @@ class TestDNAIntegrity:
 
         # Should have as many unique hashes as DNA samples
         assert len(hashes) == len(test_dna_samples)
+
+    def test_dna_round_trip_integrity_explicit(self, dna_parser, test_dna_samples):
+        """Explicit test for DNA round-trip integrity: H(D) = H(D')."""
+        for dna_name, dna_config in test_dna_samples.items():
+            # Original DNA hash
+            original_hash = dna_parser.calculate_hash(dna_config)
+
+            # Parse DNA
+            parsed_dna = dna_parser.parse_dna(dna_config)
+
+            # Serialize back to YAML (simulating storage/transmission)
+            serialized_yaml = dna_parser.to_yaml(parsed_dna)
+
+            # Parse again (simulating loading from storage)
+            reparsed_dna = dna_parser.from_yaml(serialized_yaml)
+
+            # Serialize again to canonical form
+            final_yaml = dna_parser.to_yaml(reparsed_dna)
+
+            # Calculate final hash
+            final_hash = dna_parser.calculate_hash_from_yaml(final_yaml)
+
+            # CRITICAL: H(D) = H(D') - round-trip integrity maintained
+            assert original_hash == final_hash, \
+                f"Round-trip integrity FAILED for {dna_name}: {original_hash} != {final_hash}"
+
+            # Verify structural equivalence
+            assert parsed_dna["header"] == reparsed_dna["header"]
+            assert len(parsed_dna["cells"]) == len(reparsed_dna["cells"])
+            assert len(parsed_dna["organs"]) == len(reparsed_dna["organs"])
+
+    def test_dna_hash_consistency_across_formats(self, dna_parser, test_dna_samples):
+        """Test DNA hash consistency across different serialization formats."""
+        for dna_name, dna_config in test_dna_samples.items():
+            # Calculate hash from dict
+            dict_hash = dna_parser.calculate_hash(dna_config)
+
+            # Convert to YAML and back
+            yaml_str = dna_parser.to_yaml(dna_config)
+            from_yaml = dna_parser.from_yaml(yaml_str)
+
+            # Calculate hash from reparsed dict
+            reparse_hash = dna_parser.calculate_hash(from_yaml)
+
+            # Calculate hash directly from YAML string
+            yaml_hash = dna_parser.calculate_hash_from_yaml(yaml_str)
+
+            # All hashes should be identical (H(D) = H(D'))
+            assert dict_hash == reparse_hash == yaml_hash, \
+                f"Hash inconsistency for {dna_name}: {dict_hash} != {reparse_hash} != {yaml_hash}"
+
+            # Verify this is the core success criteria for BorgLife Phase 1
+            # DNA integrity must be maintained through all transformations
