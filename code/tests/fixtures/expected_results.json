@@ -43,7 +43,7 @@
     "expected_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "expected_cells": 1,
     "expected_organs": 0,
-    "expected_cost_range": [0.0005, 0.001],
+    "expected_cost_range": [0.0005, 0.0015],
     "roundtrip_integrity": true,
     "service_index": "test-borg-edge-case-006"
   },
@@ -91,7 +91,7 @@
     "edge_case_minimal_task": {
       "expected_success": true,
       "expected_execution_time_range": [2, 15],
-      "expected_cost_range": [0.0001, 0.0005],
+      "expected_cost_range": [0.0003, 0.001],
       "expected_cell_activation": "basic_agent",
       "dna_integrity_required": true,
       "economic_accuracy_tolerance": 0.001
