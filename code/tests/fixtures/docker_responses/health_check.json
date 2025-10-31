@@ -1,12 +1,1 @@
-{
-  "Status": "healthy",
-  "FailingStreak": 0,
-  "Log": [
-    {
-      "Start": "2025-10-30T12:00:00Z",
-      "End": "2025-10-30T12:00:05Z",
-      "ExitCode": 0,
-      "Output": "Service is healthy\n"
-    }
-  ]
-}
+{"status": "healthy", "services": ["archon-server", "archon-mcp", "archon-agents"], "version": "1.0.0"}
