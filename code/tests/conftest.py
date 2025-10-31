@@ -128,6 +128,7 @@ def expected_results(fixtures_dir: Path) -> Dict[str, Any]:
 @pytest_asyncio.fixture
 async def archon_adapter(test_config: Dict[str, Any]):
     """Initialize Archon service adapter."""
+    adapter = None
     try:
         from archon_adapter import ArchonServiceAdapter
 
@@ -144,18 +145,19 @@ async def archon_adapter(test_config: Dict[str, Any]):
             pytest.skip(f"Archon services not healthy: {health}")
 
         return adapter
-
-        # Cleanup
-        await adapter.close()
     except ImportError:
         pytest.skip("Archon adapter not available")
     except Exception as e:
         pytest.skip(f"Failed to initialize Archon adapter: {e}")
+    finally:
+        # Cleanup will be handled by pytest-asyncio
+        pass
 
 
 @pytest_asyncio.fixture
 async def borg_agent(test_config: Dict[str, Any]):
     """Initialize ProtoBorgAgent for testing."""
+    borg = None
     try:
         from proto_borg import ProtoBorgAgent, BorgConfig
 
@@ -169,13 +171,13 @@ async def borg_agent(test_config: Dict[str, Any]):
         await borg.initialize()
 
         return borg
-
-        # Cleanup
-        await borg.shutdown()
     except ImportError:
         pytest.skip("ProtoBorgAgent not available")
     except Exception as e:
         pytest.skip(f"Failed to initialize ProtoBorgAgent: {e}")
+    finally:
+        # Cleanup will be handled by pytest-asyncio
+        pass
 
 
 @pytest_asyncio.fixture
@@ -201,6 +203,7 @@ async def phenotype_builder(archon_adapter):
 @pytest_asyncio.fixture
 async def jam_interface(test_config: Dict[str, Any]):
     """Initialize JAM mock interface."""
+    jam = None
     try:
         from jam_mock import JAMInterface
 
@@ -211,13 +214,13 @@ async def jam_interface(test_config: Dict[str, Any]):
         await jam.initialize()
 
         return jam
-
-        # Cleanup
-        await jam.close()
     except ImportError:
         pytest.skip("JAM interface not available")
     except Exception as e:
         pytest.skip(f"Failed to initialize JAM interface: {e}")
+    finally:
+        # Cleanup will be handled by pytest-asyncio
+        pass
 
 
 # ============================================================================

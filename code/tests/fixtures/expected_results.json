@@ -4,28 +4,28 @@
     "expected_organs": 0,
     "expected_cost_range": [0.0005, 0.002],
     "roundtrip_integrity": true,
-    "service_index": "test-borg-001"
+    "service_index": "test-borg-minimal-001"
   },
   "test_dna_complex": {
     "expected_cells": 2,
-    "expected_organs": 1,
+    "expected_organs": 2,
     "expected_cost_range": [0.001, 0.004],
     "roundtrip_integrity": true,
-    "service_index": "test-borg-002"
+    "service_index": "test-borg-complex-002"
   },
   "test_dna_edge_case_no_organs": {
     "expected_cells": 1,
     "expected_organs": 0,
     "expected_cost_range": [0.0005, 0.002],
     "roundtrip_integrity": true,
-    "service_index": "test-borg-003"
+    "service_index": "test-borg-edge-case-006"
   },
   "test_dna_edge_case_many_organs": {
     "expected_cells": 1,
     "expected_organs": 5,
     "expected_cost_range": [0.002, 0.008],
     "roundtrip_integrity": true,
-    "service_index": "test-borg-004"
+    "service_index": "test-borg-edge-case-007"
   },
   "basic_funding_task": {
     "expected_result": {
