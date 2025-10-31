@@ -1,4 +1,32 @@
 {
+  "test_dna_minimal": {
+    "expected_cells": 1,
+    "expected_organs": 0,
+    "expected_cost_range": [0.0005, 0.002],
+    "roundtrip_integrity": true,
+    "service_index": "test-borg-001"
+  },
+  "test_dna_complex": {
+    "expected_cells": 2,
+    "expected_organs": 1,
+    "expected_cost_range": [0.001, 0.004],
+    "roundtrip_integrity": true,
+    "service_index": "test-borg-002"
+  },
+  "test_dna_edge_case_no_organs": {
+    "expected_cells": 1,
+    "expected_organs": 0,
+    "expected_cost_range": [0.0005, 0.002],
+    "roundtrip_integrity": true,
+    "service_index": "test-borg-003"
+  },
+  "test_dna_edge_case_many_organs": {
+    "expected_cells": 1,
+    "expected_organs": 5,
+    "expected_cost_range": [0.002, 0.008],
+    "roundtrip_integrity": true,
+    "service_index": "test-borg-004"
+  },
   "basic_funding_task": {
     "expected_result": {
       "task": "Fund a new borg with 10 DOT for basic operations",
@@ -19,7 +47,7 @@
     },
     "validation_rules": {
       "must_contain": ["decision", "reasoning", "amount"],
-      "cost_range": [0.001, 0.005],
+      "expected_cost_range": [0.001, 0.005],
       "execution_time_max": 30
     }
   },
@@ -43,7 +71,7 @@
     },
     "validation_rules": {
       "must_contain": ["analysis", "recommendations", "protocols_analyzed"],
-      "cost_range": [0.005, 0.015],
+      "expected_cost_range": [0.005, 0.015],
       "execution_time_max": 60
     }
   },
@@ -67,7 +95,7 @@
     },
     "validation_rules": {
       "must_contain": ["findings", "key_developments", "applications"],
-      "cost_range": [0.002, 0.008],
+      "expected_cost_range": [0.002, 0.008],
       "execution_time_max": 45
     }
   },
@@ -92,7 +120,7 @@
     },
     "validation_rules": {
       "must_contain": ["decision", "reasoning", "confidence_level"],
-      "cost_range": [0.003, 0.010],
+      "expected_cost_range": [0.003, 0.010],
       "execution_time_max": 40
     }
   },
@@ -117,7 +145,7 @@
     },
     "validation_rules": {
       "must_contain": ["report_title", "sections", "key_metrics", "recommendations"],
-      "cost_range": [0.008, 0.025],
+      "expected_cost_range": [0.008, 0.025],
       "execution_time_max": 90
     }
   }
