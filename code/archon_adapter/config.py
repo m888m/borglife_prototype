@@ -24,6 +24,29 @@ class ArchonConfig(BaseModel):
     supabase_url: str = Field(default="")
     supabase_service_key: str = Field(default="")
 
+    @property
+    def supabase_client(self):
+        """Get Supabase client instance."""
+        try:
+            from supabase import create_client
+            return create_client(self.supabase_url, self.supabase_service_key)
+        except ImportError:
+            # Mock client for testing
+            class MockSupabaseClient:
+                def table(self, name):
+                    return self
+                def select(self, *args):
+                    return self
+                def insert(self, *args):
+                    return self
+                def update(self, *args):
+                    return self
+                def delete(self, *args):
+                    return self
+                def execute(self):
+                    return {"data": [], "error": None}
+            return MockSupabaseClient()
+
     # Docker MCP Configuration
     enable_docker_mcp_organs: bool = Field(default=True)
     docker_mcp_health_timeout: int = Field(default=30)

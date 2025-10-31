@@ -1,44 +1,57 @@
-{
-  "scenarios": [
-    {
-      "name": "basic_rag_task",
-      "description": "Test basic RAG functionality with knowledge retrieval",
-      "task": "Summarize the key evolution mechanisms in BorgLife whitepaper sections 4-7",
-      "expected_cell": "rag_agent",
-      "expected_cost_range": [0.0005, 0.002],
-      "timeout": 30
+[
+  {
+    "name": "basic_funding_task",
+    "task": "Fund a new borg with 10 DOT for basic operations",
+    "expected_cell": "decision_maker_1",
+    "cost_range": {
+      "min": 0.001,
+      "max": 0.005
     },
-    {
-      "name": "decision_making_task",
-      "description": "Test decision making cell with complex reasoning",
-      "task": "As a borg, decide whether to prioritize research or business development given limited resources",
-      "expected_cell": "decision_maker",
-      "expected_cost_range": [0.0008, 0.003],
-      "timeout": 45
+    "expected_organs": ["web_search"],
+    "timeout_seconds": 30
+  },
+  {
+    "name": "complex_analysis_task",
+    "task": "Analyze the current state of DeFi protocols and recommend investment strategies",
+    "expected_cell": "data_processor_1",
+    "cost_range": {
+      "min": 0.005,
+      "max": 0.015
     },
-    {
-      "name": "data_processing_task",
-      "description": "Test data processing capabilities with structured analysis",
-      "task": "Analyze the following dataset and provide insights: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]",
-      "expected_cell": "data_processor",
-      "expected_cost_range": [0.0003, 0.0015],
-      "timeout": 25
+    "expected_organs": ["web_search", "data_analysis"],
+    "timeout_seconds": 60
+  },
+  {
+    "name": "research_task",
+    "task": "Research the latest developments in zero-knowledge proofs and their applications",
+    "expected_cell": "rag_agent_1",
+    "cost_range": {
+      "min": 0.002,
+      "max": 0.008
     },
-    {
-      "name": "complex_multi_cell_task",
-      "description": "Test coordination between multiple cells for complex reasoning",
-      "task": "Research current AI trends, analyze market implications, and recommend investment strategy",
-      "expected_cell": "decision_maker",
-      "expected_cost_range": [0.002, 0.008],
-      "timeout": 90
+    "expected_organs": ["web_search"],
+    "timeout_seconds": 45
+  },
+  {
+    "name": "decision_task",
+    "task": "Decide whether to stake DOT in parachain A or B based on current TVL and risk metrics",
+    "expected_cell": "decision_maker_1",
+    "cost_range": {
+      "min": 0.003,
+      "max": 0.010
     },
-    {
-      "name": "edge_case_minimal_task",
-      "description": "Test minimal borg configuration with basic functionality",
-      "task": "Hello world",
-      "expected_cell": "basic_agent",
-      "expected_cost_range": [0.0001, 0.0005],
-      "timeout": 10
-    }
-  ]
-}
+    "expected_organs": ["data_analysis"],
+    "timeout_seconds": 40
+  },
+  {
+    "name": "comprehensive_task",
+    "task": "Create a comprehensive report on Polkadot ecosystem growth, including TVL analysis, new projects, and future predictions",
+    "expected_cell": "data_processor_1",
+    "cost_range": {
+      "min": 0.008,
+      "max": 0.025
+    },
+    "expected_organs": ["web_search", "data_analysis"],
+    "timeout_seconds": 90
+  }
+]

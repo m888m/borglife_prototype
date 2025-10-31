@@ -12,7 +12,16 @@ import hashlib
 import logging
 from pydantic import BaseModel, Field, validator
 
-# from ..archon_adapter.exceptions import DNAParsingError  # Temporarily commented for testing
+# Custom exception for DNA parsing errors
+class DNAParsingError(Exception):
+    """Exception raised for DNA parsing errors."""
+
+    def __init__(self, format_type: str, message: str, line_number: Optional[int] = None):
+        self.format_type = format_type
+        self.message = message
+        self.line_number = line_number
+        super().__init__(f"{format_type.upper()} parsing error: {message}" +
+                        (f" at line {line_number}" if line_number else ""))
 
 logger = logging.getLogger(__name__)
 
@@ -204,11 +213,9 @@ class DNAParser:
         except yaml.YAMLError as e:
             line = getattr(e, 'problem_mark', None)
             line_num = line.line if line else None
-            # raise DNAParsingError("yaml", str(e), line_num)  # Temporarily commented
-            raise ValueError(f"YAML parsing error: {e}")
+            raise DNAParsingError("yaml", str(e), line_num)
         except Exception as e:
-            # raise DNAParsingError("yaml", f"Unexpected error: {e}", None)  # Temporarily commented
-            raise ValueError(f"DNA parsing error: {e}")
+            raise DNAParsingError("yaml", f"Unexpected error: {e}", None)
 
     @staticmethod
     def to_yaml(dna: BorgDNA) -> str:

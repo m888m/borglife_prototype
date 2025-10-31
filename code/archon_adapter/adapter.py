@@ -12,6 +12,7 @@ import asyncio
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 import logging
+from datetime import datetime, timedelta
 
 from .config import ArchonConfig
 from .exceptions import ArchonError, ServiceUnavailableError
@@ -490,7 +491,6 @@ class ArchonServiceAdapter:
         if breaker['open']:
             # Check if we should attempt reset
             if breaker['last_failure']:
-                from datetime import datetime, timedelta
                 if datetime.utcnow() - breaker['last_failure'] > timedelta(minutes=5):
                     breaker['open'] = False
                     breaker['failures'] = 0

@@ -21,6 +21,7 @@ from .mcp_client import MCPClient
 from .docker_mcp_auth import DockerMCPAuthManager
 from .docker_monitor import DockerMCPMonitor
 from .dependency_monitor import ArchonDependencyMonitor
+from .rate_limiter import OrganRateLimiter
 
 __all__ = [
     'ArchonServiceAdapter',
@@ -37,5 +38,6 @@ __all__ = [
     'MCPClient',
     'DockerMCPAuthManager',
     'DockerMCPMonitor',
-    'ArchonDependencyMonitor'
+    'ArchonDependencyMonitor',
+    'OrganRateLimiter'
 ]

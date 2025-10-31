@@ -633,3 +633,47 @@ Be thorough but concise in your analysis."""
         }
 
         return cost_info
+        """
+        Calculate task execution cost based on organs used and time.
+
+        Args:
+            result: Task execution result
+            execution_time: Time taken to execute
+            wealth: Current borg wealth
+
+        Returns:
+            Cost information dictionary
+        """
+        from decimal import Decimal
+
+        total_cost = Decimal('0')
+        organ_costs = {}
+
+        # Calculate costs for organs used during execution
+        organs_used = result.get('organs_used', [])
+        for organ_name in organs_used:
+            if organ_name in self.organs:
+                # Estimate cost for this organ usage
+                organ_callable = self.organs[organ_name]
+                estimated_cost = await self.adapter.billing_manager.estimate_cost(
+                    organ_name,
+                    getattr(organ_callable, 'mcp_tool', 'unknown'),
+                    {}
+                )
+                organ_costs[organ_name] = estimated_cost
+                total_cost += estimated_cost
+
+        # Add base execution cost
+        base_execution_cost = Decimal('0.0001') * Decimal(str(execution_time))
+        total_cost += base_execution_cost
+
+        cost_info = {
+            'total_cost': str(total_cost),
+            'organ_costs': {k: str(v) for k, v in organ_costs.items()},
+            'execution_cost': str(base_execution_cost),
+            'execution_time': execution_time,
+            'currency': 'DOT',
+            'wealth_sufficient': wealth is None or float(wealth) >= float(total_cost)
+        }
+
+        return cost_info

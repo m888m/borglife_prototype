@@ -11,6 +11,11 @@ from decimal import Decimal
 
 
 class JAMInterface(ABC):
+    """Abstract interface for JAM operations."""
+    pass
+
+
+class JAMMockInterface(JAMInterface):
     """
     Abstract interface for JAM operations.
 

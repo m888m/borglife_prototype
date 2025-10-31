@@ -15,7 +15,7 @@ from datetime import datetime
 from archon_adapter import ArchonServiceAdapter
 from synthesis import DNAParser, PhenotypeBuilder
 from jam_mock import JAMMockInterface
-from wealth_tracker import WealthTracker
+from billing import DockerMCPBilling as WealthTracker
 
 logger = logging.getLogger(__name__)
 
