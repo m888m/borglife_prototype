@@ -608,72 +608,91 @@ Be thorough but concise in your analysis."""
         # Calculate costs for organs used during execution
         organs_used = result.get('organs_used', [])
         for organ_name in organs_used:
-            if organ_name in self.organs:
-                # Estimate cost for this organ usage
-                organ_callable = self.organs[organ_name]
-                estimated_cost = await self.adapter.billing_manager.estimate_cost(
-                    organ_name,
-                    getattr(organ_callable, 'mcp_tool', 'unknown'),
-                    {}
-                )
-                organ_costs[organ_name] = estimated_cost
-                total_cost += estimated_cost
+            # Get organ price cap from current DNA if available
+            price_cap = Decimal('0.001')  # Default fallback
+            if hasattr(self, '_current_dna') and self._current_dna:
+                for organ in self._current_dna.organs:
+                    if organ.name == organ_name:
+                        price_cap = Decimal(str(organ.price_cap))
+                        break
 
-        # Add base execution cost
+            # Use price cap as cost estimate (simplified for Phase 1)
+            organ_costs[organ_name] = price_cap
+            total_cost += price_cap
+
+        # Add base execution cost (time-based)
         base_execution_cost = Decimal('0.0001') * Decimal(str(execution_time))
         total_cost += base_execution_cost
+
+        # Calculate cell costs from current DNA
+        cell_costs = {}
+        if hasattr(self, '_current_dna') and self._current_dna:
+            for cell in self._current_dna.cells:
+                cell_costs[cell.name] = Decimal(str(cell.cost_estimate))
+                total_cost += cell_costs[cell.name]
 
         cost_info = {
             'total_cost': str(total_cost),
             'organ_costs': {k: str(v) for k, v in organ_costs.items()},
+            'cell_costs': {k: str(v) for k, v in cell_costs.items()},
             'execution_cost': str(base_execution_cost),
             'execution_time': execution_time,
             'currency': 'DOT',
-            'wealth_sufficient': wealth is None or float(wealth) >= float(total_cost)
+            'wealth_sufficient': wealth is None or float(wealth) >= float(total_cost),
+            'cost_breakdown': {
+                'organs': str(sum(Decimal(str(v)) for v in organ_costs.values())),
+                'cells': str(sum(Decimal(str(v)) for v in cell_costs.values())),
+                'execution': str(base_execution_cost)
+            }
         }
 
         return cost_info
+
+    def calculate_phenotype_cost(self, dna: BorgDNA) -> Dict[str, Any]:
         """
-        Calculate task execution cost based on organs used and time.
+        Calculate total cost of building and maintaining a phenotype.
 
         Args:
-            result: Task execution result
-            execution_time: Time taken to execute
-            wealth: Current borg wealth
+            dna: BorgDNA to calculate costs for
 
         Returns:
-            Cost information dictionary
+            Cost breakdown dictionary with decimal precision
         """
-        from decimal import Decimal
+        from decimal import Decimal, getcontext
+
+        # Set high precision for DOT calculations
+        getcontext().prec = 10
 
         total_cost = Decimal('0')
+        cell_costs = {}
         organ_costs = {}
 
-        # Calculate costs for organs used during execution
-        organs_used = result.get('organs_used', [])
-        for organ_name in organs_used:
-            if organ_name in self.organs:
-                # Estimate cost for this organ usage
-                organ_callable = self.organs[organ_name]
-                estimated_cost = await self.adapter.billing_manager.estimate_cost(
-                    organ_name,
-                    getattr(organ_callable, 'mcp_tool', 'unknown'),
-                    {}
-                )
-                organ_costs[organ_name] = estimated_cost
-                total_cost += estimated_cost
+        # Calculate cell costs
+        for cell in dna.cells:
+            cell_cost = Decimal(str(cell.cost_estimate))
+            cell_costs[cell.name] = cell_cost
+            total_cost += cell_cost
 
-        # Add base execution cost
-        base_execution_cost = Decimal('0.0001') * Decimal(str(execution_time))
-        total_cost += base_execution_cost
+        # Calculate organ costs (price caps)
+        for organ in dna.organs:
+            organ_cost = Decimal(str(organ.price_cap))
+            organ_costs[organ.name] = organ_cost
+            total_cost += organ_cost
 
-        cost_info = {
+        # Add base phenotype maintenance cost
+        base_cost = Decimal('0.001')  # Fixed cost per phenotype
+        total_cost += base_cost
+
+        return {
             'total_cost': str(total_cost),
+            'cell_costs': {k: str(v) for k, v in cell_costs.items()},
             'organ_costs': {k: str(v) for k, v in organ_costs.items()},
-            'execution_cost': str(base_execution_cost),
-            'execution_time': execution_time,
+            'base_cost': str(base_cost),
             'currency': 'DOT',
-            'wealth_sufficient': wealth is None or float(wealth) >= float(total_cost)
+            'cost_breakdown': {
+                'cells': str(sum(Decimal(str(v)) for v in cell_costs.values())),
+                'organs': str(sum(Decimal(str(v)) for v in organ_costs.values())),
+                'base': str(base_cost)
+            },
+            'decimal_precision': getcontext().prec
         }
-
-        return cost_info
