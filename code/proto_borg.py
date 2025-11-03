@@ -14,7 +14,7 @@ from datetime import datetime
 from dataclasses import dataclass, field
 
 from archon_adapter import ArchonServiceAdapter
-from synthesis import DNAParser, PhenotypeBuilder, BorgDNA
+from synthesis import DNAParser, PhenotypeBuilder, PhenotypeEncoder, BorgDNA
 from jam_mock import LocalJAMMock
 
 logger = logging.getLogger(__name__)
@@ -102,6 +102,10 @@ class ProtoBorgAgent:
         self.wealth = MockWealthTracker(initial_wealth=config.initial_wealth)
         self.jam = LocalJAMMock()  # Use real JAM implementation
 
+        # Initialize DNA encoding components
+        self.dna_parser = DNAParser()
+        self.phenotype_encoder = PhenotypeEncoder()
+
         # Initialize Archon adapter
         self.archon = ArchonServiceAdapter()
 
@@ -142,8 +146,8 @@ class ProtoBorgAgent:
             try:
                 self.phenotype = await self.phenotype_builder.build(self.dna)
                 if not self.phenotype:
-                    logger.error("Failed to build phenotype")
-                    return False
+                    logger.warning("Phenotype building failed - creating mock phenotype")
+                    self.phenotype = self._create_mock_phenotype()
             except Exception as e:
                 logger.warning(f"Phenotype building failed: {e} - creating mock phenotype")
                 self.phenotype = self._create_mock_phenotype()
@@ -218,6 +222,11 @@ class ProtoBorgAgent:
                 # Create minimal DNA for bootstrapping
                 logger.warning("No borg_dna.yaml found, creating minimal DNA")
                 return self._create_minimal_dna()
+        except Exception as e:
+            logger.error(f"Failed to load DNA: {e}")
+            # Create minimal DNA as fallback
+            logger.warning("Creating minimal DNA as fallback")
+            return self._create_minimal_dna()
 
         except Exception as e:
             logger.error(f"Failed to load DNA: {e}")
@@ -290,13 +299,17 @@ class ProtoBorgAgent:
 
     async def execute_task(self, task_description: str) -> Dict[str, Any]:
         """
-        Execute a task using the borg's phenotype.
+        Execute a task using the borg's phenotype and handle DNA storage workflow.
 
-        Args:
-            task_description: Description of task to execute
+        Process:
+        1. Execute task using phenotype
+        2. Update wealth tracking for task costs
+        3. Encode phenotype back to DNA after successful execution
+        4. Store DNA on-chain via JAM
+        5. Update wealth for storage costs
 
         Returns:
-            Task execution result with metadata
+            Task execution result with execution and storage details
         """
         if not self.is_initialized:
             raise RuntimeError("Proto-Borg not initialized")
@@ -317,13 +330,26 @@ class ProtoBorgAgent:
             execution_time = (datetime.utcnow() - start_time).total_seconds()
             actual_cost = Decimal(str(execution_time * 0.0001))  # Cost per second
 
-            # Record transaction
+            # Record transaction for task execution
             self.wealth.log_transaction(
                 transaction_type="cost",
                 amount=actual_cost,
                 currency="DOT",
                 description=f"Task execution: {task_description[:50]}..."
             )
+
+            # Encode phenotype to DNA after successful execution
+            dna_storage_result = await self._encode_and_store_dna()
+
+            # Update wealth for DNA storage cost
+            if dna_storage_result['success']:
+                storage_cost = Decimal(str(dna_storage_result.get('cost', 0.001)))
+                self.wealth.log_transaction(
+                    transaction_type="cost",
+                    amount=storage_cost,
+                    currency="DOT",
+                    description="DNA storage on JAM"
+                )
 
             # Return result with metadata
             return {
@@ -334,7 +360,8 @@ class ProtoBorgAgent:
                 'cost': float(actual_cost),
                 'borg_id': self.config.service_index,
                 'timestamp': start_time.isoformat(),
-                'success': True
+                'success': True,
+                'dna_storage': dna_storage_result
             }
 
         except Exception as e:
@@ -354,6 +381,45 @@ class ProtoBorgAgent:
                 'borg_id': self.config.service_index,
                 'timestamp': start_time.isoformat(),
                 'success': False
+            }
+
+    async def _encode_and_store_dna(self) -> Dict[str, Any]:
+        """
+        Encode current phenotype to DNA and store on JAM.
+        """
+        try:
+            # Encode phenotype to DNA
+            encoded_dna = self.phenotype_encoder.encode(self.phenotype)
+
+            # Prepare for JAM storage
+            jam_data = self.phenotype_encoder.prepare_for_jam_storage(encoded_dna)
+
+            # Store on JAM
+            storage_result = await self.jam.store_dna_hash(
+                borg_id=self.config.service_index,
+                dna_hash=jam_data['dna_hash'],
+                metadata={
+                    'cell_count': jam_data['cell_count'],
+                    'organ_count': jam_data['organ_count'],
+                    'code_length': jam_data['code_length']
+                }
+            )
+
+            return {
+                'success': storage_result['success'],
+                'dna_hash': jam_data['dna_hash'],
+                'block_number': storage_result.get('block_number'),
+                'transaction_hash': storage_result.get('transaction_hash'),
+                'cost': storage_result.get('cost', Decimal('0')),
+                'encoded_at': jam_data['prepared_at']
+            }
+
+        except Exception as e:
+            logger.error(f"DNA encoding/storage failed: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'cost': Decimal('0')
             }
 
     async def get_status(self) -> Dict[str, Any]:
