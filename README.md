@@ -30,38 +30,37 @@ Archon MCP (FastAPI)
 
 1. **Install Dependencies**:
    ```bash
-   pip install pydantic-ai substrate-interface streamlit fastapi uvicorn pyyaml
+   pip install -r code/requirements.txt
    ```
 
 2. **Run Demo**:
    ```bash
-   python integration_test.py
+   python -m code.tests.e2e_test_suite
    ```
 
 3. **Start UI**:
    ```bash
-   streamlit run sponsor_ui.py
+   streamlit run code/sponsor_ui.py
    ```
 
 4. **Run MCP Server**:
    ```bash
-   python archon_integration.py
+   python -m code.archon_adapter.adapter
    ```
 
 5. **Docker Deployment**:
    ```bash
-   docker-compose up --build
+   docker-compose -f code/docker-compose.yml up --build
    ```
 
 ## Components
 
-- `proto_borg.py`: Main AI agent with wealth tracking
-- `dna_system.py`: DNA encoding/decoding system
-- `pvm_foundation.rs`: Rust foundations for PVM bytecode
-- `on_chain.py`: Kusama storage and JAM mocks
-- `sponsor_ui.py`: Streamlit dashboard
-- `archon_integration.py`: MCP server for organs
-- `integration_test.py`: End-to-end testing and demo
+- `code/proto_borg.py`: Main AI agent with wealth tracking
+- `code/synthesis/`: DNA encoding/decoding system (dna_parser.py, phenotype_builder.py)
+- `code/jam_mock/`: JAM blockchain mock and on-chain storage simulation
+- `code/sponsor_ui.py`: Streamlit dashboard
+- `code/archon_adapter/`: MCP server for organs and Archon integration
+- `code/tests/e2e_test_suite.py`: End-to-end testing and demo
 
 ## Key Features
 
@@ -76,12 +75,12 @@ Archon MCP (FastAPI)
 
 Run integration tests:
 ```bash
-python -m pytest integration_test.py -v
+python -m pytest code/tests/ -v
 ```
 
 Or run demo:
 ```bash
-python integration_test.py
+python -m code.tests.e2e_test_suite
 ```
 
 ## Documentation
