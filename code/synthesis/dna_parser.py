@@ -60,7 +60,7 @@ class Organ(BaseModel):
     name: str = Field(..., min_length=1, description="Unique organ name")
     mcp_tool: str = Field(..., description="MCP tool identifier")
     url: str = Field(..., description="Service endpoint URL")
-    abi_version: str = Field(..., description="ABI version for compatibility")
+    abi_version: str = Field("1.0", description="ABI version for compatibility")
     price_cap: float = Field(default=0.0, ge=0, description="Maximum price per call")
 
     @validator('name')
