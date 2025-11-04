@@ -9,8 +9,13 @@ import time
 import asyncio
 from typing import Dict, Any, Optional, Tuple, List
 from decimal import Decimal
+import httpx
+import json
+import ssl
 from substrateinterface import SubstrateInterface, Keypair
-from .interface import JAMInterface, JAMMode
+from interface import JAMInterface, JAMMode
+from ssl_utils import SSLUtils
+from keypair_manager import KeypairManager
 
 
 class KusamaAdapter(JAMInterface):
@@ -34,6 +39,9 @@ class KusamaAdapter(JAMInterface):
         self.keypair = keypair
         self.mode = JAMMode.TESTNET
 
+        # Initialize keypair manager
+        self.keypair_manager = KeypairManager()
+
         # In-memory cache for wealth tracking (since Kusama doesn't have native wealth tracking)
         self.wealth_cache: Dict[str, Decimal] = {}
         self.transaction_cache: Dict[str, list] = {}
@@ -46,14 +54,145 @@ class KusamaAdapter(JAMInterface):
         # Transaction cache for faster lookups
         self.tx_cache: Dict[str, Dict[str, Any]] = {}  # tx_hash -> tx_data
 
+        # HTTP fallback configuration
+        self.http_client = None
+        self.http_timeout = 30.0  # seconds
+        self.retry_attempts = 3
+        self.retry_backoff = 1.0  # base backoff in seconds
+
+        # Rate limiting configuration
+        self.rate_limit_requests = 10  # requests per window
+        self.rate_limit_window = 60    # window in seconds
+        self.request_history: List[float] = []  # timestamps of recent requests
+
+        # Multi-endpoint configuration - prioritize working endpoints
+        self.endpoints = [
+            "wss://kusama.api.onfinality.io/public-ws",  # Working endpoint (primary)
+            "wss://kusama-rpc.polkadot.io",  # Requires different SSL config
+            "wss://kusama-rpc.dwellir.com",  # Requires different SSL config
+        ]
+        self.current_endpoint_index = 0
+        self.endpoint_health: Dict[str, Dict[str, Any]] = {}
+
+        # SSL/TLS configuration for LibreSSL compatibility
+        self.ssl_context = SSLUtils.create_libressl_compatible_context()
+
         # Initialize substrate connection
         self.substrate = None
         if connect_immediately:
             try:
-                self.substrate = SubstrateInterface(url=rpc_url)
+                # Use ws_options to pass SSL context for WebSocket connections
+                ws_options = {'sslopt': {'context': self.ssl_context}} if self.ssl_context else {}
+                self.substrate = SubstrateInterface(
+                    url=rpc_url,
+                    ws_options=ws_options,
+                    ss58_format=2  # Kusama address format
+                )
             except Exception as e:
                 print(f"Warning: Failed to connect to Kusama RPC: {e}")
                 print("Adapter will work in offline mode for some operations")
+
+    async def _init_http_client(self):
+        """Initialize HTTP client for fallback operations."""
+        if self.http_client is None:
+            self.http_client = httpx.AsyncClient(
+                timeout=self.http_timeout,
+                headers={'Content-Type': 'application/json'}
+            )
+
+    async def _make_http_request(self, method: str, params: List[Any] = None) -> Optional[Dict[str, Any]]:
+        """
+        Make HTTP JSON-RPC request with retry logic and rate limiting.
+
+        Args:
+            method: RPC method name
+            params: RPC parameters
+
+        Returns:
+            RPC response or None if failed
+        """
+        await self._init_http_client()
+
+        # Check rate limit
+        if not await self._check_rate_limit():
+            print("Rate limit exceeded, skipping request")
+            return None
+
+        # Prepare request
+        request_id = int(time.time() * 1000)
+        payload = {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "method": method,
+            "params": params or []
+        }
+
+        # Try each endpoint with retries
+        for endpoint_index in range(len(self.endpoints)):
+            endpoint = self.endpoints[endpoint_index]
+            http_url = endpoint.replace('wss://', 'https://').replace('ws://', 'http://')
+
+            for attempt in range(self.retry_attempts):
+                try:
+                    # Record request for rate limiting
+                    self.request_history.append(time.time())
+
+                    response = await self.http_client.post(
+                        http_url,
+                        json=payload,
+                        headers={'Content-Type': 'application/json'}
+                    )
+
+                    if response.status_code == 200:
+                        result = response.json()
+                        if 'error' not in result:
+                            return result.get('result')
+                        else:
+                            print(f"RPC error: {result['error']}")
+                    else:
+                        print(f"HTTP error {response.status_code}: {response.text}")
+
+                except Exception as e:
+                    print(f"HTTP request attempt {attempt + 1} failed for {http_url}: {e}")
+
+                    if attempt < self.retry_attempts - 1:
+                        # Exponential backoff
+                        delay = self.retry_backoff * (2 ** attempt)
+                        await asyncio.sleep(delay)
+
+            # Try next endpoint if this one failed
+            continue
+
+        print("All endpoints failed")
+        return None
+
+    async def _check_rate_limit(self) -> bool:
+        """
+        Check if we're within rate limits.
+
+        Returns:
+            True if request is allowed, False if rate limited
+        """
+        now = time.time()
+
+        # Remove old requests outside the window
+        cutoff = now - self.rate_limit_window
+        self.request_history = [t for t in self.request_history if t > cutoff]
+
+        # Check if we're under the limit
+        return len(self.request_history) < self.rate_limit_requests
+
+    async def _get_healthy_endpoint(self) -> str:
+        """
+        Get the healthiest available endpoint.
+
+        Returns:
+            Endpoint URL to use
+        """
+        # Simple round-robin for now - could be enhanced with health checks
+        endpoint = self.endpoints[self.current_endpoint_index]
+        self.current_endpoint_index = (self.current_endpoint_index + 1) % len(self.endpoints)
+        return endpoint
 
     async def store_dna_hash(self, borg_id: str, dna_hash: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -424,6 +563,19 @@ class KusamaAdapter(JAMInterface):
                 'max_scan_blocks': self.max_scan_blocks,
                 'scan_batch_size': self.scan_batch_size,
                 'scan_delay': self.scan_delay
+            },
+            'rate_limit_config': {
+                'requests_per_window': self.rate_limit_requests,
+                'window_seconds': self.rate_limit_window,
+                'current_requests': len(self.request_history)
+            },
+            'endpoints': self.endpoints,
+            'current_endpoint_index': self.current_endpoint_index,
+            'ssl_config': {
+                'openssl_version': ssl.OPENSSL_VERSION,
+                'has_tls_1_3': hasattr(ssl, 'PROTOCOL_TLSv1_3'),
+                'max_tls_version': getattr(self.ssl_context, 'maximum_version', None),
+                'min_tls_version': getattr(self.ssl_context, 'minimum_version', None)
             }
         }
 
@@ -465,7 +617,7 @@ class KusamaAdapter(JAMInterface):
         """Configure testnet parameters."""
         try:
             self.rpc_url = rpc_url
-            self.substrate = SubstrateInterface(url=rpc_url)
+            self.substrate = SubstrateInterface(url=rpc_url, ssl_context=self.ssl_context)
 
             if keypair_data:
                 if 'seed' in keypair_data:
