@@ -176,10 +176,20 @@ class ProtoBorgAgent:
                 }
                 self.is_built = True
 
+            def _calculate_task_cost(self, execution_time: float) -> Decimal:
+                """Calculate task execution cost"""
+                return Decimal(str(execution_time * 0.0001))
+
             async def execute_task(self, task_description: str):
+                """Execute task with cost calculation"""
+                execution_time = 0.1  # Mock execution time
+                cost = self._calculate_task_cost(execution_time)
+
                 return {
                     'response': f'Mock execution result for: {task_description}',
                     'mock': True,
+                    'cost': cost,
+                    'execution_time': execution_time,
                     'timestamp': datetime.utcnow().isoformat()
                 }
 

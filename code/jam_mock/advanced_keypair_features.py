@@ -40,7 +40,7 @@ class AdvancedKeypairManager(KeypairManager):
         self.max_transaction_fee = Decimal('0.1')  # Max 0.1 KSM per transaction
 
         # Network parameters
-        self.network_prefix = 2  # Kusama SS58 prefix
+        self.network_prefix = 42  # Westend SS58 prefix (testnet)
         self.keypair_type = KeypairType.SR25519
 
     def create_keypair_from_mnemonic(self, name: str, mnemonic: str, save_to_disk: bool = True) -> Dict[str, Any]:
@@ -140,7 +140,7 @@ class AdvancedKeypairManager(KeypairManager):
 
     def validate_address(self, address: str) -> Tuple[bool, str]:
         """
-        Validate Kusama SS58 address format and checksum.
+        Validate Westend SS58 address format and checksum.
 
         Args:
             address: SS58 address to validate
@@ -154,13 +154,13 @@ class AdvancedKeypairManager(KeypairManager):
 
             # Check network prefix
             if ss58_format != self.network_prefix:
-                return False, f"Invalid network prefix: {ss58_format}, expected {self.network_prefix} (Kusama)"
+                return False, f"Invalid network prefix: {ss58_format}, expected {self.network_prefix} (Westend)"
 
             # Verify length (32 bytes for public key)
             if len(public_key_bytes) != 32:
                 return False, f"Invalid public key length: {len(public_key_bytes)} bytes"
 
-            return True, "Valid Kusama address"
+            return True, "Valid Westend address"
 
         except Exception as e:
             return False, f"Invalid address format: {e}"
@@ -311,7 +311,7 @@ class AdvancedKeypairManager(KeypairManager):
     def get_network_info(self) -> Dict[str, Any]:
         """Get current network configuration."""
         return {
-            'network': 'Kusama',
+            'network': 'Westend',
             'ss58_prefix': self.network_prefix,
             'keypair_type': self.keypair_type.value,
             'development_mode': self.development_mode,

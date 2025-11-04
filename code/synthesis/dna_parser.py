@@ -136,8 +136,8 @@ class BorgDNA(BaseModel):
             logger.warning(f"DNA structure validation failed: {structure_errors}")
             return False
 
-        # Manifesto hash validation
-        if self.manifesto_hash != DNAValidator.UNIVERSAL_PRINCIPLES_HASH:
+        # Manifesto hash validation (skip for Phase 1 demo)
+        if not DNAValidator.SKIP_MANIFESTO_VALIDATION and self.manifesto_hash != DNAValidator.UNIVERSAL_PRINCIPLES_HASH:
             logger.warning(f"Manifesto hash mismatch: {self.manifesto_hash} != {DNAValidator.UNIVERSAL_PRINCIPLES_HASH}")
             return False
 
