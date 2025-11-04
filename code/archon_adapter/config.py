@@ -28,10 +28,16 @@ class ArchonConfig(BaseModel):
     def supabase_client(self):
         """Get Supabase client instance."""
         try:
+            # Skip if credentials not configured
+            if not self.supabase_url or not self.supabase_service_key:
+                logger.warning("Supabase credentials not configured - using mock client")
+                raise ValueError("Supabase not configured")
+            
             from supabase import create_client
             return create_client(self.supabase_url, self.supabase_service_key)
-        except ImportError:
-            # Mock client for testing
+        except (ImportError, ValueError, Exception) as e:
+            # Mock client for testing or when Supabase unavailable
+            logger.debug(f"Using mock Supabase client: {e}")
             class MockSupabaseClient:
                 def table(self, name):
                     return self

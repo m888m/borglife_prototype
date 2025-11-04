@@ -67,7 +67,7 @@ class KeypairManager:
         # Generate new keypair
         keypair = Keypair.create_from_seed(
             seed_hex=secrets.token_hex(32),  # 256-bit seed
-            ss58_format=2  # Kusama format
+            ss58_format=42  # Westend format
         )
 
         # Get public information
@@ -75,7 +75,7 @@ class KeypairManager:
             'name': name,
             'public_key': keypair.public_key.hex(),
             'ss58_address': keypair.ss58_address,
-            'ss58_format': 2,  # Kusama
+            'ss58_format': 42,  # Westend
             'created_at': self._get_timestamp(),
             'fingerprint': self._generate_fingerprint(keypair.public_key.hex())
         }
@@ -107,7 +107,7 @@ class KeypairManager:
         try:
             keypair = Keypair.create_from_seed(
                 seed_hex=seed_hex,
-                ss58_format=2  # Kusama format
+                ss58_format=42  # Westend format
             )
         except Exception as e:
             raise KeypairSecurityError(f"Invalid seed: {e}")
@@ -116,7 +116,7 @@ class KeypairManager:
             'name': name,
             'public_key': keypair.public_key.hex(),
             'ss58_address': keypair.ss58_address,
-            'ss58_format': 2,
+            'ss58_format': 42,  # Westend
             'created_at': self._get_timestamp(),
             'fingerprint': self._generate_fingerprint(keypair.public_key.hex())
         }
@@ -143,7 +143,7 @@ class KeypairManager:
         try:
             keypair = Keypair.create_from_uri(
                 uri=uri,
-                ss58_format=2  # Kusama format
+                ss58_format=42  # Westend format
             )
         except Exception as e:
             raise KeypairSecurityError(f"Invalid URI: {e}")
@@ -152,7 +152,7 @@ class KeypairManager:
             'name': name,
             'public_key': keypair.public_key.hex(),
             'ss58_address': keypair.ss58_address,
-            'ss58_format': 2,
+            'ss58_format': 42,  # Westend
             'created_at': self._get_timestamp(),
             'fingerprint': self._generate_fingerprint(keypair.public_key.hex())
         }

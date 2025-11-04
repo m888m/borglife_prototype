@@ -31,6 +31,7 @@ from synthesis.phenotype_encoder import PhenotypeEncoder
 from transaction_manager import TransactionManager
 from advanced_keypair_features import AdvancedKeypairManager
 from kusama_adapter import WestendAdapter
+from demo_metrics import DemoMetricsCollector, DemoAlertManager
 
 
 class BorgLifeDNADemo:
@@ -47,12 +48,17 @@ class BorgLifeDNADemo:
             self.westend_adapter,
             self.keypair_manager
         )
+        
+        # Metrics and monitoring
+        self.metrics = DemoMetricsCollector()
+        self.alerts = DemoAlertManager(self.metrics)
 
         # Demo state
         self.borg = None
         self.original_dna = None
         self.stored_dna_hash = None
         self.transaction_result = None
+        self.current_step = None
 
     async def run_complete_demo(self) -> Dict[str, Any]:
         """
@@ -61,6 +67,9 @@ class BorgLifeDNADemo:
         Returns:
             Demo results with success status and metrics
         """
+        # Start metrics tracking
+        run_metrics = self.metrics.start_run()
+        
         print("🚀 BorgLife Phase 1 - Complete DNA Storage Demo")
         print("=" * 60)
 
@@ -121,6 +130,7 @@ class BorgLifeDNADemo:
 
     async def _step_1_initialize_borg(self, results: Dict[str, Any]):
         """Step 1: Initialize Proto-Borg with DNA."""
+        self.current_step = self.metrics.record_step_start("borg_initialization")
         try:
             # Load DNA from file
             dna_file = Path(__file__).parent.parent / 'borg_dna.yaml'
@@ -149,13 +159,17 @@ class BorgLifeDNADemo:
 
             print("   ✅ Proto-Borg initialized and ready")
             results['steps_completed'].append('borg_initialization')
+            self.current_step.complete(success=True)
 
         except Exception as e:
             results['errors'].append(f"Step 1 failed: {e}")
+            self.current_step.complete(success=False, error=str(e))
+            self.metrics.record_error(f"Step 1: {e}")
             raise
 
     async def _step_2_execute_task(self, results: Dict[str, Any]):
         """Step 2: Execute a task to generate wealth and demonstrate functionality."""
+        self.current_step = self.metrics.record_step_start("task_execution")
         try:
             # Execute a simple task
             task_description = "Analyze the evolution mechanisms in BorgLife whitepaper"
@@ -174,13 +188,17 @@ class BorgLifeDNADemo:
             results['steps_completed'].append('task_execution')
             results['metrics']['task_execution_time'] = execution_time
             results['metrics']['task_cost'] = float(self.borg.wealth.get_balance())
+            self.current_step.complete(success=True)
 
         except Exception as e:
             results['errors'].append(f"Step 2 failed: {e}")
+            self.current_step.complete(success=False, error=str(e))
+            self.metrics.record_error(f"Step 2: {e}")
             raise
 
     async def _step_3_encode_phenotype(self, results: Dict[str, Any]):
         """Step 3: Encode the working phenotype back to DNA."""
+        self.current_step = self.metrics.record_step_start("phenotype_encoding")
         try:
             print("   🔄 Encoding phenotype to DNA...")
 
@@ -200,13 +218,17 @@ class BorgLifeDNADemo:
             results['steps_completed'].append('phenotype_encoding')
             results['metrics']['original_dna_hash'] = original_hash
             results['metrics']['encoded_dna_hash'] = encoded_hash
+            self.current_step.complete(success=True)
 
         except Exception as e:
             results['errors'].append(f"Step 3 failed: {e}")
+            self.current_step.complete(success=False, error=str(e))
+            self.metrics.record_error(f"Step 3: {e}")
             raise
 
     async def _step_4_submit_transaction(self, results: Dict[str, Any]):
         """Step 4: Submit signed transaction to Westend."""
+        self.current_step = self.metrics.record_step_start("transaction_submission")
         try:
             print("   📤 Preparing DNA storage transaction...")
 
@@ -226,9 +248,21 @@ class BorgLifeDNADemo:
             # Use demo keypair (would be sponsor's keypair in production)
             keypair_name = 'demo_dna_storage'
 
-            # Create demo keypair for this demo
-            demo_keypair = self.keypair_manager.create_keypair(keypair_name, save_to_disk=False)
-            print(f"   🔑 Using demo keypair: {demo_keypair['ss58_address'][:20]}...")
+            # Use deterministic seed for reproducible funded address
+            import hashlib
+            demo_uri = "//BorgLifeDemo//Phase1//Westend"
+            seed_hex = hashlib.sha256(demo_uri.encode()).hexdigest()
+
+            demo_keypair = self.keypair_manager.create_keypair_from_seed(
+                keypair_name,
+                seed_hex,
+                save_to_disk=False
+            )
+
+            print(f"   🔑 Demo address: {demo_keypair['ss58_address']}")
+            print(f"   💡 FUND THIS ADDRESS at: https://faucet.polkadot.io/westend")
+            print(f"   💡 Select 'Westend' network → 'Relaychain' → paste address")
+            print(f"   💡 Request test WND tokens (minimum 0.1 WND)")
 
             # CRITICAL FIX: Load the keypair into WestendAdapter for transaction signing
             # The keypair is stored in the cache, so we need to load it from there
@@ -254,15 +288,26 @@ class BorgLifeDNADemo:
                 results['steps_completed'].append('transaction_submission')
                 results['metrics']['transaction_hash'] = tx_result.get('transaction_hash')
                 results['metrics']['fee_paid'] = float(tx_result.get('fee_paid', 0))
+                
+                # Record transaction metrics
+                self.metrics.record_transaction(
+                    tx_hash=tx_result.get('transaction_hash'),
+                    fee=Decimal(str(tx_result.get('fee_paid', 0)))
+                )
+                self.current_step.complete(success=True)
             else:
                 raise Exception(f"Transaction failed: {tx_result.get('error', 'Unknown error')}")
 
         except Exception as e:
             results['errors'].append(f"Step 4 failed: {e}")
+            self.current_step.complete(success=False, error=str(e))
+            self.metrics.record_error(f"Step 4: {e}")
             raise
 
     async def _step_5_confirm_transaction(self, results: Dict[str, Any]):
         """Step 5: Wait for block confirmation."""
+        self.current_step = self.metrics.record_step_start("block_confirmation")
+        confirmation_start = time.time()
         try:
             if not self.transaction_result:
                 raise Exception("No transaction result available")
@@ -289,6 +334,11 @@ class BorgLifeDNADemo:
                     results['steps_completed'].append('block_confirmation')
                     results['metrics']['block_number'] = block_number
                     results['metrics']['confirmation_time'] = confirmation_time
+                    
+                    # Record confirmation metrics
+                    conf_duration = time.time() - confirmation_start
+                    self.metrics.record_confirmation(conf_duration)
+                    self.current_step.complete(success=True)
                     return
 
                 await asyncio.sleep(5)  # Check every 5 seconds
@@ -297,10 +347,13 @@ class BorgLifeDNADemo:
 
         except Exception as e:
             results['errors'].append(f"Step 5 failed: {e}")
+            self.current_step.complete(success=False, error=str(e))
+            self.metrics.record_error(f"Step 5: {e}")
             raise
 
     async def _step_6_verify_integrity(self, results: Dict[str, Any]):
         """Step 6: Retrieve DNA from chain and verify integrity."""
+        self.current_step = self.metrics.record_step_start("dna_verification")
         try:
             print("   🔍 Retrieving DNA from Westend blockchain...")
 
@@ -337,18 +390,45 @@ class BorgLifeDNADemo:
 
             print(f"   🔄 Round-trip integrity: {'✅ VERIFIED' if integrity_ok else '❌ FAILED'}")
 
+            # Record DNA integrity metrics
+            self.metrics.record_dna_hashes(
+                original_hash=self.original_dna.compute_hash(),
+                encoded_hash=self.stored_dna_hash,
+                integrity_verified=integrity_ok
+            )
+            
             if integrity_ok:
                 results['steps_completed'].append('round_trip_integrity')
                 results['metrics']['round_trip_integrity'] = True
+                self.current_step.complete(success=True)
             else:
                 results['errors'].append("Round-trip integrity check failed")
-
+                self.current_step.complete(success=False, error="Integrity check failed")
+                
         except Exception as e:
             results['errors'].append(f"Step 6 failed: {e}")
+            self.current_step.complete(success=False, error=str(e))
+            self.metrics.record_error(f"Step 6: {e}")
             raise
 
     def _print_final_results(self, results: Dict[str, Any]):
         """Print comprehensive final results."""
+        # Complete metrics collection
+        if self.metrics.current_run:
+            run_metrics = self.metrics.complete_run(success=results['success'])
+            
+            # Check for alerts
+            if results['success']:
+                balance = Decimal('1.0') - run_metrics.total_cost  # Remaining balance
+                alerts = self.alerts.check_all_alerts(
+                    current_balance=balance,
+                    current_duration=run_metrics.total_duration
+                )
+                if alerts:
+                    print("\n⚠️  ALERTS:")
+                    for alert in alerts:
+                        print(f"   {alert}")
+        
         print("\n" + "=" * 60)
         print("📊 DEMO RESULTS SUMMARY")
         print("=" * 60)
@@ -387,6 +467,14 @@ class BorgLifeDNADemo:
             print("\n💥 DEMO FAILED")
             print(f"   ❌ {len(results['errors'])} errors encountered")
 
+        # Print metrics report if available
+        avg_metrics = self.metrics.get_average_metrics(5)
+        if avg_metrics:
+            print("\n📈 HISTORICAL METRICS (Last 5 Runs):")
+            print(f"   Success Rate: {avg_metrics['success_rate']*100:.1f}%")
+            print(f"   Avg Duration: {avg_metrics['avg_duration']:.2f}s")
+            print(f"   Avg Cost: {avg_metrics['avg_cost']:.6f} WND")
+        
         print("=" * 60)
 
     async def _cleanup(self):

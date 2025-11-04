@@ -19,39 +19,45 @@ class SSLUtils:
     @staticmethod
     def create_libressl_compatible_context() -> ssl.SSLContext:
         """
-        Create SSL context compatible with LibreSSL 2.8.3.
+        Create SSL context compatible with LibreSSL 2.8.3 for TESTNET use.
 
         LibreSSL 2.8.3 doesn't support TLS 1.3, so we configure for TLS 1.2 max.
+        Certificate verification is DISABLED for testnet compatibility.
+
+        WARNING: This configuration is ONLY safe for testnet/development use!
 
         Returns:
             Configured SSL context
         """
-        context = ssl.create_default_context()
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 
-        # Disable TLS 1.3 if available (though LibreSSL doesn't have it)
-        if hasattr(ssl, 'PROTOCOL_TLSv1_3'):
-            # If we had TLS 1.3, we'd disable it here for compatibility
-            pass
+        # CRITICAL: Disable certificate verification for testnet/LibreSSL compatibility
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
 
         # Set maximum TLS version to 1.2 for LibreSSL compatibility
-        if hasattr(context, 'maximum_version'):
-            context.maximum_version = ssl.TLSVersion.TLSv1_2
+        if hasattr(context, 'maximum_version') and hasattr(ssl, 'TLSVersion'):
+            try:
+                context.maximum_version = ssl.TLSVersion.TLSv1_2
+                context.minimum_version = ssl.TLSVersion.TLSv1
+            except AttributeError:
+                # Some LibreSSL versions don't support version setting
+                pass
 
-        # Set minimum TLS version to 1.1 for broader compatibility
-        if hasattr(context, 'minimum_version'):
-            context.minimum_version = ssl.TLSVersion.TLSv1_1
+        # Disable problematic SSL options
+        context.options |= ssl.OP_NO_SSLv2
+        context.options |= ssl.OP_NO_SSLv3
 
-        # Enable certificate verification
-        context.check_hostname = True
-        context.verify_mode = ssl.CERT_REQUIRED
+        # Use permissive cipher list for maximum compatibility
+        try:
+            context.set_ciphers('DEFAULT:@SECLEVEL=0')
+        except:
+            try:
+                context.set_ciphers('DEFAULT:!aNULL:!eNULL:!EXPORT')
+            except:
+                context.set_ciphers('ALL')
 
-        # Add common cipher suites that work with LibreSSL
-        context.set_ciphers(
-            'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:'
-            'ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384:'
-            'AES128-GCM-SHA256:AES256-GCM-SHA384'
-        )
-
+        print(f"✅ SSL context created for testnet (LibreSSL {ssl.OPENSSL_VERSION})")
         return context
 
     @staticmethod

@@ -77,27 +77,39 @@ class WestendAdapter(JAMInterface):
         # SSL/TLS configuration for LibreSSL compatibility
         self.ssl_context = SSLUtils.create_libressl_compatible_context()
 
-        # Initialize substrate connection
+        # Initialize substrate connection with fallback endpoints
         self.substrate = None
         if connect_immediately:
-            try:
-                # Use ws_options to pass SSL context for WebSocket connections
-                # Try different SSL configurations for different endpoints
-                if 'onfinality' in rpc_url:
-                    # OnFinality works with our LibreSSL config
-                    ws_options = {'sslopt': {'context': self.ssl_context}} if self.ssl_context else {}
-                else:
-                    # For other endpoints, try without custom SSL context first
-                    ws_options = {}
-
-                self.substrate = SubstrateInterface(
-                    url=rpc_url,
-                    ws_options=ws_options,
-                    ss58_format=42  # Westend address format
-                )
-            except Exception as e:
-                print(f"Warning: Failed to connect to Kusama RPC: {e}")
-                print("Adapter will work in offline mode for some operations")
+            # Try each endpoint until one works
+            for endpoint in self.endpoints:
+                try:
+                    print(f"🔌 Attempting connection to {endpoint}...")
+                    
+                    # Try without custom SSL context first (let substrate-interface handle it)
+                    self.substrate = SubstrateInterface(
+                        url=endpoint,
+                        ss58_format=42,  # Westend address format
+                        # Let substrate-interface use its own SSL handling
+                    )
+                    
+                    # Test the connection with proper API call
+                    chain_name = self.substrate.chain
+                    block_num = self.substrate.get_block_number(None)  # Pass None for latest block
+                    
+                    print(f"✅ Connected to Westend via {endpoint}")
+                    print(f"   Chain: {chain_name}, Block: {block_num}")
+                    self.rpc_url = endpoint  # Update to working endpoint
+                    break
+                    
+                except Exception as e:
+                    print(f"❌ Failed to connect to {endpoint}: {e}")
+                    self.substrate = None
+                    continue
+            
+            if not self.substrate:
+                print("⚠️  WARNING: All Westend endpoints failed")
+                print("⚠️  Demo will run in offline mode (Steps 1-3 only)")
+                print("⚠️  This may be due to network/firewall issues")
 
     async def _init_http_client(self):
         """Initialize HTTP client for fallback operations."""
