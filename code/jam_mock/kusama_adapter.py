@@ -13,9 +13,9 @@ import httpx
 import json
 import ssl
 from substrateinterface import SubstrateInterface, Keypair
-from interface import JAMInterface, JAMMode
-from ssl_utils import SSLUtils
-from keypair_manager import KeypairManager
+from .interface import JAMInterface, JAMMode
+from .ssl_utils import SSLUtils
+from .keypair_manager import KeypairManager
 
 
 class WestendAdapter(JAMInterface):

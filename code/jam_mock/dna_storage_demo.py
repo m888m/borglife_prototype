@@ -30,7 +30,7 @@ from synthesis.dna_parser import DNAParser
 from synthesis.phenotype_encoder import PhenotypeEncoder
 from transaction_manager import TransactionManager
 from advanced_keypair_features import AdvancedKeypairManager
-from kusama_adapter import WestendAdapter
+from .kusama_adapter import WestendAdapter
 from demo_metrics import DemoMetricsCollector, DemoAlertManager
 
 
