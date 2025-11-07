@@ -353,25 +353,56 @@ class KeypairManager:
 
     def _save_keypair_to_disk(self, name: str, keypair: Keypair, public_info: Dict[str, Any]):
         """
-        Encrypt and save keypair to disk.
+        Encrypt and save keypair to disk using PBKDF2 + Fernet (production secure).
         """
         # Prepare data to encrypt
         keypair_data = {
-            'seed_hex': keypair.seed_hex,
+            'seed_hex': keypair.seed_hex.hex() if hasattr(keypair.seed_hex, 'hex') else str(keypair.seed_hex),
             'public_key': keypair.public_key.hex(),
             'ss58_address': keypair.ss58_address,
-            'ss58_format': keypair.ss58_format
+            'ss58_format': keypair.ss58_format,
+            'encrypted_at': self._get_timestamp(),
+            'encryption_version': 'pbkdf2_fernet'
         }
 
-        # Simple XOR encryption (for development only - NOT production secure)
-        json_str = json.dumps(keypair_data)
-        json_bytes = json_str.encode()
-        encrypted_data = self._xor_encrypt(json_bytes, self.encryption_key)
+        # Use PBKDF2 + Fernet encryption (production secure)
+        import base64
+        from cryptography.fernet import Fernet
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-        # Save encrypted data
+        # Generate random salt for this keypair
+        salt = os.urandom(16)
+
+        # Derive encryption key from master encryption key using PBKDF2
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000,  # High iteration count for security
+        )
+        derived_key = base64.urlsafe_b64encode(kdf.derive(self.encryption_key))
+
+        # Encrypt data with Fernet
+        cipher = Fernet(derived_key)
+        json_str = json.dumps(keypair_data, indent=2)
+        encrypted_data = cipher.encrypt(json_str.encode())
+
+        # Store encrypted data with salt
+        keystore_data = {
+            'encrypted_data': base64.b64encode(encrypted_data).decode(),
+            'salt': base64.b64encode(salt).decode(),
+            'created_at': self._get_timestamp(),
+            'encryption_version': 'pbkdf2_fernet'
+        }
+
+        # Save encrypted keystore
         keypair_file = self.storage_path / f"{name}.enc"
-        with open(keypair_file, 'wb') as f:
-            f.write(encrypted_data)
+        with open(keypair_file, 'w') as f:
+            json.dump(keystore_data, f, indent=2)
+
+        # Set secure file permissions
+        os.chmod(keypair_file, 0o600)
 
         # Update metadata
         metadata = self._load_metadata()
@@ -380,20 +411,51 @@ class KeypairManager:
 
     def _load_keypair_from_disk(self, name: str) -> Keypair:
         """
-        Load and decrypt keypair from disk.
+        Load and decrypt keypair from disk using PBKDF2 + Fernet.
         """
         keypair_file = self.storage_path / f"{name}.enc"
 
         if not keypair_file.exists():
             raise KeypairSecurityError(f"Keypair '{name}' not found")
 
-        # Load encrypted data
-        with open(keypair_file, 'rb') as f:
-            encrypted_data = f.read()
+        # Load keystore data
+        with open(keypair_file, 'r') as f:
+            keystore_data = json.load(f)
 
-        # Decrypt
-        json_bytes = self._xor_decrypt(encrypted_data, self.encryption_key)
-        keypair_data = json.loads(json_bytes.decode())
+        # Check encryption version
+        if keystore_data.get('encryption_version') != 'pbkdf2_fernet':
+            # Fallback to old XOR encryption for backward compatibility
+            # Load encrypted data
+            with open(keypair_file, 'rb') as f:
+                encrypted_data = f.read()
+
+            # Decrypt with XOR (legacy)
+            json_bytes = self._xor_decrypt(encrypted_data, self.encryption_key)
+            keypair_data = json.loads(json_bytes.decode())
+        else:
+            # Use PBKDF2 + Fernet decryption
+            import base64
+            from cryptography.fernet import Fernet
+            from cryptography.hazmat.primitives import hashes
+            from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+            # Get salt and encrypted data
+            salt = base64.b64decode(keystore_data['salt'])
+            encrypted_data = base64.b64decode(keystore_data['encrypted_data'])
+
+            # Derive decryption key
+            kdf = PBKDF2HMAC(
+                algorithm=hashes.SHA256(),
+                length=32,
+                salt=salt,
+                iterations=100000,
+            )
+            derived_key = base64.urlsafe_b64encode(kdf.derive(self.encryption_key))
+
+            # Decrypt data
+            cipher = Fernet(derived_key)
+            decrypted_data = cipher.decrypt(encrypted_data)
+            keypair_data = json.loads(decrypted_data.decode())
 
         # Recreate keypair
         keypair = Keypair.create_from_seed(

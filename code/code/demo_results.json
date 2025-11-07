@@ -1,0 +1,108 @@
+{
+  "demo_status": "completed",
+  "timestamp": "now",
+  "summary": {
+    "borgs_created": 4,
+    "funding_transactions": 4,
+    "inter_borg_transfers": 2,
+    "total_usdb_transferred": 4610.0
+  },
+  "borgs": [
+    {
+      "borg_id": "borg_1",
+      "address": "5CGCHhyKsBjuGUQdGUtctX2yWMrXqpiZMgc7AoqJ94s8XQzY",
+      "dna_hash": "70dc30e5f051bc84ab71de98f93b56734ae4bc8344ffdf675ac4215b22e25f73",
+      "created_at": "now"
+    },
+    {
+      "borg_id": "borg_2",
+      "address": "5DLq1mqSWMooy3VnJ4rnzdpjeeAFCGNtZaS4NxLnqbjfSSTG",
+      "dna_hash": "881a231d2bc8f88c20d5e8e19b47a5fd7314791d7177bd3acf8b09ff04c75875",
+      "created_at": "now"
+    },
+    {
+      "borg_id": "borg_3",
+      "address": "5GEVyvurQkUoTjViidPMespnZLehTfm2QHGbzj2328WWM5nh",
+      "dna_hash": "91367123d4fc5cf8bb4f353a66a7ad95ef6000d233ee6afd4315dc7fbd168a21",
+      "created_at": "now"
+    },
+    {
+      "borg_id": "borg_4",
+      "address": "5FR3w1oQ2UEjo7Fk8M27aYiUcBEW14i3sAWNdweuhA4yd7rX",
+      "dna_hash": "944ec60ed453ffc23cbdbefcb2e206418cfa2a2cf84392ff64a10bc9d872c05b",
+      "created_at": "now"
+    }
+  ],
+  "transactions": [
+    {
+      "type": "funding",
+      "borg_id": "borg_1",
+      "from_address": "5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD",
+      "to_address": "5CGCHhyKsBjuGUQdGUtctX2yWMrXqpiZMgc7AoqJ94s8XQzY",
+      "amount_usdb": 1050.0,
+      "amount_planck": 1050000000000000,
+      "tx_hash": "0xd685f7d5f4756878a417a2746259370e1d399c448a91ab3c8d547f420a00aaef",
+      "block_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "timestamp": "now"
+    },
+    {
+      "type": "funding",
+      "borg_id": "borg_2",
+      "from_address": "5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD",
+      "to_address": "5DLq1mqSWMooy3VnJ4rnzdpjeeAFCGNtZaS4NxLnqbjfSSTG",
+      "amount_usdb": 1050.0,
+      "amount_planck": 1050000000000000,
+      "tx_hash": "0xb8881d68cd36e49b27ac96156a320a283c6ecd202c1e5bb25979e4cfa594c204",
+      "block_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "timestamp": "now"
+    },
+    {
+      "type": "funding",
+      "borg_id": "borg_3",
+      "from_address": "5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD",
+      "to_address": "5GEVyvurQkUoTjViidPMespnZLehTfm2QHGbzj2328WWM5nh",
+      "amount_usdb": 1050.0,
+      "amount_planck": 1050000000000000,
+      "tx_hash": "0xe51a55d37c03c71ae6b4c85867f7d3edaa0fd5a5cd2ab227ded5108223a7cbbc",
+      "block_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "timestamp": "now"
+    },
+    {
+      "type": "funding",
+      "borg_id": "borg_4",
+      "from_address": "5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD",
+      "to_address": "5FR3w1oQ2UEjo7Fk8M27aYiUcBEW14i3sAWNdweuhA4yd7rX",
+      "amount_usdb": 1050.0,
+      "amount_planck": 1050000000000000,
+      "tx_hash": "0xc3953e5388c005941e580572bf02d23f4c0bfb4d235f05a9d4556046ec2ee086",
+      "block_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "timestamp": "now"
+    }
+  ],
+  "transfers": [
+    {
+      "type": "borg_transfer",
+      "from_borg": "borg_2",
+      "to_borg": "borg_4",
+      "from_address": "5DLq1mqSWMooy3VnJ4rnzdpjeeAFCGNtZaS4NxLnqbjfSSTG",
+      "to_address": "5FR3w1oQ2UEjo7Fk8M27aYiUcBEW14i3sAWNdweuhA4yd7rX",
+      "amount_usdb": 233.0,
+      "amount_planck": 233000000000000,
+      "tx_hash": "0xa1b4c7ba37b6f2e938c90d1f41a52ee4a5280c80c9eb08daf1d44ce9400c9aa7",
+      "block_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "timestamp": "now"
+    },
+    {
+      "type": "borg_transfer",
+      "from_borg": "borg_3",
+      "to_borg": "borg_1",
+      "from_address": "5GEVyvurQkUoTjViidPMespnZLehTfm2QHGbzj2328WWM5nh",
+      "to_address": "5CGCHhyKsBjuGUQdGUtctX2yWMrXqpiZMgc7AoqJ94s8XQzY",
+      "amount_usdb": 177.0,
+      "amount_planck": 177000000000000,
+      "tx_hash": "0x3ab53a4ffa7ce68209d9b1bb685bf8cfc99197cf848ef092e3bd025a88670055",
+      "block_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "timestamp": "now"
+    }
+  ]
+}

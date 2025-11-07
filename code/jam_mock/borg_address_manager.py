@@ -24,17 +24,44 @@ class BorgAddressManager:
     encrypted storage with Supabase integration.
     """
 
-    def __init__(self, supabase_client=None, audit_logger: Optional[DemoAuditLogger] = None):
+    def __init__(self, supabase_client=None, audit_logger: Optional[DemoAuditLogger] = None, keystore: Optional[SecureKeyStore] = None):
         """
         Initialize BorgAddressManager.
 
         Args:
             supabase_client: Supabase client for database operations
             audit_logger: Audit logger for compliance tracking
+            keystore: Optional shared keystore instance (must be unlocked)
         """
         self.supabase = supabase_client
         self.audit_logger = audit_logger or DemoAuditLogger()
-        self.secure_storage = SecureKeyStore("code/jam_mock/.borg_keystore.enc")
+
+        # Use shared keystore if provided, otherwise create new one
+        if keystore:
+            self.secure_storage = keystore
+            self._shared_keystore = True
+        else:
+            self.secure_storage = SecureKeyStore("code/jam_mock/.borg_keystore.enc")
+            self._shared_keystore = False
+
+        # Unlock keystore automatically for demo purposes
+        # In production, this would require explicit password entry
+        try:
+            # Use a stronger password that meets complexity requirements
+            demo_password = "BorgLife_Demo_Password_2024!@#"
+            self.secure_storage.unlock_keystore(demo_password)
+            self.audit_logger.log_event(
+                "keystore_auto_unlocked",
+                "Keystore automatically unlocked for demo operations",
+                {"demo_mode": True}
+            )
+        except Exception as e:
+            self.audit_logger.log_event(
+                "keystore_unlock_failed",
+                f"Failed to auto-unlock keystore: {str(e)}",
+                {"error": str(e)}
+            )
+
         self.dna_anchor = DNAAanchor(audit_logger)
 
         # Cache for address lookups
@@ -113,18 +140,42 @@ class BorgAddressManager:
                 'ss58_address': keypair.ss58_address
             }
 
-            # Use proper Fernet encryption instead of base64
-            json_str = json.dumps(keypair_data, indent=2)
-            encrypted_data = self.secure_storage.store_keypair(borg_id, keypair, {
+            # Use proper Fernet encryption for keystore storage
+            success = self.secure_storage.store_keypair(borg_id, keypair, {
                 'dna_hash': dna_hash,
                 'created_at': datetime.utcnow().isoformat(),
                 'purpose': 'borg_fund_holding'
             })
 
-            # For database storage, we need a string representation
-            # Since store_keypair returns bool, we'll create a simple encrypted version for DB
-            import base64
-            db_encrypted_data = base64.b64encode(json_str.encode()).decode()
+            if not success:
+                raise Exception("Failed to store keypair in encrypted keystore")
+
+            # CRITICAL SECURITY FIX: Encrypt database storage with proper encryption
+            # Use PBKDF2 + Fernet encryption for database storage
+            json_str = json.dumps(keypair_data, indent=2)
+
+            # Get encryption cipher from secure keystore
+            try:
+                cipher = self.secure_storage._get_cipher()
+                encrypted_db_data = cipher.encrypt(json_str.encode())
+                # Base64 encode the encrypted data for database storage
+                import base64
+                db_encrypted_data = base64.b64encode(encrypted_db_data).decode()
+
+                self.audit_logger.log_event(
+                    "database_encryption_success",
+                    f"Database keypair storage encrypted for borg {borg_id}",
+                    {"borg_id": borg_id, "encryption_method": "pbkdf2_fernet"}
+                )
+            except Exception as e:
+                # Fallback to base64 only if keystore not unlocked (for backward compatibility)
+                # But log the security issue
+                self.audit_logger.log_event(
+                    "security_warning",
+                    f"Database keypair storage not encrypted for borg {borg_id}: {str(e)}",
+                    {"borg_id": borg_id, "error": str(e), "fallback": "base64_only"}
+                )
+                db_encrypted_data = base64.b64encode(json_str.encode()).decode()
 
             # Anchor DNA hash on-chain for tamper-evident proof
             anchoring_tx_hash = self.dna_anchor.anchor_dna_hash(dna_hash, borg_id)
@@ -286,14 +337,44 @@ class BorgAddressManager:
                 )
                 return None
 
-            # Decrypt keypair data using proper Fernet decryption
+            # CRITICAL SECURITY FIX: Decrypt database-stored keypairs with proper encryption
             import base64
-            decrypted_bytes = base64.b64decode(encrypted_data)
-            keypair_data = json.loads(decrypted_bytes.decode())
+            encrypted_bytes = base64.b64decode(encrypted_data)
+
+            try:
+                # Try to decrypt with Fernet (new secure method)
+                cipher = self.secure_storage._get_cipher()
+                decrypted_bytes = cipher.decrypt(encrypted_bytes)
+                keypair_data = json.loads(decrypted_bytes.decode())
+            except Exception:
+                # Fallback to direct base64 decode for backward compatibility
+                # This handles existing unencrypted database entries
+                try:
+                    keypair_data = json.loads(encrypted_bytes.decode())
+                    self.audit_logger.log_event(
+                        "security_warning",
+                        f"Retrieved unencrypted keypair data for borg {borg_id} - database encryption not applied",
+                        {"borg_id": borg_id, "dna_hash": dna_hash[:16] if dna_hash else None}
+                    )
+                except Exception as fallback_error:
+                    self.audit_logger.log_event(
+                        "keypair_retrieval_failed",
+                        f"Failed to decrypt keypair data for borg {borg_id}: {str(fallback_error)}",
+                        {"borg_id": borg_id, "error": str(fallback_error)}
+                    )
+                    return None
 
             # Recreate keypair from private key (more reliable than seed)
-            private_key = bytes.fromhex(keypair_data['private_key'])
-            keypair = Keypair(private_key=private_key)
+            try:
+                private_key = bytes.fromhex(keypair_data['private_key'])
+                keypair = Keypair(private_key=private_key)
+            except Exception as key_error:
+                self.audit_logger.log_event(
+                    "keypair_reconstruction_failed",
+                    f"Failed to reconstruct keypair for borg {borg_id}: {str(key_error)}",
+                    {"borg_id": borg_id, "error": str(key_error)}
+                )
+                return None
 
             self.audit_logger.log_event(
                 "keypair_retrieved",
