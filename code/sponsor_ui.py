@@ -118,8 +118,8 @@ class SponsorUI:
             st.warning("⚠️ Please initialize services in the sidebar first.")
             return
 
-        tab1, tab2, tab3, tab4 = st.tabs([
-            "🏦 Fund Borg", "🧬 Create Borg", "🎯 Execute Task", "📊 Results & History"
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "🏦 Fund Borg", "🧬 Create Borg", "🎯 Execute Task", "💰 Fund Management", "📊 Results & History"
         ])
 
         with tab1:
@@ -132,6 +132,9 @@ class SponsorUI:
             self.execute_task_tab()
 
         with tab4:
+            self.fund_management_tab()
+
+        with tab5:
             self.results_history_tab()
 
     def fund_borg_tab(self):
@@ -357,6 +360,211 @@ class SponsorUI:
 
             except Exception as e:
                 st.error(f"Task execution failed: {e}")
+
+    def fund_management_tab(self):
+        """Tab for fund management and USDB transfers."""
+        st.header("💰 Fund Management & USDB Transfers")
+
+        st.markdown("""
+        **Phase 2A:** Manage dual-currency balances and execute secure USDB transfers between borgs.
+        USDB enables economic wealth storage separate from WND operational costs.
+        """)
+
+        if not self.current_borg:
+            st.warning("⚠️ Please fund and create a borg first.")
+            return
+
+        # Initialize fund management components if needed
+        if not hasattr(self, 'fund_manager'):
+            self._init_fund_management()
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            self._display_balance_summary()
+
+        with col2:
+            self._display_transfer_interface()
+
+        # Transfer history
+        self._display_transfer_history()
+
+    def _init_fund_management(self):
+        """Initialize fund management components."""
+        try:
+            from jam_mock.borg_address_manager import BorgAddressManager
+            from jam_mock.inter_borg_transfer import InterBorgTransfer
+            from jam_mock.economic_validator import EconomicValidator
+            from jam_mock.ethical_compliance_monitor import EthicalComplianceMonitor
+            from jam_mock.demo_cost_controller import DemoCostController
+            from jam_mock.transaction_manager import TransactionManager
+
+            # Mock Supabase client for demo
+            supabase_client = None
+
+            self.address_manager = BorgAddressManager(
+                supabase_client=supabase_client,
+                audit_logger=DemoAuditLogger()
+            )
+
+            self.cost_controller = DemoCostController()
+            self.compliance_monitor = EthicalComplianceMonitor()
+            self.economic_validator = EconomicValidator(
+                cost_controller=self.cost_controller,
+                compliance_monitor=self.compliance_monitor,
+                supabase_client=supabase_client
+            )
+
+            self.transaction_manager = TransactionManager(
+                kusama_adapter=self.jam,
+                keypair_manager=None  # Would need proper keypair manager
+            )
+
+            self.transfer_protocol = InterBorgTransfer(
+                westend_adapter=self.jam,
+                address_manager=self.address_manager,
+                economic_validator=self.economic_validator,
+                transaction_manager=self.transaction_manager
+            )
+
+            self.fund_manager = True
+
+        except ImportError as e:
+            st.error(f"Phase 2A components not available: {e}")
+            st.info("Run Phase 2A implementation to enable fund management features.")
+
+    def _display_balance_summary(self):
+        """Display dual-currency balance summary."""
+        st.markdown("### Balance Summary")
+
+        try:
+            # Get balance summary
+            balance_summary = asyncio.run(
+                self.transfer_protocol.get_borg_balance_summary(self.current_borg['id'])
+            )
+
+            if 'error' in balance_summary:
+                st.error(f"Failed to load balances: {balance_summary['error']}")
+                return
+
+            # Display balances
+            col1, col2 = st.columns(2)
+
+            with col1:
+                wnd_balance = balance_summary['balances']['WND']['database']
+                st.metric("WND Balance", f"{wnd_balance} WND")
+                st.caption("Blockchain operations & gas fees")
+
+            with col2:
+                usdb_balance = balance_summary['balances']['USDB']['database']
+                st.metric("USDB Balance", f"{usdb_balance} USDB")
+                st.caption("Economic wealth & transfers")
+
+            # Quick actions
+            st.markdown("### Quick Actions")
+
+            if st.button("🚰 Request USDB Funds"):
+                # Simulate faucet request
+                st.info("USDB faucet would distribute funds here")
+                st.success("✅ 50 USDB distributed (simulated)")
+
+            if st.button("🔄 Sync Balances"):
+                st.info("Balance synchronization would occur here")
+                st.success("✅ Balances synchronized")
+
+        except Exception as e:
+            st.error(f"Balance display error: {e}")
+
+    def _display_transfer_interface(self):
+        """Display USDB transfer interface."""
+        st.markdown("### Transfer USDB")
+
+        # Transfer form
+        with st.form("usdb_transfer"):
+            to_borg_id = st.text_input(
+                "Recipient Borg ID",
+                help="ID of the borg to receive USDB"
+            )
+
+            amount = st.number_input(
+                "Amount (USDB)",
+                min_value=0.01,
+                max_value=1000.0,
+                value=10.0,
+                step=0.1,
+                help="Amount of USDB to transfer"
+            )
+
+            description = st.text_area(
+                "Description (Optional)",
+                height=60,
+                help="Purpose of the transfer"
+            )
+
+            submitted = st.form_submit_button("💸 Transfer USDB", type="primary")
+
+            if submitted:
+                if not to_borg_id.strip():
+                    st.error("Please enter recipient borg ID")
+                    return
+
+                try:
+                    with st.spinner("Processing transfer..."):
+                        # Execute transfer
+                        result = asyncio.run(self.transfer_protocol.transfer_usdb(
+                            from_borg_id=self.current_borg['id'],
+                            to_borg_id=to_borg_id,
+                            amount=Decimal(str(amount)),
+                            description=description or "Manual transfer"
+                        ))
+
+                    if result['success']:
+                        st.success("✅ Transfer completed successfully!")
+                        st.info(f"Transaction ID: {result['transfer_id']}")
+                        st.info(f"Blockchain TX: {result['transaction_hash']}")
+
+                        # Refresh balances
+                        st.rerun()
+                    else:
+                        st.error("❌ Transfer failed:")
+                        for error in result.get('errors', []):
+                            st.error(f"  • {error}")
+
+                except Exception as e:
+                    st.error(f"Transfer error: {e}")
+
+    def _display_transfer_history(self):
+        """Display transfer history."""
+        st.markdown("### Transfer History")
+
+        try:
+            # Get transfer history
+            history = asyncio.run(
+                self.transfer_protocol.get_transfer_history(self.current_borg['id'], limit=10)
+            )
+
+            if not history:
+                st.info("No transfers yet.")
+                return
+
+            # Display as table
+            import pandas as pd
+
+            df_data = []
+            for transfer in history:
+                df_data.append({
+                    'Direction': transfer['direction'].title(),
+                    'Amount': f"{transfer['amount']} USDB",
+                    'Counterparty': transfer['to_borg_id'] if transfer['direction'] == 'sent' else transfer['from_borg_id'],
+                    'Status': transfer['status'].title(),
+                    'Date': time.strftime('%Y-%m-%d %H:%M', time.localtime(float(transfer['created_at'])))
+                })
+
+            df = pd.DataFrame(df_data)
+            st.dataframe(df, use_container_width=True)
+
+        except Exception as e:
+            st.error(f"History display error: {e}")
 
     def results_history_tab(self):
         """Tab for viewing results and execution history."""

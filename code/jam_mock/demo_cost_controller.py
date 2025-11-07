@@ -3,7 +3,7 @@ Cost Control System for BorgLife Demo
 Implements spending limits and budget tracking for ethical compliance.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from decimal import Decimal
 from datetime import datetime, timedelta
 import json

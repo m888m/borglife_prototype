@@ -18,6 +18,10 @@ class DemoAuditLogger:
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         self.session_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
 
+    def log_event(self, operation: str, message: str, details: Dict[str, Any] = None) -> bool:
+        """Log event with message and details (compatibility method)"""
+        return self.log_operation(operation, 'system', details or {}, 'success', None)
+
     def log_operation(self, operation: str, user_id: str, details: Dict[str, Any],
                      status: str = 'success', error_details: str = None) -> bool:
         """Log all demo operations with full context"""
@@ -33,7 +37,7 @@ class DemoAuditLogger:
                 'environment': {
                     'user': os.getenv('USER', 'unknown'),
                     'hostname': os.getenv('HOSTNAME', 'unknown'),
-                    'python_version': os.sys.version.split()[0] if 'os' in globals() else 'unknown'
+                    'python_version': os.sys.version.split()[0]
                 }
             }
 

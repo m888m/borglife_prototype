@@ -42,8 +42,8 @@ class WestendAdapter(JAMInterface):
         # Initialize keypair manager
         self.keypair_manager = KeypairManager()
 
-        # In-memory cache for wealth tracking (since Kusama doesn't have native wealth tracking)
-        self.wealth_cache: Dict[str, Decimal] = {}
+        # Dual-currency wealth tracking for Phase 2A
+        self.wealth_cache: Dict[str, Dict[str, Decimal]] = {}  # borg_id -> {currency: balance}
         self.transaction_cache: Dict[str, list] = {}
 
         # Block scanning configuration
@@ -578,6 +578,7 @@ class WestendAdapter(JAMInterface):
             'keypair_configured': self.keypair is not None,
             'cached_wealth_records': len(self.wealth_cache),
             'cached_transactions': len(self.tx_cache),
+            'usdb_asset_id': self._get_usdb_asset_id(),
             'scan_config': {
                 'max_scan_blocks': self.max_scan_blocks,
                 'scan_batch_size': self.scan_batch_size,
@@ -735,3 +736,251 @@ class WestendAdapter(JAMInterface):
     def set_keypair_from_uri(self, uri: str):
         """Set keypair from URI (seed or mnemonic)."""
         self.keypair = Keypair.create_from_uri(uri)
+
+    # Phase 2A: Dual-Currency Support Methods
+
+    async def transfer_usdb(self, from_address: str, to_address: str, amount: int, asset_id: int) -> Dict[str, Any]:
+        """
+        Transfer USDB assets between addresses using assets.transfer extrinsic.
+
+        Args:
+            from_address: Sender's substrate address
+            to_address: Recipient's substrate address
+            amount: Amount to transfer in planck units
+            asset_id: USDB asset ID
+
+        Returns:
+            Transfer result with success status and transaction details
+        """
+        if not self.substrate:
+            return {'success': False, 'error': 'No substrate connection'}
+
+        if not self.keypair:
+            return {'success': False, 'error': 'No keypair configured'}
+
+        try:
+            # Compose assets.transfer extrinsic
+            call = self.substrate.compose_call(
+                call_module='Assets',
+                call_function='transfer',
+                call_params={
+                    'id': asset_id,
+                    'target': to_address,
+                    'amount': amount
+                }
+            )
+
+            # Create signed extrinsic
+            extrinsic = self.substrate.create_signed_extrinsic(
+                call=call,
+                keypair=self.keypair
+            )
+
+            # Submit and wait for inclusion
+            receipt = self.substrate.submit_extrinsic(extrinsic, wait_for_inclusion=True)
+
+            if receipt.is_success:
+                return {
+                    'success': True,
+                    'transaction_hash': receipt.extrinsic_hash,
+                    'block_hash': receipt.block_hash,
+                    'block_number': receipt.block_number,
+                    'from_address': from_address,
+                    'to_address': to_address,
+                    'amount': amount,
+                    'asset_id': asset_id
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': f'Transfer failed: {receipt.error_message}',
+                    'from_address': from_address,
+                    'to_address': to_address,
+                    'amount': amount
+                }
+
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'from_address': from_address,
+                'to_address': to_address,
+                'amount': amount
+            }
+
+    async def get_usdb_balance(self, address: str, asset_id: int) -> int:
+        """
+        Query USDB balance for an address using Assets.Account storage.
+
+        Args:
+            address: Substrate address to query
+            asset_id: USDB asset ID
+
+        Returns:
+            Balance in planck units
+        """
+        if not self.substrate:
+            return 0
+
+        try:
+            # Query Assets.Account storage
+            account_info = self.substrate.query(
+                module='Assets',
+                storage_function='Account',
+                params=[asset_id, address]
+            )
+
+            if account_info.value:
+                return account_info.value.get('balance', 0)
+            else:
+                return 0
+
+        except Exception as e:
+            print(f"Error querying USDB balance for {address}: {e}")
+            return 0
+
+    async def get_wnd_balance(self, address: str) -> int:
+        """
+        Query WND balance for an address using System.Account storage.
+
+        Args:
+            address: Substrate address to query
+
+        Returns:
+            Balance in planck units
+        """
+        if not self.substrate:
+            return 0
+
+        try:
+            # Query System.Account storage
+            account_info = self.substrate.query(
+                module='System',
+                storage_function='Account',
+                params=[address]
+            )
+
+            if account_info.value and 'data' in account_info.value:
+                return account_info.value['data'].get('free', 0)
+            else:
+                return 0
+
+        except Exception as e:
+            print(f"Error querying WND balance for {address}: {e}")
+            return 0
+
+    async def get_dual_balance(self, address: str, asset_id: Optional[int] = None) -> Dict[str, int]:
+        """
+        Get both WND and USDB balances for an address.
+
+        Args:
+            address: Substrate address to query
+            asset_id: USDB asset ID (if None, will try to get from config)
+
+        Returns:
+            Dict with 'wnd' and 'usdb' balance keys
+        """
+        # Get asset_id from config if not provided
+        if asset_id is None:
+            asset_id = self._get_usdb_asset_id()
+
+        wnd_balance = await self.get_wnd_balance(address)
+        usdb_balance = await self.get_usdb_balance(address, asset_id) if asset_id else 0
+
+        return {
+            'wnd': wnd_balance,
+            'usdb': usdb_balance
+        }
+
+    def _get_usdb_asset_id(self) -> Optional[int]:
+        """Get USDB asset ID from configuration."""
+        try:
+            config_path = os.path.join(os.path.dirname(__file__), '..', '.borglife_config')
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    for line in f:
+                        if line.startswith('USDB_ASSET_ID='):
+                            return int(line.split('=', 1)[1].strip())
+        except Exception as e:
+            print(f"Warning: Could not read USDB asset ID from config: {e}")
+
+        return None
+
+    async def update_wealth_dual(self, borg_id: str, currency: str, amount: Decimal, operation: str, description: str) -> bool:
+        """
+        Update wealth balance for dual-currency system.
+
+        Args:
+            borg_id: Borg identifier
+            currency: 'WND' or 'USDB'
+            amount: Amount to add/subtract
+            operation: 'revenue', 'transfer', or 'cost'
+            description: Transaction description
+
+        Returns:
+            True if update successful
+        """
+        if currency not in ['WND', 'USDB']:
+            raise ValueError(f"Invalid currency: {currency}")
+
+        if borg_id not in self.wealth_cache:
+            self.wealth_cache[borg_id] = {'WND': Decimal('0'), 'USDB': Decimal('0')}
+
+        # Update balance
+        if operation in ['revenue', 'transfer']:
+            self.wealth_cache[borg_id][currency] += amount
+        elif operation == 'cost':
+            self.wealth_cache[borg_id][currency] -= amount
+        else:
+            raise ValueError(f"Unknown operation: {operation}")
+
+        # Log transaction
+        if borg_id not in self.transaction_cache:
+            self.transaction_cache[borg_id] = []
+
+        transaction = {
+            'timestamp': time.time(),
+            'currency': currency,
+            'operation': operation,
+            'amount': float(amount),
+            'description': description,
+            'balance_after': float(self.wealth_cache[borg_id][currency])
+        }
+
+        self.transaction_cache[borg_id].append(transaction)
+
+        return True
+
+    async def get_wealth_balance_dual(self, borg_id: str, currency: str) -> Decimal:
+        """
+        Get wealth balance for specific currency.
+
+        Args:
+            borg_id: Borg identifier
+            currency: 'WND' or 'USDB'
+
+        Returns:
+            Balance as Decimal
+        """
+        if currency not in ['WND', 'USDB']:
+            raise ValueError(f"Invalid currency: {currency}")
+
+        if borg_id not in self.wealth_cache:
+            return Decimal('0')
+
+        return self.wealth_cache[borg_id].get(currency, Decimal('0'))
+
+    async def get_wealth_summary(self, borg_id: str) -> Dict[str, Decimal]:
+        """
+        Get complete wealth summary for a borg.
+
+        Args:
+            borg_id: Borg identifier
+
+        Returns:
+            Dict with WND and USDB balances
+        """
+        return {
+            'WND': await self.get_wealth_balance_dual(borg_id, 'WND'),
+            'USDB': await self.get_wealth_balance_dual(borg_id, 'USDB')
+        }

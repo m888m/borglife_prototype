@@ -16,7 +16,7 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 
 from substrateinterface import SubstrateInterface, Keypair
-from advanced_keypair_features import AdvancedKeypairManager, TransactionSigner
+from .advanced_keypair_features import AdvancedKeypairManager, TransactionSigner
 
 
 class TransactionStatus(Enum):
@@ -34,6 +34,8 @@ class TransactionType(Enum):
     DNA_STORAGE = "dna_storage"
     WEALTH_UPDATE = "wealth_update"
     BATCH_OPERATION = "batch_operation"
+    TRANSFER = "transfer"           # WND transfers
+    ASSET_TRANSFER = "asset_transfer"  # USDB transfers
 
 
 @dataclass
@@ -54,6 +56,11 @@ class TransactionRecord:
     error_message: Optional[str] = None
     retry_count: int = 0
     max_retries: int = 3
+    # Phase 2A: Transfer-specific fields
+    from_borg_id: Optional[str] = None
+    to_borg_id: Optional[str] = None
+    currency: Optional[str] = None  # 'WND' or 'USDB'
+    transfer_amount: Optional[Decimal] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""

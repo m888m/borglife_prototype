@@ -17,7 +17,7 @@ import binascii
 
 from substrateinterface import Keypair, KeypairType
 from substrateinterface.utils.ss58 import ss58_encode, ss58_decode
-from keypair_manager import KeypairManager, KeypairSecurityError
+from .keypair_manager import KeypairManager, KeypairSecurityError
 
 
 class AdvancedKeypairManager(KeypairManager):
