@@ -184,12 +184,12 @@ async def test_docker_mcp_authentication():
     auth_manager = DockerMCPAuthManager()
 
     # Add credentials
-    auth_manager.add_credential('gmail', 'app_password', 'test_password')
+    auth_manager.add_credential('gmail', 'app_password', 'test_app_password')
     auth_manager.add_credential('stripe', 'api_key', 'sk_test_123')
 
     # Retrieve credentials
     gmail_cred = auth_manager.get_credential('gmail')
-    assert gmail_cred == 'test_password'
+    assert gmail_cred == 'test_app_password'
 
     stripe_cred = auth_manager.get_credential('stripe')
     assert stripe_cred == 'sk_test_123'

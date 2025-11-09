@@ -6,10 +6,12 @@ Production-grade encrypted dispenser with access controls and audit logging.
 import os
 import json
 import hashlib
+import re
 from typing import Dict, Any, Optional
 from decimal import Decimal
 from datetime import datetime, timedelta
 from substrateinterface import Keypair
+import keyring
 
 from .dna_anchor import DNAAanchor
 import sys
@@ -38,8 +40,8 @@ class SecureDispenser:
         self.dna_anchor = DNAAanchor()
 
         # Transfer limits and controls
-        self.max_transfer_amount = Decimal('0.01')  # Max 0.01 WND per transfer
-        self.daily_limit = Decimal('1.0')           # Max 1.0 WND per day
+        self.max_transfer_amount = Decimal('3.0')   # Max 3.0 WND per transfer
+        self.daily_limit = Decimal('9.0')           # Max 9.0 WND per day
         self.min_balance_threshold = Decimal('0.1') # Alert when balance drops below
 
         # Session management
@@ -58,95 +60,88 @@ class SecureDispenser:
             return False
         return True
 
-    def _load_master_password_securely(self) -> Optional[str]:
-        """Load master password from secure persistent storage."""
+    def _get_keyring_service_name(self) -> str:
+        """Get the keyring service name for dispenser keys."""
+        return "borglife-dispenser"
+
+    def _store_keypair_atomic(self, keypair: Keypair, service_name: str) -> bool:
+        """Store keypair with rollback on failure."""
+        stored_keys = []
         try:
-            password_file = os.path.expanduser("~/.borglife_master_key.enc")
-            if not os.path.exists(password_file):
-                return None
-
-            # Read encrypted password file
-            with open(password_file, 'rb') as f:
-                encrypted_data = f.read()
-
-            # Get system-specific salt for decryption
-            import socket
-            import getpass
-            hostname = socket.gethostname()
-            username = getpass.getuser()
-            salt_source = f"{username}@{hostname}_borglife_master".encode()
-
-            # Derive decryption key
-            import base64
-            from cryptography.fernet import Fernet
-            from cryptography.hazmat.primitives import hashes
-            from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-
-            kdf = PBKDF2HMAC(
-                algorithm=hashes.SHA256(),
-                length=32,
-                salt=salt_source[:16],  # Use first 16 bytes as salt
-                iterations=100000,
-            )
-            key = base64.urlsafe_b64encode(kdf.derive(salt_source))
-
-            # Decrypt password
-            cipher = Fernet(key)
-            decrypted_data = cipher.decrypt(encrypted_data)
-            return decrypted_data.decode()
-
-        except Exception:
-            return None
-
-    def _save_master_password_securely(self, password: str) -> bool:
-        """Save master password to secure persistent storage."""
-        try:
-            password_file = os.path.expanduser("~/.borglife_master_key.enc")
-
-            # Get system-specific salt for encryption
-            import socket
-            import getpass
-            hostname = socket.gethostname()
-            username = getpass.getuser()
-            salt_source = f"{username}@{hostname}_borglife_master".encode()
-
-            # Derive encryption key
-            import base64
-            from cryptography.fernet import Fernet
-            from cryptography.hazmat.primitives import hashes
-            from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-
-            kdf = PBKDF2HMAC(
-                algorithm=hashes.SHA256(),
-                length=32,
-                salt=salt_source[:16],  # Use first 16 bytes as salt
-                iterations=100000,
-            )
-            key = base64.urlsafe_b64encode(kdf.derive(salt_source))
-
-            # Encrypt password
-            cipher = Fernet(key)
-            encrypted_data = cipher.encrypt(password.encode())
-
-            # Write to file with secure permissions
-            with open(password_file, 'wb') as f:
-                f.write(encrypted_data)
-
-            # Set owner-only permissions
-            os.chmod(password_file, 0o600)
+            # Store each component
+            for key_type, value in [
+                ('private_key', keypair.private_key.hex()),
+                ('public_key', keypair.public_key.hex()),
+                ('address', keypair.ss58_address)
+            ]:
+                keyring.set_password(service_name, key_type, value)
+                stored_keys.append(key_type)
 
             return True
-
-        except Exception:
+        except Exception as e:
+            # Rollback on failure
+            for key_type in stored_keys:
+                try:
+                    keyring.delete_password(service_name, key_type)
+                except:
+                    pass  # Best effort cleanup
+            print(f"Failed to store keypair in keyring: {e}")
             return False
 
-    def setup_keystore(self, dispenser_seed: Optional[str] = None, master_password: Optional[str] = None) -> bool:
+    def _safe_load_keypair(self, private_key_hex: str) -> Optional[Keypair]:
+        """Safely reconstruct keypair with validation."""
+        try:
+            # Validate hex format and length (64 hex chars = 32 bytes)
+            if not re.match(r'^[0-9a-fA-F]{128}$', private_key_hex):
+                raise ValueError("Invalid private key format - must be 128 hex characters (64 bytes)")
+
+            private_key = bytes.fromhex(private_key_hex)
+            keypair = Keypair(private_key=private_key, ss58_format=42)
+
+            # Verify keypair integrity
+            if not keypair.public_key or not keypair.ss58_address:
+                raise ValueError("Invalid keypair generated")
+
+            return keypair
+        except Exception as e:
+            self.audit_logger.log_event(
+                "keypair_reconstruction_failed",
+                f"Failed to reconstruct keypair: {str(e)}",
+                {"error": str(e)}
+            )
+            return None
+
+    def _load_keypair_from_keyring(self, service_name: str) -> Optional[Keypair]:
+        """Load keypair from macOS Keychain with safe reconstruction."""
+        try:
+            private_key_hex = keyring.get_password(service_name, "private_key")
+            public_key_hex = keyring.get_password(service_name, "public_key")
+
+            if not private_key_hex or not public_key_hex:
+                return None
+
+            # Use safe keypair reconstruction
+            keypair = self._safe_load_keypair(private_key_hex)
+            if not keypair:
+                return None
+
+            # Verify keys match
+            if keypair.public_key.hex() != public_key_hex:
+                print("Keyring keypair integrity check failed")
+                return None
+
+            return keypair
+
+        except Exception as e:
+            print(f"Failed to load keypair from keyring: {e}")
+            return None
+
+    def setup_keystore(self, dispenser_seed: Optional[str] = None) -> bool:
         """
-        Set up encrypted keystore for dispenser with master password protection.
+        Set up dispenser keypair stored securely in macOS Keychain.
 
         Args:
             dispenser_seed: Dispenser seed (if None, uses config file)
-            master_password: Master password for encryption (if None, prompts user)
 
         Returns:
             True if setup successful
@@ -165,78 +160,24 @@ class SecureDispenser:
             if not dispenser_seed:
                 raise ValueError("No dispenser seed found in config")
 
-            # Get master password for encryption
-            if not master_password:
-                # Try to load from persistent storage first
-                master_password = self._load_master_password_securely()
-                if not master_password:
-                    # Prompt user securely
-                    print("🔐 Enter master password to encrypt dispenser keystore:")
-                    print("(Password will be hidden and saved securely)")
-                    try:
-                        import getpass
-                        master_password = getpass.getpass('Master password: ')
+            # Create keypair from seed with secure cleanup
+            keypair = self._process_seed_securely(dispenser_seed)
 
-                        # Offer to save password securely
-                        if master_password:
-                            save_choice = input("Save password securely for future sessions? (y/N): ").lower().strip()
-                            if save_choice == 'y':
-                                if self._save_master_password_securely(master_password):
-                                    print("✅ Password saved securely!")
-                                else:
-                                    print("⚠️  Password not saved - you'll need to enter it each session")
+            # Store keypair in macOS Keychain atomically
+            service_name = self._get_keyring_service_name()
+            if not self._store_keypair_atomic(keypair, service_name):
+                raise ValueError("Failed to store keypair in macOS Keychain")
 
-                    except (EOFError, KeyboardInterrupt, ImportError):
-                        print("⚠️  Secure password input not available")
-                        return False
-
-            if not master_password:
-                raise ValueError("Master password required for dispenser encryption")
-
-            # Create keypair from seed
-            keypair = Keypair.create_from_seed(dispenser_seed)
-
-            # Prepare dispenser data
-            dispenser_data = {
+            # Store metadata in keystore file (no sensitive data)
+            keystore_data = {
                 'seed_hash': hashlib.sha256(dispenser_seed.encode()).hexdigest(),  # Never store actual seed
-                'public_key': keypair.public_key.hex(),
-                'private_key': keypair.private_key.hex(),  # Store encrypted private key
                 'ss58_address': keypair.ss58_address,
                 'created_at': datetime.utcnow().isoformat(),
-                'setup_version': '2.0',  # Updated for encryption
-                'encryption_version': 'pbkdf2_fernet'
+                'setup_version': '3.0',  # Updated for keyring storage
+                'storage_method': 'macos_keychain'
             }
 
-            # Encrypt dispenser data with master password
-            import base64
-            from cryptography.fernet import Fernet
-            from cryptography.hazmat.primitives import hashes
-            from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-
-            # Derive encryption key from master password
-            salt = os.urandom(16)  # Generate random salt
-            kdf = PBKDF2HMAC(
-                algorithm=hashes.SHA256(),
-                length=32,
-                salt=salt,
-                iterations=100000,
-            )
-            key = base64.urlsafe_b64encode(kdf.derive(master_password.encode()))
-
-            # Encrypt the dispenser data
-            cipher = Fernet(key)
-            json_data = json.dumps(dispenser_data, indent=2)
-            encrypted_data = cipher.encrypt(json_data.encode())
-
-            # Store encrypted data with salt
-            keystore_data = {
-                'encrypted_data': base64.b64encode(encrypted_data).decode(),
-                'salt': base64.b64encode(salt).decode(),
-                'created_at': datetime.utcnow().isoformat(),
-                'encryption_version': 'pbkdf2_fernet'
-            }
-
-            # Write encrypted keystore
+            # Write keystore metadata
             with open(self.keystore_path, 'w') as f:
                 json.dump(keystore_data, f, indent=2)
 
@@ -245,13 +186,13 @@ class SecureDispenser:
 
             self.audit_logger.log_event(
                 "dispenser_keystore_created",
-                f"Secure dispenser keystore created with master password encryption for address {keypair.ss58_address}",
-                {"address": keypair.ss58_address, "setup_version": "2.0", "encrypted": True}
+                f"Secure dispenser keystore created with macOS Keychain storage for address {keypair.ss58_address}",
+                {"address": keypair.ss58_address, "setup_version": "3.0", "storage": "macos_keychain"}
             )
 
-            print(f"✅ Dispenser keystore created with master password encryption: {self.keystore_path}")
+            print(f"✅ Dispenser keystore created with macOS Keychain storage: {self.keystore_path}")
             print(f"   Address: {keypair.ss58_address}")
-            print("   🔐 Keypair encrypted with PBKDF2 + Fernet")
+            print("   🔐 Keypair stored securely in macOS Keychain")
             return True
 
         except Exception as e:
@@ -263,73 +204,39 @@ class SecureDispenser:
             print(f"❌ Failed to setup keystore: {e}")
             return False
 
-    def unlock_for_session(self, password: Optional[str] = None, session_duration_hours: int = 1) -> bool:
+    def unlock_for_session(self, session_duration_hours: int = 1) -> bool:
         """
-        Unlock dispenser for a limited session using master password.
+        Unlock dispenser for a limited session using macOS Keychain.
 
         Args:
-            password: Master password (if None, tries to load from secure storage)
             session_duration_hours: How long session remains active
 
         Returns:
             True if unlocked successfully
         """
         try:
-            # Load keystore data
+            # Load keystore metadata
             if not os.path.exists(self.keystore_path):
                 raise ValueError("Keystore not found")
 
             with open(self.keystore_path, 'r') as f:
                 keystore_data = json.load(f)
 
-            # Get master password
-            if not password:
-                password = self._load_master_password_securely()
-                if not password:
-                    print("🔐 Enter master password to unlock dispenser:")
-                    try:
-                        import getpass
-                        password = getpass.getpass('Master password: ')
-                    except (EOFError, KeyboardInterrupt, ImportError):
-                        print("⚠️  Secure password input not available")
-                        return False
-
-            if not password:
-                raise ValueError("Master password required")
-
-            # Decrypt keystore data
-            import base64
-            from cryptography.fernet import Fernet
-            from cryptography.hazmat.primitives import hashes
-            from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-
-            # Derive decryption key from master password
-            salt = base64.b64decode(keystore_data['salt'])
-            kdf = PBKDF2HMAC(
-                algorithm=hashes.SHA256(),
-                length=32,
-                salt=salt,
-                iterations=100000,
-            )
-            key = base64.urlsafe_b64encode(kdf.derive(password.encode()))
-
-            # Decrypt dispenser data
-            cipher = Fernet(key)
-            encrypted_data = base64.b64decode(keystore_data['encrypted_data'])
-            decrypted_data = cipher.decrypt(encrypted_data)
-            dispenser_data = json.loads(decrypted_data.decode())
-
-            # Verify dispenser data integrity
-            if not dispenser_data.get('private_key') or not dispenser_data.get('ss58_address'):
-                raise ValueError("Invalid dispenser data structure")
-
             # Verify setup version compatibility
-            if dispenser_data.get('setup_version') != '2.0':
+            if keystore_data.get('setup_version') != '3.0':
                 raise ValueError("Incompatible keystore version - please recreate keystore")
 
-            # Create keypair from decrypted private key
-            private_key = bytes.fromhex(dispenser_data['private_key'])
-            self.unlocked_keypair = Keypair(private_key=private_key)
+            # Load keypair from macOS Keychain
+            service_name = self._get_keyring_service_name()
+            self.unlocked_keypair = self._load_keypair_from_keyring(service_name)
+
+            if not self.unlocked_keypair:
+                raise ValueError("Failed to load keypair from macOS Keychain")
+
+            # Verify address matches stored metadata
+            if self.unlocked_keypair.ss58_address != keystore_data.get('ss58_address'):
+                raise ValueError("Keypair address mismatch - possible tampering")
+
             self.session_start = datetime.utcnow()
 
             self.audit_logger.log_event(
@@ -338,13 +245,13 @@ class SecureDispenser:
                 {
                     "address": self.unlocked_keypair.ss58_address,
                     "session_duration_hours": session_duration_hours,
-                    "decryption_successful": True
+                    "keychain_load_successful": True
                 }
             )
 
             print(f"✅ Dispenser unlocked for {session_duration_hours} hour session")
             print(f"   Address: {self.unlocked_keypair.ss58_address}")
-            print("   🔐 Keypair decrypted from master password encryption")
+            print("   🔐 Keypair loaded from macOS Keychain")
             return True
 
         except Exception as e:
@@ -492,3 +399,278 @@ class SecureDispenser:
         # This would integrate with the audit logger to get dispenser-specific events
         # For now, return empty list
         return []
+
+    # USDB Asset Hub Operations - Phase 2A Extension
+
+    async def connect_to_asset_hub(self):
+        """Connect to Westend Asset Hub for USDB operations."""
+        from jam_mock.kusama_adapter import WestendAdapter
+        import asyncio
+
+        # Initialize Asset Hub connection (different endpoint than main Westend)
+        asset_hub_url = "wss://westend-asset-hub-rpc.polkadot.io"
+
+        self.asset_hub_adapter = WestendAdapter(asset_hub_url)
+        await asyncio.sleep(1)  # Allow connection to establish
+
+        # Test connection
+        health = await self.asset_hub_adapter.health_check()
+        if health.get('status') != 'healthy':
+            raise Exception(f"Asset Hub connection failed: {health}")
+
+        print(f"✅ Connected to Westend Asset Hub: {asset_hub_url}")
+        return True
+
+    async def mint_usdb_tokens(self, amount_usdb: float) -> Dict[str, Any]:
+        """
+        Mint USDB tokens to dispenser address using assets.mint extrinsic.
+
+        Args:
+            amount_usdb: Amount of USDB to mint
+
+        Returns:
+            Mint result with transaction details
+        """
+        result = {
+            'success': False,
+            'error': None,
+            'transaction_hash': None,
+            'amount_minted': None,
+            'asset_id': None
+        }
+
+        try:
+            # Ensure session is active
+            if not self.is_session_active():
+                result['error'] = 'Dispenser session not active'
+                return result
+
+            # Connect to Asset Hub if not already connected
+            if not hasattr(self, 'asset_hub_adapter'):
+                await self.connect_to_asset_hub()
+
+            # Get asset ID from config
+            asset_id = self._get_usdb_asset_id()
+            if not asset_id:
+                result['error'] = 'USDB asset ID not configured'
+                return result
+
+            # Convert USDB to planck units
+            amount_planck = int(amount_usdb * (10 ** 12))
+
+            # Execute assets.mint extrinsic
+            call = self.asset_hub_adapter.substrate.compose_call(
+                call_module='Assets',
+                call_function='mint',
+                call_params={
+                    'id': asset_id,
+                    'beneficiary': self.unlocked_keypair.ss58_address,
+                    'amount': amount_planck
+                }
+            )
+
+            # Create signed extrinsic
+            extrinsic = self.asset_hub_adapter.substrate.create_signed_extrinsic(
+                call=call,
+                keypair=self.unlocked_keypair
+            )
+
+            # Submit and wait for inclusion
+            receipt = self.asset_hub_adapter.substrate.submit_extrinsic(extrinsic, wait_for_inclusion=True)
+
+            if receipt.is_success:
+                result.update({
+                    'success': True,
+                    'transaction_hash': receipt.extrinsic_hash,
+                    'block_hash': receipt.block_hash,
+                    'block_number': receipt.block_number,
+                    'amount_minted': amount_planck,
+                    'asset_id': asset_id
+                })
+
+                # Log the minting operation
+                self.audit_logger.log_event(
+                    "usdb_minting_completed",
+                    f"Minted {amount_usdb} USDB ({amount_planck} planck) to dispenser address",
+                    {
+                        'asset_id': asset_id,
+                        'amount_usdb': amount_usdb,
+                        'amount_planck': amount_planck,
+                        'dispenser_address': self.unlocked_keypair.ss58_address,
+                        'transaction_hash': receipt.extrinsic_hash,
+                        'block_number': receipt.block_number
+                    }
+                )
+
+                print(f"✅ Minted {amount_usdb} USDB to dispenser address")
+                print(f"   Transaction: {receipt.extrinsic_hash}")
+                print(f"   Block: {receipt.block_number}")
+
+            else:
+                result['error'] = f'Minting failed: {receipt.error_message}'
+
+        except Exception as e:
+            result['error'] = str(e)
+            self.audit_logger.log_event(
+                "usdb_minting_failed",
+                f"Failed to mint USDB tokens: {str(e)}",
+                {'error': str(e), 'amount_requested': amount_usdb}
+            )
+
+        return result
+
+    async def transfer_usdb_to_borg(self, borg_address: str, borg_id: str, amount_usdb: float) -> Dict[str, Any]:
+        """
+        Transfer USDB tokens from dispenser to borg address using assets.transfer extrinsic.
+
+        Args:
+            borg_address: Recipient borg's substrate address
+            borg_id: Borg identifier for logging
+            amount_usdb: Amount of USDB to transfer
+
+        Returns:
+            Transfer result with transaction details
+        """
+        result = {
+            'success': False,
+            'error': None,
+            'transaction_hash': None,
+            'amount_transferred': None,
+            'from_address': None,
+            'to_address': borg_address
+        }
+
+        try:
+            # Ensure session is active
+            if not self.is_session_active():
+                result['error'] = 'Dispenser session not active'
+                return result
+
+            # Connect to Asset Hub if not already connected
+            if not hasattr(self, 'asset_hub_adapter'):
+                await self.connect_to_asset_hub()
+
+            # Get asset ID from config
+            asset_id = self._get_usdb_asset_id()
+            if not asset_id:
+                result['error'] = 'USDB asset ID not configured'
+                return result
+
+            # Convert USDB to planck units
+            amount_planck = int(amount_usdb * (10 ** 12))
+
+            # Check dispenser balance before transfer
+            dispenser_balance = await self.asset_hub_adapter.get_usdb_balance(
+                self.unlocked_keypair.ss58_address, asset_id
+            )
+
+            if dispenser_balance < amount_planck:
+                result['error'] = f'Insufficient dispenser balance: {dispenser_balance} < {amount_planck}'
+                return result
+
+            # Execute assets.transfer extrinsic
+            transfer_result = await self.asset_hub_adapter.transfer_usdb(
+                from_address=self.unlocked_keypair.ss58_address,
+                to_address=borg_address,
+                amount=amount_planck,
+                asset_id=asset_id
+            )
+
+            if transfer_result.get('success'):
+                result.update({
+                    'success': True,
+                    'transaction_hash': transfer_result['transaction_hash'],
+                    'block_hash': transfer_result.get('block_hash'),
+                    'block_number': transfer_result.get('block_number'),
+                    'amount_transferred': amount_planck,
+                    'from_address': self.unlocked_keypair.ss58_address
+                })
+
+                # Log the transfer operation
+                self.audit_logger.log_event(
+                    "usdb_transfer_completed",
+                    f"Transferred {amount_usdb} USDB from dispenser to borg {borg_id}",
+                    {
+                        'borg_id': borg_id,
+                        'borg_address': borg_address,
+                        'dispenser_address': self.unlocked_keypair.ss58_address,
+                        'asset_id': asset_id,
+                        'amount_usdb': amount_usdb,
+                        'amount_planck': amount_planck,
+                        'transaction_hash': transfer_result['transaction_hash'],
+                        'block_number': transfer_result.get('block_number')
+                    }
+                )
+
+                print(f"✅ Transferred {amount_usdb} USDB to borg {borg_id}")
+                print(f"   Transaction: {transfer_result['transaction_hash']}")
+                print(f"   Block: {transfer_result.get('block_number')}")
+
+            else:
+                result['error'] = transfer_result.get('error', 'Transfer failed')
+
+        except Exception as e:
+            result['error'] = str(e)
+            self.audit_logger.log_event(
+                "usdb_transfer_failed",
+                f"Failed to transfer USDB to borg {borg_id}: {str(e)}",
+                {
+                    'borg_id': borg_id,
+                    'borg_address': borg_address,
+                    'error': str(e),
+                    'amount_requested': amount_usdb
+                }
+            )
+
+        return result
+
+    async def get_usdb_balance(self, address: str) -> int:
+        """
+        Get USDB balance for an address on Asset Hub.
+
+        Args:
+            address: Substrate address to query
+
+        Returns:
+            Balance in planck units
+        """
+        try:
+            # Connect to Asset Hub if not already connected
+            if not hasattr(self, 'asset_hub_adapter'):
+                await self.connect_to_asset_hub()
+
+            asset_id = self._get_usdb_asset_id()
+            if not asset_id:
+                return 0
+
+            return await self.asset_hub_adapter.get_usdb_balance(address, asset_id)
+
+        except Exception as e:
+            print(f"Error getting USDB balance for {address}: {e}")
+            return 0
+
+    def _process_seed_securely(self, seed: str) -> Keypair:
+        """Process seed with secure cleanup."""
+        try:
+            keypair = Keypair.create_from_seed(seed)
+            # Immediately clear seed from memory
+            seed = '\x00' * len(seed)
+            return keypair
+        except Exception as e:
+            seed = '\x00' * len(seed)
+            raise
+
+    def _get_usdb_asset_id(self) -> Optional[int]:
+        """Get USDB asset ID from configuration."""
+        try:
+            import os
+            config_path = os.path.join(os.path.dirname(__file__), '..', '.borglife_config')
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    for line in f:
+                        if line.startswith('USDB_ASSET_ID='):
+                            return int(line.split('=', 1)[1].strip())
+        except Exception as e:
+            print(f"Warning: Could not read USDB asset ID from config: {e}")
+
+        return None
