@@ -5,15 +5,10 @@ Production-grade encrypted keypair management with access controls and audit log
 
 import os
 import json
-import base64
 import hashlib
-import getpass
 import re
 from typing import Dict, Optional, Any, List
 from datetime import datetime
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from substrateinterface import Keypair
 import keyring
 

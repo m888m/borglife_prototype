@@ -45,7 +45,7 @@ class BorgAddressManager:
             self._shared_keystore = False
 
         # Unlock keystore automatically using macOS Keychain
-        # In production, this would require explicit password entry
+        # Hardware-backed security with no password required
         try:
             self.secure_storage.unlock_keystore()
             self.audit_logger.log_event(

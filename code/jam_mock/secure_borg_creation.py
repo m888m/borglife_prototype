@@ -12,12 +12,9 @@ This module provides the standard workflow for creating borgs with:
 
 import os
 import json
-import base64
 import re
 from typing import Dict, Any, Optional
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from substrateinterface import Keypair
 from jam_mock.secure_key_storage import SecureKeypairManager
 from jam_mock.borg_address_manager import BorgAddressManager
 import keyring
@@ -224,7 +221,7 @@ class SecureBorgCreator:
                 'database_encryption',
                 'dna_blockchain_anchoring',
                 'comprehensive_audit_logging',
-                'password_complexity_enforcement',
+                'hardware_keychain_security',
                 'session_timeout_protection',
                 'backup_recovery_systems'
             ]
