@@ -22,6 +22,7 @@ keyring>=24.0.0
 # Blockchain/Substrate
 substrate-interface>=1.7.0
 semver>=3.0.0
+scalecodec>=1.2.0
 
 # Database
 supabase>=2.3.0

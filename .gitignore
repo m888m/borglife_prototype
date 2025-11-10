@@ -72,3 +72,7 @@ venv.bak/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# BorgLife keystore files (deprecated - now using Supabase + macOS Keychain)
+*.borg*_keystore.enc
+.borg*_keystore.enc
