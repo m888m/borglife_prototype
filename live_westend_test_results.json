@@ -1,0 +1,13 @@
+{
+  "borg_creation": {
+    "borg_a": {
+      "id": "live_test_borg_1762777697",
+      "address": "5GdtQX9Yvt6Jz3NHqdsYj3jUwBjiVstYNSM8HpsF9mGH4m2X"
+    }
+  },
+  "dispenser_funding": null,
+  "inter_borg_transfer": null,
+  "final_balances": null,
+  "overall_success": false,
+  "error": "Borg A funding failed"
+}

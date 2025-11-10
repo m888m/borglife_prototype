@@ -895,6 +895,7 @@ class WestendAdapter(JAMInterface):
     def _get_usdb_asset_id(self) -> Optional[int]:
         """Get USDB asset ID from configuration."""
         try:
+            import os
             config_path = os.path.join(os.path.dirname(__file__), '..', '.borglife_config')
             if os.path.exists(config_path):
                 with open(config_path, 'r') as f:

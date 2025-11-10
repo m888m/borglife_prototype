@@ -3,7 +3,7 @@
   "steps": {
     "health_check": {
       "status": "healthy",
-      "block_number": 28437734,
+      "block_number": 28437886,
       "success": true
     },
     "address_creation": {

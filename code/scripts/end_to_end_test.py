@@ -63,7 +63,8 @@ class EndToEndTester:
 
         self.address_manager = BorgAddressManager(
             supabase_client=self.supabase_client,
-            audit_logger=DemoAuditLogger()
+            audit_logger=DemoAuditLogger(),
+            keystore=None  # Use default keystore
         )
 
         self.cost_controller = DemoCostController()

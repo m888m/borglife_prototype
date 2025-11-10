@@ -348,3 +348,19 @@ class DNAParser:
             organs=[],
             manifesto_hash=manifesto_hash
         )
+
+    @staticmethod
+    def parse_dna(dna_data: Dict[str, Any]) -> str:
+        """
+        Parse DNA data and return hash (simplified for live testing).
+
+        Args:
+            dna_data: DNA data dictionary
+
+        Returns:
+            DNA hash string
+        """
+        import hashlib
+        # Simple hash of the DNA data for testing
+        dna_str = str(sorted(dna_data.items()))
+        return hashlib.sha256(dna_str.encode()).hexdigest()

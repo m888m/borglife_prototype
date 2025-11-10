@@ -41,10 +41,17 @@ class Phase2ADatabaseSetup:
         """Create borg_addresses table for address and keypair management."""
         sql = """
         CREATE TABLE IF NOT EXISTS borg_addresses (
-            borg_id VARCHAR(50) PRIMARY KEY,
-            substrate_address VARCHAR(64) NOT NULL UNIQUE,
-            dna_hash VARCHAR(64) NOT NULL,
+            borg_id VARCHAR(100) PRIMARY KEY,
+            substrate_address VARCHAR(100) NOT NULL UNIQUE,
+            dna_hash VARCHAR(100) NOT NULL,
             keypair_encrypted TEXT NOT NULL,
+            creator_public_key VARCHAR(100),
+            creator_signature VARCHAR(200),
+            anchoring_tx_hash VARCHAR(100),
+            anchoring_status VARCHAR(20) DEFAULT 'pending',
+            keyring_service_name VARCHAR(100),
+            setup_version VARCHAR(10) DEFAULT '4.0',
+            storage_method VARCHAR(50) DEFAULT 'macos_keychain_supabase',
             created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             last_sync TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
@@ -61,7 +68,7 @@ class Phase2ADatabaseSetup:
         """Create borg_balances table for dual-currency balance tracking."""
         sql = """
         CREATE TABLE IF NOT EXISTS borg_balances (
-            borg_id VARCHAR(50) REFERENCES borg_addresses(borg_id),
+            borg_id VARCHAR(100) REFERENCES borg_addresses(borg_id),
             currency VARCHAR(10) NOT NULL CHECK (currency IN ('WND', 'USDB')),
             balance_wei BIGINT NOT NULL DEFAULT 0,
             last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -80,12 +87,12 @@ class Phase2ADatabaseSetup:
         """Create transfer_transactions table for transfer history."""
         sql = """
         CREATE TABLE IF NOT EXISTS transfer_transactions (
-            tx_id VARCHAR(32) PRIMARY KEY,
-            from_borg_id VARCHAR(50) REFERENCES borg_addresses(borg_id),
-            to_borg_id VARCHAR(50) REFERENCES borg_addresses(borg_id),
+            tx_id VARCHAR(100) PRIMARY KEY,
+            from_borg_id VARCHAR(100) REFERENCES borg_addresses(borg_id),
+            to_borg_id VARCHAR(100) REFERENCES borg_addresses(borg_id),
             currency VARCHAR(10) NOT NULL CHECK (currency IN ('WND', 'USDB')),
             amount_wei BIGINT NOT NULL,
-            transaction_hash VARCHAR(66),
+            transaction_hash VARCHAR(100),
             block_number BIGINT,
             status VARCHAR(20) DEFAULT 'pending',
             created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

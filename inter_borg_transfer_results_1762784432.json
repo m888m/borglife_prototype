@@ -1,0 +1,30 @@
+{
+  "borg_tester": {
+    "id": "borgTester_1762782723",
+    "address": "5EeeSsZAzVzZjTnLA9yCV8pwsuQvbHDfYPZX5YcmitVFFA2c",
+    "initial_balance": 0.583972588708,
+    "final_balance": 0.167945177416
+  },
+  "borg2": {
+    "id": "borgTester2_1762784364",
+    "address": "5FFME3vBJ6XpJDZ9qJcbgY2KPYvTCEzMSPU1tj6VNWNb5NRA",
+    "initial_balance": 0.383972588708,
+    "final_balance": 0.767945177416
+  },
+  "transfers": [
+    {
+      "from": "borgTester_1762782723",
+      "to": "borgTester2_1762784364",
+      "amount": 0.5,
+      "timestamp": 1762784402.661978
+    },
+    {
+      "from": "borgTester2_1762784364",
+      "to": "borgTester_1762782723",
+      "amount": 0.1,
+      "timestamp": 1762784432.6619809
+    }
+  ],
+  "validation_passed": false,
+  "completed_at": 1762784432.661982
+}
