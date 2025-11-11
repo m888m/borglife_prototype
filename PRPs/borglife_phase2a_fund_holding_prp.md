@@ -92,6 +92,64 @@ CREATE INDEX idx_transfers_created ON transfer_transactions(created_at DESC);
 - **Market Preparation**: Foundation for mating markets and organ trading
 - **Compliance**: Integrates with existing ethical monitoring and cost controls
 
+### Technical Architecture Context
+
+#### Asset Hub Architecture
+- **System Chain**: Asset Hub serves as Polkadot's system parachain for asset management
+- **Pallet Structure**: Uses FRAME pallets including Assets, Balances, and System
+- **Cross-Chain Communication**: XCM protocol for cross-chain asset transfers
+- **Asset Creation**: Assets pallet provides `create`, `mint`, `transfer`, and `burn` functions
+- **Storage**: Asset metadata and balances stored in pallet-specific storage maps
+
+#### USDB Stablecoin Design
+- **Asset Type**: Fungible token created via Assets pallet
+- **Decimals**: 12 decimal places (Polkadot standard for precision)
+- **Initial Supply**: 1,000,000 USDB minted to dispenser account
+- **Transfer Mechanism**: `assets.transfer` extrinsic for peer-to-peer transfers
+- **Balance Queries**: `Assets.Account` storage map for balance lookups
+
+#### Network Configuration Requirements
+- **RPC Endpoints**: Primary `wss://westend-asset-hub-rpc.polkadot.io`, fallbacks available
+- **Chain Spec**: Westend Asset Hub chain specification with Assets pallet enabled
+- **Genesis Config**: Asset Hub genesis includes pallet configurations
+- **Block Production**: 6-second block time with Babe consensus
+- **Finality**: GRANDPA finality gadget for deterministic finality
+
+#### Smart Contract Interaction Protocols
+- **Extrinsic Format**: Substrate extrinsics with call data and signatures
+- **Pallet Calls**: Assets pallet calls: `create`, `mint`, `transfer`, `set_metadata`
+- **Storage Queries**: Runtime API queries for balance and metadata lookups
+- **Event Monitoring**: System events for transaction confirmation
+- **Error Handling**: DispatchError types for transaction failure classification
+
+#### Gas Fee Optimization Strategies
+- **Fee Calculation**: Based on extrinsic weight and length
+- **Priority Fees**: Optional tip for faster inclusion
+- **Batch Transactions**: Multiple operations in single extrinsic
+- **Weight Estimation**: Pre-calculation of computational weight
+- **Fee Preferences**: Dynamic adjustment based on network congestion
+
+#### Security Considerations
+- **Key Management**: AES-256 encrypted keypairs in macOS Keychain
+- **Transaction Signing**: Ed25519 signatures with replay protection
+- **Balance Validation**: Pre-transfer balance checks with race condition protection
+- **Audit Trail**: Comprehensive logging of all economic operations
+- **Access Control**: Role-based permissions for asset operations
+
+#### Testing Methodologies
+- **Unit Tests**: Individual component testing with mock blockchain
+- **Integration Tests**: Full system testing with testnet
+- **Economic Scenario Tests**: Multi-borg interaction simulations
+- **Load Testing**: Performance validation under high transaction volume
+- **Security Testing**: Penetration testing and vulnerability assessment
+
+#### Integration Patterns
+- **Database Synchronization**: Real-time balance updates with conflict resolution
+- **Event-Driven Architecture**: Reactive processing of blockchain events
+- **Circuit Breaker Pattern**: Failure isolation and graceful degradation
+- **Retry Mechanisms**: Exponential backoff for transient failures
+- **Monitoring Integration**: Comprehensive observability and alerting
+
 ## Implementation Tasks
 
 ### Task 1: Create USDB Stablecoin on Westend Asset Hub
@@ -103,67 +161,297 @@ CREATE INDEX idx_transfers_created ON transfer_transactions(created_at DESC);
 - **Asset ID**: Auto-assigned by pallet, tracked in configuration
 - **Metadata**: Set name, symbol, decimals via `assets.setMetadata`
 - **Admin Account**: Funded Westend account for asset management
+- **Dispenser Account**: Dedicated account for initial USDB distribution to borgs
 
 **Implementation Steps**:
 1. Create `scripts/create_usdb_asset.py` using substrate-interface 1.7.0+
 2. Generate admin keypair using existing `AdvancedKeypairManager` from `jam_mock/keypair_manager.py`
 3. Execute `assets.create` extrinsic with metadata parameters:
    ```python
-   # Create asset
+   # Create asset with dispenser as admin
    call = substrate.compose_call(
        call_module='Assets',
        call_function='create',
        call_params={
            'id': asset_id,  # Let pallet assign
-           'admin': admin_address,
-           'min_balance': 1  # Minimum balance
+           'admin': dispenser_address,  # Dispenser account controls asset
+           'min_balance': 1  # Minimum balance in planck units
        }
    )
    ```
-4. Set metadata using `assets.set_metadata` extrinsic
-5. Mint initial supply using `assets.mint` to admin account
+4. Set metadata using `assets.set_metadata` extrinsic:
+   ```python
+   metadata_call = substrate.compose_call(
+       call_module='Assets',
+       call_function='set_metadata',
+       call_params={
+           'id': asset_id,
+           'name': 'USDBorglifeStablecoin'.encode(),
+           'symbol': 'USDB'.encode(),
+           'decimals': 12
+       }
+   )
+   ```
+5. Mint initial supply using `assets.mint` to dispenser account:
+   ```python
+   mint_call = substrate.compose_call(
+       call_module='Assets',
+       call_function='mint',
+       call_params={
+           'id': asset_id,
+           'beneficiary': dispenser_address,
+           'amount': 1_000_000 * (10 ** 12)  # 1M USDB in planck units
+       }
+   )
+   ```
 6. Store asset ID in `code/.borglife_config` configuration file
-7. Verify asset creation via `assets.metadata` query
+7. Verify asset creation via `assets.metadata` and `assets.account` queries
+
+**Network Configuration Requirements**:
+- **RPC Endpoint**: `wss://westend-asset-hub-rpc.polkadot.io` (primary)
+- **Fallback Endpoints**: `wss://westend.api.onfinality.io/public-ws`, `wss://westend-rpc.dwellir.com`
+- **Chain ID**: Westend Asset Hub (parachain ID: 1000)
+- **Genesis Hash**: Verified against known Westend Asset Hub genesis
+- **Assets Pallet Version**: Compatible with substrate-interface 1.7.0+
+
+**Smart Contract Interaction Protocols**:
+- **Extrinsic Construction**: Use `substrate.compose_call()` for pallet calls
+- **Transaction Signing**: Ed25519 signatures with keypair from secure storage
+- **Batch Transactions**: Combine create, metadata, and mint operations
+- **Event Monitoring**: Listen for `Assets.Created`, `Assets.MetadataSet`, `Assets.Minted` events
+- **Error Handling**: Handle `DispatchError` types (InsufficientBalance, BadOrigin, etc.)
+
+**Gas Fee Optimization Strategies**:
+- **Weight Estimation**: Pre-calculate extrinsic weight using `payment_queryInfo`
+- **Fee Calculation**: Base fee + weight fee + length fee
+- **Priority Adjustment**: Add tip for faster inclusion during congestion
+- **Batch Operations**: Combine multiple calls in single extrinsic to reduce total fees
+- **Optimal Timing**: Execute during low-congestion periods
+
+**Security Considerations**:
+- **Keypair Security**: Admin keypair encrypted with AES-256 in macOS Keychain
+- **Transaction Signing**: Secure signing with hardware-backed entropy when available
+- **Access Control**: Dispenser account has exclusive minting rights
+- **Audit Trail**: All asset creation operations logged with transaction hashes
+- **Backup Recovery**: Admin seed phrase securely backed up offline
 
 **Integration Points**:
 - Uses existing `jam_mock/kusama_adapter.py` connection logic (WestendAdapter class)
 - Leverages `jam_mock/secure_key_storage.py` for admin keypair management
 - Updates configuration system for asset ID tracking
+- Integrates with existing transaction monitoring infrastructure
 
 **Validation**:
 - Asset created successfully on Westend Asset Hub
 - Initial supply minted and visible on chain via Subscan
 - Asset metadata correctly set (name: "USDBorglifeStablecoin", symbol: "USDB", decimals: 12)
 - Asset ID stored in configuration and retrievable
-- Admin account shows correct balance in asset
+- Dispenser account shows correct balance in asset
+- Asset appears in Polkadot.js explorer with correct properties
+
+**Troubleshooting**:
+- **Asset Creation Fails**: Check admin account WND balance (minimum 0.1 WND required)
+- **Metadata Not Set**: Verify admin account has permission to set metadata
+- **Minting Fails**: Ensure dispenser account exists and has proper permissions
+- **RPC Connection Issues**: Try fallback endpoints, check network connectivity
+- **Transaction Timeout**: Increase timeout settings, check network congestion
+
+**Best Practices**:
+- Test asset creation on small amounts first
+- Verify all operations on testnet explorer before production
+- Implement comprehensive error handling and rollback procedures
+- Document all asset parameters for future reference
+- Set up monitoring for asset-related events
 
 **Dependencies**: None
-**Estimated Effort**: 2 hours
+**Estimated Effort**: 4 hours
 
 ### Task 2: Implement Borg-Specific Address Management
 **Description**: Create deterministic address generation and management for borg fund holding.
 
 **Technical Details**:
-- **Address Generation**: Deterministic keypairs from borg DNA hash
-- **Storage**: Secure encrypted storage of borg keypairs
-- **Registration**: Track borg addresses in Supabase database
-- **Synchronization**: Balance tracking across WND and USDB
+- **Address Generation**: Deterministic keypairs from borg DNA hash using PBKDF2
+- **Storage**: Secure encrypted storage of borg keypairs using AES-256
+- **Registration**: Track borg addresses in Supabase database with referential integrity
+- **Synchronization**: Real-time balance tracking across WND and USDB currencies
+- **Key Derivation**: Hierarchical deterministic (HD) key derivation for borg accounts
 
 **Implementation Steps**:
-1. Create `BorgAddressManager` class for address generation
-2. Implement deterministic keypair creation: `Keypair.create_from_uri(dna_hash)`
-3. Add Supabase tables for borg addresses and balances
-4. Integrate with existing `SecureKeyStorage` for keypair management
-5. Create address registration and balance sync methods
+1. Create `BorgAddressManager` class extending existing keypair management:
+   ```python
+   class BorgAddressManager:
+       def __init__(self, supabase_client, secure_storage: SecureKeypairManager):
+           self.supabase = supabase_client
+           self.secure_storage = secure_storage
+           self.key_derivation_path = "m/44'/354'/0'/0"  # BorgLife HD path
+   ```
+
+2. Implement deterministic keypair creation with enhanced security:
+   ```python
+   def create_borg_keypair(self, borg_id: str, dna_hash: str) -> Dict[str, Any]:
+       # Use PBKDF2 with borg DNA hash as salt
+       seed = hashlib.pbkdf2_hmac(
+           'sha512',
+           dna_hash.encode(),
+           f"borglife-{borg_id}".encode(),
+           2048  # iterations
+       )[:32]  # Take first 32 bytes
+
+       # Create keypair from derived seed
+       keypair = Keypair.create_from_seed(seed.hex())
+
+       # Store securely
+       self.secure_storage.store_keypair(f"borg-{borg_id}", keypair, {
+           'borg_id': borg_id,
+           'dna_hash': dna_hash,
+           'derivation_method': 'pbkdf2',
+           'created_at': datetime.utcnow().isoformat()
+       })
+
+       return {
+           'borg_id': borg_id,
+           'address': keypair.ss58_address,
+           'public_key': keypair.public_key.hex()
+       }
+   ```
+
+3. Add Supabase tables for borg addresses and balances with constraints:
+   ```sql
+   -- Enhanced borg addresses table
+   CREATE TABLE borg_addresses (
+       borg_id VARCHAR(50) PRIMARY KEY,
+       substrate_address VARCHAR(64) NOT NULL UNIQUE,
+       dna_hash VARCHAR(64) NOT NULL,
+       keypair_encrypted TEXT NOT NULL,
+       derivation_path VARCHAR(100),
+       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+       last_sync TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+       status VARCHAR(20) DEFAULT 'active'
+   );
+
+   -- Enhanced dual-currency balance tracking
+   CREATE TABLE borg_balances (
+       borg_id VARCHAR(50) REFERENCES borg_addresses(borg_id) ON DELETE CASCADE,
+       currency VARCHAR(10) NOT NULL CHECK (currency IN ('WND', 'USDB')),
+       balance_wei BIGINT NOT NULL DEFAULT 0 CHECK (balance_wei >= 0),
+       last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+       last_block_synced BIGINT,
+       PRIMARY KEY (borg_id, currency)
+   );
+   ```
+
+4. Implement balance synchronization with conflict resolution:
+   ```python
+   async def sync_borg_balance(self, borg_id: str, currency: str, asset_id: Optional[int] = None) -> bool:
+       """Synchronize borg balance with on-chain state."""
+       try:
+           # Get borg address
+           address_result = self.supabase.table('borg_addresses').select('substrate_address').eq('borg_id', borg_id).execute()
+           if not address_result.data:
+               raise ValueError(f"Borg {borg_id} not found")
+
+           address = address_result.data[0]['substrate_address']
+
+           # Query on-chain balance
+           if currency == 'WND':
+               balance = await self.westend_adapter.get_wnd_balance(address)
+           else:  # USDB
+               balance = await self.westend_adapter.get_usdb_balance(address, asset_id)
+
+           # Update database with optimistic locking
+           self.supabase.table('borg_balances').upsert({
+               'borg_id': borg_id,
+               'currency': currency,
+               'balance_wei': balance,
+               'last_updated': datetime.utcnow().isoformat(),
+               'last_block_synced': await self.westend_adapter.get_current_block()
+           }).execute()
+
+           return True
+       except Exception as e:
+           print(f"Balance sync failed for {borg_id}: {e}")
+           return False
+   ```
+
+5. Create address registration and validation methods:
+   ```python
+   async def register_borg_address(self, borg_id: str, dna_hash: str) -> Dict[str, Any]:
+       """Register new borg address with validation."""
+       # Validate DNA hash format
+       if not re.match(r'^[0-9a-fA-F]{64}$', dna_hash):
+           raise ValueError("Invalid DNA hash format")
+
+       # Check for existing registration
+       existing = self.supabase.table('borg_addresses').select('borg_id').eq('borg_id', borg_id).execute()
+       if existing.data:
+           raise ValueError(f"Borg {borg_id} already registered")
+
+       # Create keypair and register
+       keypair_data = self.create_borg_keypair(borg_id, dna_hash)
+
+       # Register in database
+       self.supabase.table('borg_addresses').insert({
+           'borg_id': borg_id,
+           'substrate_address': keypair_data['address'],
+           'dna_hash': dna_hash,
+           'keypair_encrypted': 'stored_in_keychain',  # Reference only
+           'derivation_path': self.key_derivation_path
+       }).execute()
+
+       # Initialize balances
+       for currency in ['WND', 'USDB']:
+           self.supabase.table('borg_balances').insert({
+               'borg_id': borg_id,
+               'currency': currency,
+               'balance_wei': 0
+           }).execute()
+
+       return keypair_data
+   ```
+
+**Security Considerations**:
+- **Key Derivation**: PBKDF2 with high iteration count prevents brute force attacks
+- **Encryption**: AES-256-GCM encryption for keypair storage
+- **Access Control**: Role-based access to borg keypairs
+- **Audit Trail**: All address operations logged with timestamps
+- **Backup Recovery**: Secure backup procedures for keypairs
+
+**Integration Patterns**:
+- **Database Transactions**: Atomic operations for address registration
+- **Event-Driven Sync**: Reactive balance updates on blockchain events
+- **Circuit Breaker**: Failure isolation for external service dependencies
+- **Caching Layer**: Redis caching for frequently accessed balances
+
+**Testing Methodologies**:
+- **Deterministic Testing**: Verify address generation consistency
+- **Security Testing**: Key derivation strength validation
+- **Integration Testing**: End-to-end address registration flow
+- **Load Testing**: Concurrent address registration handling
 
 **Validation**:
-- Deterministic address generation works consistently
-- Keypairs stored securely with encryption
-- Database schema supports address and balance tracking
-- Address generation is reproducible from DNA hash
+- Deterministic address generation works consistently across environments
+- Keypairs stored securely with AES-256 encryption in macOS Keychain
+- Database schema supports address and balance tracking with constraints
+- Address generation is reproducible from DNA hash with proper validation
+- Balance synchronization works correctly with on-chain state
+- Address registration prevents duplicates and validates inputs
+
+**Troubleshooting**:
+- **Key Derivation Fails**: Check DNA hash format and encoding
+- **Database Constraints**: Verify foreign key relationships and data types
+- **Encryption Errors**: Check macOS Keychain accessibility
+- **Balance Sync Issues**: Verify RPC connectivity and address formats
+- **Duplicate Registration**: Implement proper conflict resolution
+
+**Best Practices**:
+- Use cryptographically secure random generation for salts
+- Implement proper key rotation procedures
+- Regular security audits of key management
+- Comprehensive logging of all address operations
+- Backup strategies for critical keypairs
 
 **Dependencies**: Task 1 (USDB asset creation)
-**Estimated Effort**: 3 hours
+**Estimated Effort**: 4 hours
 
 ### Task 3: Extend WestendAdapter for Dual-Currency Support
 **Description**: Add USDB asset operations to WestendAdapter alongside existing WND operations.
@@ -173,36 +461,265 @@ CREATE INDEX idx_transfers_created ON transfer_transactions(created_at DESC);
 - **Balance Queries**: Query both WND (`System.Account`) and USDB (`Assets.Account`) balances
 - **Dual Tracking**: Maintain separate caches for WND and USDB in existing wealth_cache
 - **Transaction Types**: Support both native (`Balances.transfer`) and asset transfers
+- **Batch Operations**: Support multiple asset operations in single transaction
+- **Event Monitoring**: Track asset transfer events and confirmations
 
 **Implementation Steps**:
 1. Add asset transfer methods to `jam_mock/kusama_adapter.py` WestendAdapter class:
    ```python
    async def transfer_usdb(self, from_address: str, to_address: str, amount: int, asset_id: int) -> Dict[str, Any]:
-       """Transfer USDB assets between addresses."""
-       # Use assets.transfer extrinsic
+       """Transfer USDB assets between addresses with comprehensive error handling."""
+       if not self.substrate:
+           return {'success': False, 'error': 'No substrate connection'}
+
+       if not self.keypair:
+           return {'success': False, 'error': 'No keypair configured for signing'}
+
+       try:
+           # Validate addresses
+           if not (from_address.startswith('5') and to_address.startswith('5')):
+               return {'success': False, 'error': 'Invalid Substrate addresses'}
+
+           # Check sender balance before transfer
+           sender_balance = await self.get_usdb_balance(from_address, asset_id)
+           if sender_balance < amount:
+               return {'success': False, 'error': f'Insufficient balance: {sender_balance} < {amount}'}
+
+           # Compose assets.transfer extrinsic
+           call = self.substrate.compose_call(
+               call_module='Assets',
+               call_function='transfer',
+               call_params={
+                   'id': asset_id,
+                   'target': to_address,
+                   'amount': amount
+               }
+           )
+
+           # Create signed extrinsic
+           extrinsic = self.substrate.create_signed_extrinsic(
+               call=call,
+               keypair=self.keypair
+           )
+
+           # Submit and wait for inclusion
+           receipt = self.substrate.submit_extrinsic(extrinsic, wait_for_inclusion=True)
+
+           if receipt.is_success:
+               return {
+                   'success': True,
+                   'transaction_hash': receipt.extrinsic_hash,
+                   'block_hash': receipt.block_hash,
+                   'block_number': receipt.block_number,
+                   'from_address': from_address,
+                   'to_address': to_address,
+                   'amount': amount,
+                   'asset_id': asset_id,
+                   'fee': getattr(receipt, 'total_fee_amount', 0)
+               }
+           else:
+               return {
+                   'success': False,
+                   'error': f'Transfer failed: {receipt.error_message}',
+                   'from_address': from_address,
+                   'to_address': to_address,
+                   'amount': amount
+               }
+
+       except Exception as e:
+           return {
+               'success': False,
+               'error': f'Transfer error: {str(e)}',
+               'from_address': from_address,
+               'to_address': to_address,
+               'amount': amount
+           }
    ```
-2. Implement balance queries for both currencies:
+
+2. Implement balance queries for both currencies with caching:
    ```python
    async def get_usdb_balance(self, address: str, asset_id: int) -> int:
-       """Query USDB balance using Assets.Account storage."""
-   ```
-3. Extend wealth cache to support multiple assets (modify existing wealth_cache dict)
-4. Add asset-specific transaction composition using `compose_call` with Assets pallet
-5. Update `health_check()` method to include asset balances
+       """Query USDB balance using Assets.Account storage with caching."""
+       if not self.substrate:
+           return 0
 
-**Integration Points**:
-- Extends existing `jam_mock/kusama_adapter.py` WestendAdapter class
-- Uses existing `substrate.compose_call()` and `create_signed_extrinsic()` patterns
-- Integrates with existing keypair and transaction submission infrastructure
+       # Check cache first
+       cache_key = f"usdb_{address}_{asset_id}"
+       if cache_key in self.wealth_cache:
+           cached_data = self.wealth_cache[cache_key]
+           # Cache for 30 seconds
+           if time.time() - cached_data['timestamp'] < 30:
+               return cached_data['balance']
+
+       try:
+           # Query Assets.Account storage
+           account_info = self.substrate.query(
+               module='Assets',
+               storage_function='Account',
+               params=[asset_id, address]
+           )
+
+           balance = 0
+           if account_info.value:
+               balance = account_info.value.get('balance', 0)
+
+           # Update cache
+           self.wealth_cache[cache_key] = {
+               'balance': balance,
+               'timestamp': time.time()
+           }
+
+           return balance
+
+       except Exception as e:
+           print(f"Error querying USDB balance for {address}: {e}")
+           return 0
+   ```
+
+3. Extend wealth cache to support multiple assets:
+   ```python
+   # Enhanced wealth cache structure
+   self.wealth_cache: Dict[str, Dict[str, Any]] = {}  # key -> {'balance': int, 'timestamp': float, 'currency': str}
+   self.transaction_cache: Dict[str, list] = {}
+   ```
+
+4. Add asset-specific transaction composition and batch operations:
+   ```python
+   async def batch_asset_operations(self, operations: List[Dict[str, Any]]) -> Dict[str, Any]:
+       """Execute multiple asset operations in single transaction."""
+       if not self.substrate or not self.keypair:
+           return {'success': False, 'error': 'Adapter not properly configured'}
+
+       calls = []
+       for op in operations:
+           if op['type'] == 'transfer':
+               call = self.substrate.compose_call(
+                   call_module='Assets',
+                   call_function='transfer',
+                   call_params={
+                       'id': op['asset_id'],
+                       'target': op['to_address'],
+                       'amount': op['amount']
+                   }
+               )
+               calls.append(call)
+
+       if not calls:
+           return {'success': False, 'error': 'No valid operations'}
+
+       # Create batch extrinsic
+       batch_call = self.substrate.compose_call(
+           call_module='Utility',
+           call_function='batch',
+           call_params={'calls': calls}
+       )
+
+       extrinsic = self.substrate.create_signed_extrinsic(
+           call=batch_call,
+           keypair=self.keypair
+       )
+
+       receipt = self.substrate.submit_extrinsic(extrinsic, wait_for_inclusion=True)
+
+       return {
+           'success': receipt.is_success,
+           'transaction_hash': receipt.extrinsic_hash if receipt.is_success else None,
+           'error': receipt.error_message if not receipt.is_success else None,
+           'operations_count': len(operations)
+       }
+   ```
+
+5. Update `health_check()` method to include asset balances and network metrics:
+   ```python
+   async def health_check(self) -> Dict[str, Any]:
+       """Enhanced health check with dual-currency support."""
+       base_info = {
+           'mode': self.mode.value,
+           'rpc_url': self.rpc_url,
+           'keypair_configured': self.keypair is not None,
+           'usdb_asset_id': self._get_usdb_asset_id(),
+           # ... existing fields ...
+       }
+
+       if not self.substrate:
+           return {**base_info, 'status': 'offline', 'error': 'No substrate connection'}
+
+       try:
+           # ... existing checks ...
+
+           # Check USDB balance if asset_id available
+           usdb_balance = None
+           if self.keypair and base_info['usdb_asset_id']:
+               usdb_balance = await self.get_usdb_balance(
+                   self.keypair.ss58_address,
+                   base_info['usdb_asset_id']
+               )
+
+           results['usdb_balance'] = usdb_balance
+
+           # Network congestion based on recent blocks
+           congestion = await self._assess_network_congestion()
+           results['network_congestion'] = congestion
+
+           return results
+
+       except Exception as e:
+           return {**base_info, 'status': 'unhealthy', 'error': str(e)}
+   ```
+
+**Gas Fee Optimization Strategies**:
+- **Dynamic Fee Adjustment**: Monitor network congestion and adjust tips
+- **Batch Operations**: Combine multiple transfers to reduce per-operation fees
+- **Optimal Timing**: Execute during low-congestion periods (off-peak hours)
+- **Fee Estimation**: Pre-calculate fees using `payment_queryInfo` runtime API
+- **Length Optimization**: Minimize extrinsic size for lower length fees
+
+**Security Considerations**:
+- **Replay Protection**: Include nonce in all transactions
+- **Balance Validation**: Pre-transfer balance checks prevent overdrafts
+- **Address Validation**: Verify Substrate address formats
+- **Error Handling**: Comprehensive error classification and user feedback
+- **Audit Logging**: All operations logged with full context
+
+**Integration Patterns**:
+- **Event-Driven Updates**: Reactive balance updates on transfer events
+- **Optimistic UI**: Immediate UI updates with server-side confirmation
+- **Conflict Resolution**: Handle concurrent transfer scenarios
+- **Rate Limiting**: Prevent abuse with request throttling
+- **Monitoring**: Comprehensive metrics collection for operations
+
+**Testing Methodologies**:
+- **Unit Tests**: Individual method testing with mock substrate
+- **Integration Tests**: Full transfer flows with testnet
+- **Load Tests**: High-frequency transfer validation
+- **Security Tests**: Attempt invalid operations and verify protections
+- **Network Tests**: Various network conditions and failure scenarios
 
 **Validation**:
 - USDB transfers work correctly using `assets.transfer` extrinsic
 - Balance queries return accurate data for both currencies via storage queries
 - Transaction composition handles asset parameters correctly
+- Batch operations execute multiple transfers efficiently
 - Health checks include asset information alongside existing WND data
+- Error scenarios handled gracefully with detailed error messages
+- Event monitoring captures all transfer confirmations
+
+**Troubleshooting**:
+- **Transfer Fails**: Check balance, address format, and network connectivity
+- **Balance Query Errors**: Verify asset ID and address validity
+- **RPC Timeouts**: Try fallback endpoints and increase timeouts
+- **Extrinsic Rejections**: Check for sufficient WND balance for fees
+- **Cache Inconsistencies**: Implement cache invalidation strategies
+
+**Best Practices**:
+- Implement comprehensive error handling and recovery
+- Use batch operations for multiple transfers when possible
+- Monitor network conditions and adjust operations accordingly
+- Implement proper logging and monitoring for all operations
+- Regular testing of failure scenarios and edge cases
 
 **Dependencies**: Tasks 1-2
-**Estimated Effort**: 4 hours
+**Estimated Effort**: 5 hours
 
 ### Task 4: Implement Inter-Borg Transfer Protocol
 **Description**: Create secure fund transfer capabilities between borg addresses.
@@ -588,3 +1105,67 @@ Transfer Request → Balance Validation → Transaction Composition
    Signing Keypair    →   Submit Extrinsic   →   Confirmation
        ↓                     ↓                    ↓
    Update Balances   →   Record Transaction  →   Audit Log
+
+## Comprehensive Troubleshooting Guide
+
+### Asset Creation Issues
+
+#### Problem: Asset Creation Fails with "InsufficientBalance"
+**Symptoms**: Transaction rejected with `DispatchError::Module { index: 6, error: 3 }`
+**Root Cause**: Admin account lacks sufficient WND for existential deposit + fees
+**Solution**:
+1. Fund admin account with at least 0.1 WND via Westend faucet
+2. Verify balance: `substrate.query('System', 'Account', [admin_address])`
+3. Retry asset creation after funding
+
+#### Problem: Metadata Setting Fails
+**Symptoms**: Asset created but metadata not applied
+**Root Cause**: Permission issues or invalid metadata format
+**Solution**:
+1. Verify admin account owns the asset
+2. Check metadata format (name/symbol as bytes, valid decimals)
+3. Use `assets.set_metadata` extrinsic with correct parameters
+
+### Address Management Issues
+
+#### Problem: Deterministic Address Generation Inconsistent
+**Symptoms**: Same DNA hash produces different addresses
+**Root Cause**: PBKDF2 parameters or salt generation issues
+**Solution**:
+1. Verify PBKDF2 parameters (iterations: 2048, hash: sha512)
+2. Check salt format: `f"borglife-{borg_id}"`
+3. Ensure consistent encoding (UTF-8) for inputs
+
+### Transfer Protocol Issues
+
+#### Problem: Transfer Validation Fails
+**Symptoms**: Transfers rejected despite sufficient balance
+**Root Cause**: Database balance inconsistency or validation logic errors
+**Solution**:
+1. Sync balances with on-chain state: `sync_borg_balance()`
+2. Check database transaction isolation levels
+3. Verify balance calculation logic (planck to token conversion)
+
+## Best Practices Guide
+
+### Development Best Practices
+- Separate concerns: blockchain ops, database, business logic
+- Use dependency injection for testability
+- Implement comprehensive error handling
+- Add detailed logging for debugging
+
+### Security Practices
+- Never log sensitive data (private keys, seeds)
+- Use environment variables for configuration
+- Implement least privilege access
+- Regular security audits and penetration testing
+
+### Operational Best Practices
+- Monitor transaction success rates
+- Alert on balance discrepancies
+- Regular database backups
+- Test backup restoration regularly
+
+## Conclusion
+
+This comprehensive PRP provides the technical foundation for BorgLife Phase 2A, enabling secure, scalable, and user-friendly fund holding and transfer capabilities. The detailed specifications, implementation guidance, and operational procedures ensure successful delivery of a production-ready economic system for autonomous borg interactions.
