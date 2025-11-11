@@ -1,0 +1,12 @@
+{
+  "test_start_time": "2025-11-11T13:08:32.742025",
+  "from_borg_id": "borgTester",
+  "to_borg_id": "borg_2",
+  "transfer_amount_wnd": 0.5,
+  "initial_balances": {},
+  "final_balances": {},
+  "transfer_result": null,
+  "success": false,
+  "error": "No address found for borg borgTester",
+  "test_end_time": "2025-11-11T13:08:36.645080"
+}

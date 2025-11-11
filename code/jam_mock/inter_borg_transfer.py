@@ -50,20 +50,20 @@ class InterBorgTransfer:
         self.confirmation_timeout = 300  # 5 minutes
         self.max_retry_attempts = 3
 
-    async def transfer_usdb(
+    async def transfer_wnd_between_borgs(
         self,
         from_borg_id: str,
         to_borg_id: str,
-        amount: Decimal,
+        amount_wnd: float,
         description: str = ""
     ) -> Dict[str, Any]:
         """
-        Execute secure USDB transfer between borgs.
+        Execute secure WND transfer between borgs using live Westend network.
 
         Args:
             from_borg_id: Sending borg ID
             to_borg_id: Receiving borg ID
-            amount: Transfer amount in USDB
+            amount_wnd: Transfer amount in WND
             description: Optional transfer description
 
         Returns:
@@ -71,9 +71,8 @@ class InterBorgTransfer:
         """
         transfer_result = {
             'success': False,
-            'transfer_id': None,
             'transaction_hash': None,
-            'amount': str(amount),
+            'amount': str(amount_wnd),
             'from_borg_id': from_borg_id,
             'to_borg_id': to_borg_id,
             'errors': [],
@@ -89,129 +88,106 @@ class InterBorgTransfer:
                 transfer_result['errors'].append("Could not resolve borg addresses")
                 return transfer_result
 
-            # Step 2: Get USDB asset ID
-            asset_id = self.westend_adapter._get_usdb_asset_id()
-            if not asset_id:
-                transfer_result['errors'].append("USDB asset ID not configured")
+            # Step 2: Get borg keypairs from macOS Keychain
+            from_keypair = self.address_manager.get_borg_keypair(from_borg_id)
+            if not from_keypair:
+                transfer_result['errors'].append(f"No keypair found in macOS Keychain for borg {from_borg_id}")
                 return transfer_result
 
-            # Step 3: Comprehensive validation
-            validation = await self.economic_validator.validate_transfer(
-                from_borg_id, to_borg_id, 'USDB', amount, asset_id
-            )
+            # Step 3: Convert amount to planck units
+            amount_planck = int(amount_wnd * (10 ** 12))  # WND has 12 decimals
 
-            if not validation['valid']:
-                transfer_result['errors'].extend(validation['errors'])
-                transfer_result['warnings'].extend(validation.get('warnings', []))
+            # Step 4: Check sender balance
+            sender_balance = await self.westend_adapter.get_wnd_balance(from_address)
+            if sender_balance < amount_planck:
+                transfer_result['errors'].append(f"Insufficient balance: {sender_balance} < {amount_planck} planck")
                 return transfer_result
-
-            # Step 4: Convert amount to planck units
-            amount_planck = int(amount * (10 ** 12))  # USDB has 12 decimals
 
             # Step 5: Execute blockchain transfer
-            transfer_tx = await self.westend_adapter.transfer_usdb(
-                from_address, to_address, amount_planck, asset_id
+            # Set the sender's keypair for signing
+            self.westend_adapter.set_keypair(from_keypair)
+
+            transfer_tx = await self.westend_adapter.transfer_wnd(
+                from_address, to_address, amount_planck
             )
 
             if not transfer_tx.get('success'):
                 transfer_result['errors'].append(f"Blockchain transfer failed: {transfer_tx.get('error', 'Unknown error')}")
                 return transfer_result
 
-            # Step 6: Record transaction
-            tx_record = await self.transaction_manager.submit_transaction(
-                borg_id=from_borg_id,
-                transaction_data={
-                    'type': 'asset_transfer',
-                    'from_borg_id': from_borg_id,
-                    'to_borg_id': to_borg_id,
-                    'currency': 'USDB',
-                    'amount': amount_planck,
-                    'asset_id': asset_id,
-                    'description': description
-                },
-                keypair_name=f"borg_{from_borg_id}",
-                wait_for_confirmation=True
-            )
+            # Step 6: Update balances in database
+            await self._update_balances_wnd(from_borg_id, to_borg_id, amount_wnd)
 
-            if not tx_record.get('success'):
-                transfer_result['errors'].append(f"Transaction recording failed: {tx_record.get('error', 'Unknown error')}")
-                # Note: Blockchain transfer succeeded but recording failed
-                transfer_result['warnings'].append("Blockchain transfer succeeded but transaction recording failed")
-                return transfer_result
-
-            # Step 7: Update balances in database
-            await self._update_balances(from_borg_id, to_borg_id, amount, asset_id)
-
-            # Step 8: Success
+            # Step 7: Success
             transfer_result.update({
                 'success': True,
-                'transfer_id': tx_record.get('tx_id'),
                 'transaction_hash': transfer_tx.get('transaction_hash'),
                 'block_number': transfer_tx.get('block_number'),
-                'warnings': validation.get('warnings', [])
+                'from_address': from_address,
+                'to_address': to_address
             })
 
             # Log successful transfer
             self.audit_logger.log_event(
-                "borg_transfer_completed",
-                f"USDB transfer completed: {from_borg_id} -> {to_borg_id} ({amount} USDB)",
+                "borg_wnd_transfer_completed",
+                f"WND transfer completed: {from_borg_id} -> {to_borg_id} ({amount_wnd} WND)",
                 {
                     "from_borg_id": from_borg_id,
                     "to_borg_id": to_borg_id,
-                    "amount": str(amount),
+                    "amount_wnd": amount_wnd,
                     "transaction_hash": transfer_tx.get('transaction_hash'),
-                    "transfer_id": tx_record.get('tx_id')
+                    "from_address": from_address,
+                    "to_address": to_address
                 }
             )
 
         except Exception as e:
             transfer_result['errors'].append(f"Transfer execution error: {str(e)}")
             self.audit_logger.log_event(
-                "borg_transfer_error",
-                f"Transfer failed: {from_borg_id} -> {to_borg_id} ({amount} USDB)",
+                "borg_wnd_transfer_error",
+                f"WND transfer failed: {from_borg_id} -> {to_borg_id} ({amount_wnd} WND)",
                 {
                     "from_borg_id": from_borg_id,
                     "to_borg_id": to_borg_id,
-                    "amount": str(amount),
+                    "amount_wnd": amount_wnd,
                     "error": str(e)
                 }
             )
 
         return transfer_result
 
-    async def _update_balances(
+    async def _update_balances_wnd(
         self,
         from_borg_id: str,
         to_borg_id: str,
-        amount: Decimal,
-        asset_id: int
+        amount_wnd: float
     ) -> None:
-        """Update borg balances after successful transfer."""
+        """Update borg WND balances after successful transfer."""
         try:
             # Convert amount to planck units for database
-            amount_planck = int(amount * (10 ** 12))
+            amount_planck = int(amount_wnd * (10 ** 12))
 
             # Deduct from sender
             success_from = self.address_manager.sync_balance(
-                from_borg_id, 'USDB', -amount_planck
+                from_borg_id, 'WND', -amount_planck
             )
 
             # Add to recipient
             success_to = self.address_manager.sync_balance(
-                to_borg_id, 'USDB', amount_planck
+                to_borg_id, 'WND', amount_planck
             )
 
             if not (success_from and success_to):
                 self.audit_logger.log_event(
                     "balance_update_warning",
-                    f"Balance update may have failed for transfer {from_borg_id} -> {to_borg_id}",
+                    f"WND balance update may have failed for transfer {from_borg_id} -> {to_borg_id}",
                     {"from_success": success_from, "to_success": success_to}
                 )
 
         except Exception as e:
             self.audit_logger.log_event(
                 "balance_update_error",
-                f"Balance update error: {str(e)}",
+                f"WND balance update error: {str(e)}",
                 {"from_borg_id": from_borg_id, "to_borg_id": to_borg_id}
             )
 

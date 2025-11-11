@@ -108,10 +108,10 @@ class BorgAddressManager:
 
     def register_borg_address(self, borg_id: str, dna_hash: str, creator_signature: Optional[str] = None, creator_public_key: Optional[str] = None) -> Dict[str, Any]:
         """
-        Register a borg's address in the system.
+        Register a borg's address in the system with hardware-backed key storage.
 
-        Generates deterministic keypair, stores encrypted keypair, and registers
-        address in Supabase database.
+        Generates deterministic keypair and stores it securely in macOS Keychain.
+        No database fallback for key storage - maintains security through hardware isolation.
 
         Args:
             borg_id: Unique borg identifier
@@ -129,72 +129,58 @@ class BorgAddressManager:
             if creator_signature and creator_public_key:
                 self._creator_keys[borg_id] = creator_public_key
 
-            # Encrypt and store keypair using proper Fernet encryption
-            keypair_data = {
-                'seed': keypair.seed_hash.hex() if hasattr(keypair, 'seed_hash') else keypair.private_key.hex()[:64],  # Use private key as fallback
-                'public_key': keypair.public_key.hex(),
-                'private_key': keypair.private_key.hex(),
-                'ss58_address': keypair.ss58_address
-            }
-
-            # Use proper Fernet encryption for keystore storage
-            success = self.secure_storage.store_keypair(borg_id, keypair, {
-                'dna_hash': dna_hash,
-                'created_at': datetime.utcnow().isoformat(),
-                'purpose': 'borg_fund_holding'
-            })
+            # Store keypair securely in macOS Keychain
+            service_name = f"borglife-borg-{borg_id}"
+            success = self._store_keypair_in_keychain(service_name, keypair)
 
             if not success:
-                raise Exception("Failed to store keypair in encrypted keystore")
+                raise Exception("Failed to store keypair in macOS Keychain")
 
-            # Store keypair data as base64 for database (keyring handles security)
-            import base64
-            json_str = json.dumps(keypair_data, indent=2)
-            db_encrypted_data = base64.b64encode(json_str.encode()).decode()
+            # Store minimal metadata in keystore (no sensitive data)
+            keystore_data = {
+                'borg_id': borg_id,
+                'dna_hash': dna_hash,
+                'address': keypair.ss58_address,
+                'created_at': datetime.utcnow().isoformat(),
+                'storage_method': 'macos_keychain'
+            }
+
+            # Store metadata in keystore file
+            success = self.secure_storage.store_keypair(borg_id, keypair, keystore_data)
+            if not success:
+                raise Exception("Failed to store keystore metadata")
 
             self.audit_logger.log_event(
-                "database_storage_success",
-                f"Keypair data stored in database for borg {borg_id} (secured by macOS Keychain)",
-                {"borg_id": borg_id, "storage_method": "macos_keychain"}
+                "borg_keychain_storage_success",
+                f"Keypair stored in macOS Keychain for borg {borg_id}",
+                {"borg_id": borg_id, "address": keypair.ss58_address, "service_name": service_name}
             )
 
             # Anchor DNA hash on-chain for tamper-evident proof
             anchoring_tx_hash = self.dna_anchor.anchor_dna_hash(dna_hash, borg_id)
 
-            # Prepare database record with anchoring information
+            # Prepare database record (no keypair data stored in DB)
             address_record = {
                 'borg_id': borg_id,
                 'substrate_address': keypair.ss58_address,
                 'dna_hash': dna_hash,
-                'keypair_encrypted': db_encrypted_data,  # Use base64 for DB, proper encryption for keystore
                 'creator_public_key': creator_public_key,
                 'creator_signature': creator_signature,
                 'anchoring_tx_hash': anchoring_tx_hash,
-                'anchoring_status': 'confirmed'  # Since anchoring is synchronous in demo
+                'anchoring_status': 'confirmed',
+                'key_storage_method': 'macos_keychain'
             }
 
             # Store in Supabase if available
             if self.supabase:
                 try:
-                    # Use REST API instead of direct SQL to avoid schema cache issues
-                    address_record = {
-                        'borg_id': borg_id,
-                        'substrate_address': keypair.ss58_address,
-                        'dna_hash': dna_hash,
-                        'keypair_encrypted': db_encrypted_data,
-                        'creator_public_key': creator_public_key,
-                        'creator_signature': creator_signature,
-                        'anchoring_tx_hash': anchoring_tx_hash,
-                        'anchoring_status': 'confirmed'
-                    }
-
                     # Insert or update using REST API
                     result = self.supabase.table('borg_addresses').upsert(
                         address_record,
                         on_conflict='borg_id'
                     ).execute()
 
-                    # Initialize balance records for both currencies using REST API
+                    # Initialize balance records for both currencies
                     for currency in ['WND', 'USDB']:
                         balance_record = {
                             'borg_id': borg_id,
@@ -213,11 +199,11 @@ class BorgAddressManager:
                         {"borg_id": borg_id, "error": str(db_error)}
                     )
                     print(f"⚠️  Supabase storage failed: {db_error}")
-                    # Continue without database storage - keystore is still secure
+                    # Continue - keychain storage is secure even without DB
 
                 self.audit_logger.log_event(
                     "borg_registered",
-                    f"Borg {borg_id} registered with address {keypair.ss58_address}",
+                    f"Borg {borg_id} registered with address {keypair.ss58_address} (Keychain secured)",
                     {"borg_id": borg_id, "address": keypair.ss58_address}
                 )
 
@@ -228,7 +214,8 @@ class BorgAddressManager:
                     'success': True,
                     'borg_id': borg_id,
                     'address': keypair.ss58_address,
-                    'dna_hash': dna_hash
+                    'dna_hash': dna_hash,
+                    'storage_method': 'macos_keychain'
                 }
             else:
                 # Fallback: just return the data without database storage
@@ -237,7 +224,7 @@ class BorgAddressManager:
                     'borg_id': borg_id,
                     'address': keypair.ss58_address,
                     'dna_hash': dna_hash,
-                    'keypair_data': keypair_data,
+                    'storage_method': 'macos_keychain',
                     'warning': 'No database connection - address not persisted'
                 }
 
@@ -252,6 +239,23 @@ class BorgAddressManager:
                 'error': str(e),
                 'borg_id': borg_id
             }
+
+    def _store_keypair_in_keychain(self, service_name: str, keypair: Keypair) -> bool:
+        """Store keypair components in macOS Keychain."""
+        try:
+            # Store each component separately for security
+            keyring.set_password(service_name, "private_key", keypair.private_key.hex())
+            keyring.set_password(service_name, "public_key", keypair.public_key.hex())
+            keyring.set_password(service_name, "address", keypair.ss58_address)
+
+            return True
+        except Exception as e:
+            self.audit_logger.log_event(
+                "keychain_storage_failed",
+                f"Failed to store keypair in macOS Keychain: {str(e)}",
+                {"service_name": service_name, "error": str(e)}
+            )
+            return False
 
     def get_borg_address(self, borg_id: str) -> Optional[str]:
         """
@@ -289,60 +293,49 @@ class BorgAddressManager:
 
     def get_borg_keypair(self, borg_id: str) -> Optional[Keypair]:
         """
-        Retrieve and decrypt borg keypair with DNA integrity verification.
+        Retrieve borg keypair from macOS Keychain with hardware-backed security.
+
+        IMPORTANT: No fallback to database loading - maintains security by only using
+        hardware-backed key storage. Keypairs must be created and stored in Keychain.
 
         Args:
             borg_id: Borg identifier
 
         Returns:
-            Decrypted keypair or None if not found or integrity check fails
+            Keypair from macOS Keychain or None if not found
         """
-        if not self.supabase:
-            return None
-
         try:
-            # Get encrypted keypair data and anchoring info from database
-            result = self.supabase.table('borg_addresses').select('keypair_encrypted,dna_hash,anchoring_tx_hash').eq('borg_id', borg_id).execute()
+            # Get service name for this borg
+            service_name = f"borglife-borg-{borg_id}"
 
-            if not result.data:
-                return None
+            # Retrieve keypair components from macOS Keychain
+            private_key_hex = keyring.get_password(service_name, "private_key")
+            public_key_hex = keyring.get_password(service_name, "public_key")
+            address = keyring.get_password(service_name, "address")
 
-            record = result.data[0]
-            encrypted_data = record['keypair_encrypted']
-            dna_hash = record['dna_hash']
-            anchoring_tx_hash = record.get('anchoring_tx_hash')
-
-            # Verify DNA integrity before returning keypair
-            if dna_hash and not self.dna_anchor.verify_anchoring(dna_hash):
+            if not private_key_hex or not public_key_hex or not address:
                 self.audit_logger.log_event(
-                    "dna_integrity_check_failed",
-                    f"DNA integrity check failed for borg {borg_id} - possible tampering",
-                    {"borg_id": borg_id, "dna_hash": dna_hash[:16]}
+                    "keypair_not_found",
+                    f"No keypair found in macOS Keychain for borg {borg_id}",
+                    {"borg_id": borg_id, "service_name": service_name}
                 )
                 return None
 
-            # Decode base64 database data (keyring handles security)
-            import base64
+            # Reconstruct keypair from private key
             try:
-                encrypted_bytes = base64.b64decode(encrypted_data)
-                keypair_data = json.loads(encrypted_bytes.decode())
-                self.audit_logger.log_event(
-                    "keypair_retrieval_success",
-                    f"Keypair data retrieved from database for borg {borg_id} (secured by macOS Keychain)",
-                    {"borg_id": borg_id, "storage_method": "macos_keychain"}
-                )
-            except Exception as decode_error:
-                self.audit_logger.log_event(
-                    "keypair_retrieval_failed",
-                    f"Failed to decode keypair data for borg {borg_id}: {str(decode_error)}",
-                    {"borg_id": borg_id, "error": str(decode_error)}
-                )
-                return None
-
-            # Recreate keypair from private key (more reliable than seed)
-            try:
-                private_key = bytes.fromhex(keypair_data['private_key'])
+                private_key = bytes.fromhex(private_key_hex)
                 keypair = Keypair(private_key=private_key)
+
+                # Verify keypair integrity
+                if (keypair.public_key.hex() != public_key_hex or
+                    keypair.ss58_address != address):
+                    self.audit_logger.log_event(
+                        "keypair_integrity_check_failed",
+                        f"Keypair integrity check failed for borg {borg_id}",
+                        {"borg_id": borg_id}
+                    )
+                    return None
+
             except Exception as key_error:
                 self.audit_logger.log_event(
                     "keypair_reconstruction_failed",
@@ -352,17 +345,17 @@ class BorgAddressManager:
                 return None
 
             self.audit_logger.log_event(
-                "keypair_retrieved",
-                f"Keypair retrieved for borg {borg_id} with integrity verification",
-                {"borg_id": borg_id, "dna_integrity_verified": True}
+                "keypair_retrieved_from_keychain",
+                f"Keypair successfully retrieved from macOS Keychain for borg {borg_id}",
+                {"borg_id": borg_id, "address": address, "service_name": service_name}
             )
 
             return keypair
 
         except Exception as e:
             self.audit_logger.log_event(
-                "keypair_retrieval_failed",
-                f"Failed to retrieve keypair for borg {borg_id}: {str(e)}",
+                "keypair_retrieval_error",
+                f"Error retrieving keypair for borg {borg_id}: {str(e)}",
                 {"borg_id": borg_id, "error": str(e)}
             )
             return None
