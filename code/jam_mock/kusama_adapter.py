@@ -739,6 +739,72 @@ class WestendAdapter(JAMInterface):
 
     # Phase 2A: Dual-Currency Support Methods
 
+    async def transfer_wnd(self, from_address: str, to_address: str, amount: int) -> Dict[str, Any]:
+        """
+        Transfer WND tokens between addresses using balances.transfer extrinsic.
+
+        Args:
+            from_address: Sender's substrate address
+            to_address: Recipient's substrate address
+            amount: Amount to transfer in planck units
+
+        Returns:
+            Transfer result with success status and transaction details
+        """
+        if not self.substrate:
+            return {'success': False, 'error': 'No substrate connection'}
+
+        if not self.keypair:
+            return {'success': False, 'error': 'No keypair configured'}
+
+        try:
+            # Compose balances.transfer extrinsic
+            call = self.substrate.compose_call(
+                call_module='Balances',
+                call_function='transfer_keep_alive',
+                call_params={
+                    'dest': to_address,
+                    'value': amount
+                }
+            )
+
+            # Create signed extrinsic
+            extrinsic = self.substrate.create_signed_extrinsic(
+                call=call,
+                keypair=self.keypair
+            )
+
+            # Submit and wait for inclusion
+            receipt = self.substrate.submit_extrinsic(extrinsic, wait_for_inclusion=True)
+
+            if receipt.is_success:
+                return {
+                    'success': True,
+                    'transaction_hash': receipt.extrinsic_hash,
+                    'block_hash': receipt.block_hash,
+                    'block_number': receipt.block_number,
+                    'from_address': from_address,
+                    'to_address': to_address,
+                    'amount': amount
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': f'Transfer failed: {receipt.error_message}',
+                    'from_address': from_address,
+                    'to_address': to_address,
+                    'amount': amount
+                }
+
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'from_address': from_address,
+                'to_address': to_address,
+                'amount': amount
+            }
+
     async def transfer_usdb(self, from_address: str, to_address: str, amount: int, asset_id: int) -> Dict[str, Any]:
         """
         Transfer USDB assets between addresses using assets.transfer extrinsic.

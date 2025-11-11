@@ -1,0 +1,9 @@
+{
+  "dispenser_unlock": true,
+  "borg_address_retrieved": true,
+  "initial_balances": {},
+  "transfer_result": {},
+  "final_balances": {},
+  "success": false,
+  "error": "'SecureDispenser' object has no attribute 'get_wnd_balance'"
+}

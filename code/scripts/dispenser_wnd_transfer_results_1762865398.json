@@ -1,0 +1,35 @@
+{
+  "dispenser_unlock": true,
+  "borg_address_retrieved": true,
+  "initial_balances": {
+    "dispenser": {
+      "planck": 7939486099904,
+      "wnd": 7.939486099904
+    },
+    "borg_1": {
+      "planck": 167945177416,
+      "wnd": 0.167945177416
+    }
+  },
+  "transfer_result": {
+    "success": true,
+    "error": null,
+    "transaction_hash": "0x78a4280b5679fa4264b2632d7716bedc48d823956aaaa4b12b59e50719630ae8",
+    "amount_transferred": 1000000000000,
+    "from_address": "5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD",
+    "to_address": "5EeeSsZAzVzZjTnLA9yCV8pwsuQvbHDfYPZX5YcmitVFFA2c",
+    "block_number": null,
+    "block_hash": "0xea9218f639f23daebfc5e623ca61e72ab585dfd033dcc858f7bf03f4ebed440a"
+  },
+  "final_balances": {
+    "dispenser": {
+      "planck": 6923458688612,
+      "wnd": 6.923458688612
+    },
+    "borg_1": {
+      "planck": 1167945177416,
+      "wnd": 1.167945177416
+    }
+  },
+  "success": true
+}

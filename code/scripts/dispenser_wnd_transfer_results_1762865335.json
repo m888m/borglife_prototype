@@ -1,0 +1,26 @@
+{
+  "dispenser_unlock": true,
+  "borg_address_retrieved": true,
+  "initial_balances": {
+    "dispenser": {
+      "planck": 7939486099904,
+      "wnd": 7.939486099904
+    },
+    "borg_1": {
+      "planck": 167945177416,
+      "wnd": 0.167945177416
+    }
+  },
+  "transfer_result": {
+    "success": false,
+    "error": "Call function 'Balances.transfer' not found",
+    "transaction_hash": null,
+    "amount_transferred": null,
+    "from_address": null,
+    "to_address": "5EeeSsZAzVzZjTnLA9yCV8pwsuQvbHDfYPZX5YcmitVFFA2c",
+    "block_number": null,
+    "block_hash": null
+  },
+  "final_balances": {},
+  "success": false
+}

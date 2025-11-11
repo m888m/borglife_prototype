@@ -287,6 +287,126 @@ class SecureDispenser:
 
             print("🔒 Dispenser session locked")
 
+    async def transfer_wnd_to_borg(self, borg_address: str, borg_id: str, amount_wnd: float) -> Dict[str, Any]:
+        """
+        Transfer WND tokens from dispenser to borg address using live Westend network.
+
+        Args:
+            borg_address: Recipient borg's substrate address
+            borg_id: Borg identifier for logging
+            amount_wnd: Amount of WND to transfer
+
+        Returns:
+            Transfer result with success status and transaction details
+        """
+        result = {
+            'success': False,
+            'error': None,
+            'transaction_hash': None,
+            'amount_transferred': None,
+            'from_address': None,
+            'to_address': borg_address,
+            'block_number': None,
+            'block_hash': None
+        }
+
+        try:
+            # Validate session
+            if not self.is_session_active():
+                result['error'] = 'Dispenser session not active - unlock required'
+                return result
+
+            # Validate inputs
+            if amount_wnd <= 0:
+                result['error'] = 'Transfer amount must be positive'
+                return result
+
+            if amount_wnd > float(self.max_transfer_amount):
+                result['error'] = f'Transfer amount {amount_wnd} exceeds maximum {self.max_transfer_amount}'
+                return result
+
+            # Check daily limit
+            today = datetime.utcnow().date().isoformat()
+            daily_used = self.daily_usage.get(today, Decimal('0'))
+            amount_decimal = Decimal(str(amount_wnd))
+
+            if daily_used + amount_decimal > self.daily_limit:
+                result['error'] = f'Daily limit exceeded: {daily_used + amount_decimal} > {self.daily_limit}'
+                return result
+
+            # Initialize WestendAdapter for live transfer
+            from jam_mock.kusama_adapter import WestendAdapter
+            westend_adapter = WestendAdapter("https://westend.api.onfinality.io/public-ws")
+            westend_adapter.set_keypair(self.unlocked_keypair)
+
+            # Convert WND to planck units
+            amount_planck = int(amount_wnd * (10 ** 12))
+
+            # Check dispenser balance before transfer
+            dispenser_balance = await westend_adapter.get_wnd_balance(self.unlocked_keypair.ss58_address)
+            if dispenser_balance < amount_planck:
+                result['error'] = f'Insufficient dispenser balance: {dispenser_balance} < {amount_planck} planck'
+                return result
+
+            # Execute transfer
+            transfer_result = await westend_adapter.transfer_wnd(
+                self.unlocked_keypair.ss58_address,
+                borg_address,
+                amount_planck
+            )
+
+            if transfer_result.get('success'):
+                # Update daily usage
+                self.daily_usage[today] = daily_used + amount_decimal
+
+                # Log successful transfer
+                self.audit_logger.log_event(
+                    "dispenser_wnd_transfer_completed",
+                    f"Transferred {amount_wnd} WND from dispenser to borg {borg_id}",
+                    {
+                        'borg_id': borg_id,
+                        'borg_address': borg_address,
+                        'dispenser_address': self.unlocked_keypair.ss58_address,
+                        'amount_wnd': amount_wnd,
+                        'amount_planck': amount_planck,
+                        'transaction_hash': transfer_result['transaction_hash'],
+                        'block_number': transfer_result.get('block_number'),
+                        'block_hash': transfer_result.get('block_hash')
+                    }
+                )
+
+                result.update({
+                    'success': True,
+                    'transaction_hash': transfer_result['transaction_hash'],
+                    'amount_transferred': amount_planck,
+                    'from_address': self.unlocked_keypair.ss58_address,
+                    'block_number': transfer_result.get('block_number'),
+                    'block_hash': transfer_result.get('block_hash')
+                })
+
+                print(f"✅ Transferred {amount_wnd} WND to borg {borg_id}")
+                print(f"   Transaction: {transfer_result['transaction_hash']}")
+                print(f"   Block: {transfer_result.get('block_number')}")
+                return result
+
+            else:
+                result['error'] = transfer_result.get('error', 'Transfer failed')
+                return result
+
+        except Exception as e:
+            result['error'] = str(e)
+            self.audit_logger.log_event(
+                "dispenser_wnd_transfer_failed",
+                f"Failed to transfer WND to borg {borg_id}: {str(e)}",
+                {
+                    'borg_id': borg_id,
+                    'borg_address': borg_address,
+                    'amount_requested': amount_wnd,
+                    'error': str(e)
+                }
+            )
+            return result
+
     def transfer_wnd_fee(self, borg_address: str, borg_id: str, dna_hash: str) -> Dict[str, Any]:
         """
         Transfer WND fee for borg DNA anchoring.

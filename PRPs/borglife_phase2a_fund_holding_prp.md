@@ -29,7 +29,8 @@ CREATE TABLE borg_addresses (
 CREATE TABLE borg_balances (
     borg_id VARCHAR(50) REFERENCES borg_addresses(borg_id),
     currency VARCHAR(10) NOT NULL, -- 'WND' or 'USDB'
-    balance_wei BIGINT NOT NULL DEFAULT 0,
+    balance_wei BIGINT NOT NULL DEFAULT 0 CHECK (balance_wei >= 0),
+    decimals INTEGER DEFAULT 12, -- Decimal places for precision handling
     last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     PRIMARY KEY (borg_id, currency)
 );
@@ -103,13 +104,13 @@ CREATE INDEX idx_transfers_created ON transfer_transactions(created_at DESC);
 
 #### USDB Stablecoin Design
 - **Asset Type**: Fungible token created via Assets pallet
-- **Decimals**: 12 decimal places (Polkadot standard for precision)
+- **Decimals**: 12 decimal places for precision
 - **Initial Supply**: 1,000,000 USDB minted to dispenser account
 - **Transfer Mechanism**: `assets.transfer` extrinsic for peer-to-peer transfers
 - **Balance Queries**: `Assets.Account` storage map for balance lookups
 
 #### Network Configuration Requirements
-- **RPC Endpoints**: Primary `wss://westend-asset-hub-rpc.polkadot.io`, fallbacks available
+- **RPC Endpoints**: Primary `wss://westend-asset-hub-rpc.polkadot.io`, fallback `wss://westend.api.onfinality.io/public-ws`
 - **Chain Spec**: Westend Asset Hub chain specification with Assets pallet enabled
 - **Genesis Config**: Asset Hub genesis includes pallet configurations
 - **Block Production**: 6-second block time with Babe consensus
@@ -123,15 +124,12 @@ CREATE INDEX idx_transfers_created ON transfer_transactions(created_at DESC);
 - **Error Handling**: DispatchError types for transaction failure classification
 
 #### Gas Fee Optimization Strategies
-- **Fee Calculation**: Based on extrinsic weight and length
-- **Priority Fees**: Optional tip for faster inclusion
-- **Batch Transactions**: Multiple operations in single extrinsic
-- **Weight Estimation**: Pre-calculation of computational weight
-- **Fee Preferences**: Dynamic adjustment based on network congestion
+- **Batch Transactions**: Combine multiple operations in single extrinsic to reduce total fees
+- **Fee Estimation**: Pre-calculate fees using `payment_queryInfo` runtime API
 
 #### Security Considerations
 - **Key Management**: AES-256 encrypted keypairs in macOS Keychain
-- **Transaction Signing**: Ed25519 signatures with replay protection
+- **Transaction Signing**: Ed25519 signatures with secure entropy
 - **Balance Validation**: Pre-transfer balance checks with race condition protection
 - **Audit Trail**: Comprehensive logging of all economic operations
 - **Access Control**: Role-based permissions for asset operations
@@ -158,22 +156,28 @@ CREATE INDEX idx_transfers_created ON transfer_transactions(created_at DESC);
 **Technical Details**:
 - **Asset Creation**: Use Assets pallet on Westend Asset Hub (`assets.create`)
 - **Initial Supply**: 1,000,000 USDB (1,000,000 * 10^12 planck units)
-- **Asset ID**: Auto-assigned by pallet, tracked in configuration
-- **Metadata**: Set name, symbol, decimals via `assets.setMetadata`
+- **Asset ID**: Explicitly assigned using `assets.nextAssetId()` query, tracked in configuration
+- **Metadata**: Set name, symbol, decimals via `assets.set_metadata`
 - **Admin Account**: Funded Westend account for asset management
 - **Dispenser Account**: Dedicated account for initial USDB distribution to borgs
 
 **Implementation Steps**:
 1. Create `scripts/create_usdb_asset.py` using substrate-interface 1.7.0+
 2. Generate admin keypair using existing `AdvancedKeypairManager` from `jam_mock/keypair_manager.py`
-3. Execute `assets.create` extrinsic with metadata parameters:
+3. Query next available asset ID and execute `assets.create` extrinsic:
    ```python
+   # Query next available asset ID
+   next_asset_id = substrate.query(
+       module='Assets',
+       storage_function='NextAssetId'
+   ).value
+
    # Create asset with dispenser as admin
    call = substrate.compose_call(
        call_module='Assets',
        call_function='create',
        call_params={
-           'id': asset_id,  # Let pallet assign
+           'id': next_asset_id,  # Explicitly assigned asset ID
            'admin': dispenser_address,  # Dispenser account controls asset
            'min_balance': 1  # Minimum balance in planck units
        }
@@ -222,11 +226,8 @@ CREATE INDEX idx_transfers_created ON transfer_transactions(created_at DESC);
 - **Error Handling**: Handle `DispatchError` types (InsufficientBalance, BadOrigin, etc.)
 
 **Gas Fee Optimization Strategies**:
-- **Weight Estimation**: Pre-calculate extrinsic weight using `payment_queryInfo`
-- **Fee Calculation**: Base fee + weight fee + length fee
-- **Priority Adjustment**: Add tip for faster inclusion during congestion
-- **Batch Operations**: Combine multiple calls in single extrinsic to reduce total fees
-- **Optimal Timing**: Execute during low-congestion periods
+- **Batch Transactions**: Combine multiple operations in single extrinsic to reduce total fees
+- **Fee Estimation**: Pre-calculate fees using `payment_queryInfo` runtime API
 
 **Security Considerations**:
 - **Keypair Security**: Admin keypair encrypted with AES-256 in macOS Keychain
@@ -668,14 +669,10 @@ CREATE INDEX idx_transfers_created ON transfer_transactions(created_at DESC);
    ```
 
 **Gas Fee Optimization Strategies**:
-- **Dynamic Fee Adjustment**: Monitor network congestion and adjust tips
-- **Batch Operations**: Combine multiple transfers to reduce per-operation fees
-- **Optimal Timing**: Execute during low-congestion periods (off-peak hours)
+- **Batch Transactions**: Combine multiple operations in single extrinsic to reduce total fees
 - **Fee Estimation**: Pre-calculate fees using `payment_queryInfo` runtime API
-- **Length Optimization**: Minimize extrinsic size for lower length fees
 
 **Security Considerations**:
-- **Replay Protection**: Include nonce in all transactions
 - **Balance Validation**: Pre-transfer balance checks prevent overdrafts
 - **Address Validation**: Verify Substrate address formats
 - **Error Handling**: Comprehensive error classification and user feedback
@@ -726,7 +723,7 @@ CREATE INDEX idx_transfers_created ON transfer_transactions(created_at DESC);
 
 **Technical Details**:
 - **Transfer Validation**: Balance checks, amount validation, address verification using Supabase queries
-- **Security**: Encrypted transaction signing using existing keypair infrastructure, replay protection via nonce
+- **Security**: Encrypted transaction signing using existing keypair infrastructure
 - **Confirmation**: Block confirmation monitoring for transfers using existing transaction monitoring
 - **Error Handling**: Comprehensive error handling for failed transfers with user-friendly messages
 
@@ -1034,7 +1031,7 @@ CREATE INDEX idx_transfers_created ON transfer_transactions(created_at DESC);
 
 ### Asset Creation Rollback
 1. If asset creation fails: No action needed (asset doesn't exist)
-2. If asset created but metadata wrong: Update metadata via `assets.setMetadata`
+2. If asset created but metadata wrong: Update metadata via `assets.set_metadata`
 3. If asset needs deletion: Assets pallet doesn't support deletion - document and avoid reuse
 
 ### Database Rollback
@@ -1125,6 +1122,7 @@ Transfer Request → Balance Validation → Transaction Composition
 1. Verify admin account owns the asset
 2. Check metadata format (name/symbol as bytes, valid decimals)
 3. Use `assets.set_metadata` extrinsic with correct parameters
+4. Ensure asset ID is correct and asset exists on-chain
 
 ### Address Management Issues
 
