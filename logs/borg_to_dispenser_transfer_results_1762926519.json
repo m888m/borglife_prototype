@@ -1,0 +1,13 @@
+{
+  "test_start_time": "2025-11-12T06:48:39.152517",
+  "borg_address": "5EeeSsZAzVzZjTnLA9yCV8pwsuQvbHDfYPZX5YcmitVFFA2c",
+  "dispenser_address": "5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD",
+  "transfer_amount_wnd": 2.0,
+  "service_name": "borglife-borg-borgTest1_1762870300",
+  "keypair_access": false,
+  "balance_check": {},
+  "transfer_result": {},
+  "success": false,
+  "error": "Keypair reconstruction failed: '<' not supported between instances of 'NoneType' and 'int'",
+  "test_end_time": "2025-11-12T06:48:39.178409"
+}

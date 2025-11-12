@@ -1,0 +1,12 @@
+{
+  "test_start_time": "2025-11-11T13:58:11.665369",
+  "from_borg_id": "dispenser",
+  "to_borg_id": "borg_2",
+  "transfer_amount_wnd": 0.5,
+  "initial_balances": {},
+  "final_balances": {},
+  "transfer_result": null,
+  "success": false,
+  "error": "No keypair found in macOS Keychain for borg dispenser (address: 5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD)",
+  "test_end_time": "2025-11-11T13:58:12.956905"
+}

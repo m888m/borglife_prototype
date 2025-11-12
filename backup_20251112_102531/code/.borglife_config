@@ -1,0 +1,26 @@
+# BORGLIFE_ROOT=/path/to/borglife
+# ARCHON_ROOT=/path/to/archon
+ARCHON_SERVER_URL=http://localhost:8181
+ARCHON_MCP_URL=http://localhost:8051
+ARCHON_AGENTS_URL=http://localhost:8052
+E2E_TEST_TIMEOUT=300
+E2E_TEST_PARALLEL=false
+LOG_LEVEL=INFO
+DOCKER_COMPOSE_TIMEOUT=60
+ENABLE_ADVANCED_LOGGING=false
+ENABLE_PERFORMANCE_MONITORING=true
+# OLD FUNDED ADDRESS (has ~30 WND but unknown private key):
+# WND_DISPENSER_ADDRESS=5HbUDboFxDv7DTAD1QKTNxc3NAQx1i92GwCUoc4hb9AUi9vi
+
+# FUNDED DISPENSER ADDRESS (funded and has private key in keyring):
+WND_DISPENSER_ADDRESS=5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD
+
+# Original address with ~30 WND but lost private key:
+# OLD_WND_DISPENSER_ADDRESS=5HbUDboFxDv7DTAD1QKTNxc3NAQx1i92GwCUoc4hb9AUi9vi
+
+# DISPENSER ACCOUNT - Funded and ready for live operations
+# Generated with known seed, stored securely in macOS Keychain
+WND_DISPENSER_SEED=0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+# This generates address: 5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD
+# ✅ FUNDED: This address has been funded with WND tokens
+USDB_ASSET_ID=12345

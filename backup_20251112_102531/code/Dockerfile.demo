@@ -1,0 +1,33 @@
+# BorgLife Phase 1 Demo - Docker Environment
+# Provides modern OpenSSL 3.x for Westend RPC connectivity
+
+FROM python:3.11-slim
+
+# Install system dependencies including modern OpenSSL
+RUN apt-get update && apt-get install -y \
+    openssl \
+    libssl-dev \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Verify OpenSSL version
+RUN openssl version
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Set Python path
+ENV PYTHONPATH=/app
+
+# Default command runs the demo
+CMD ["python3", "jam_mock/dna_storage_demo.py"]

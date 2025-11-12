@@ -1,0 +1,1 @@
+{"containers": [{"id": "test-container", "status": "running", "cpu_percent": 5.2, "memory_usage": "128MB"}], "total_containers": 1}

@@ -1,0 +1,23 @@
+{
+  "test_start_time": "2025-11-11T14:11:40.258759",
+  "borg_creation": {
+    "borg1": {
+      "id": "borgTest1_1762870300",
+      "address": "5EeeSsZAzVzZjTnLA9yCV8pwsuQvbHDfYPZX5YcmitVFFA2c",
+      "dna_hash": "a1b2c3d4e5f67890123456789012345678901234567890123456789012345678",
+      "service_name": "borglife-borg-borgTest1_1762870300"
+    },
+    "borg2": {
+      "id": "borgTest2_1762870300",
+      "address": "5FFME3vBJ6XpJDZ9qJcbgY2KPYvTCEzMSPU1tj6VNWNb5NRA",
+      "dna_hash": "b2c3d4e5f6789012345678901234567890123456789012345678901234567890",
+      "service_name": "borglife-borg-borgTest2_1762870300"
+    }
+  },
+  "dispenser_transfers": {},
+  "inter_borg_transfer": {},
+  "final_balances": {},
+  "success": false,
+  "error": "Transfer to borg 1 failed: Transfer failed: None",
+  "test_end_time": "2025-11-11T14:11:55.753946"
+}

@@ -1,0 +1,189 @@
+---
+# Test DNA Samples for BorgLife Phase 1 E2E Testing
+# These configurations represent different borg phenotypes for validation
+
+test_dna_minimal:
+  header:
+    code_length: 1024
+    gas_limit: 1000000
+    service_index: "test-borg-minimal-001"
+  cells:
+    - name: "basic_agent"
+      logic_type: "rag_agent"
+      parameters:
+        model: "gpt-4"
+        max_tokens: 500
+      cost_estimate: 0.001
+  organs: []
+  manifesto_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+test_dna_complex:
+  header:
+    code_length: 2048
+    gas_limit: 2000000
+    service_index: "test-borg-complex-002"
+  cells:
+    - name: "data_processor"
+      logic_type: "data_processor"
+      parameters:
+        model: "gpt-4"
+        max_tokens: 500
+      cost_estimate: 0.001
+    - name: "decision_maker"
+      logic_type: "decision_maker"
+      parameters:
+        strategy: "utility_maximization"
+      cost_estimate: 0.0005
+  organs:
+    - name: "knowledge_base"
+      mcp_tool: "archon:perform_rag_query"
+      url: "http://archon-mcp:8051"
+      abi_version: "1.0"
+      price_cap: 0.0001
+    - name: "task_manager"
+      mcp_tool: "archon:create_task"
+      url: "http://archon-mcp:8051"
+      abi_version: "1.0"
+      price_cap: 0.0002
+  manifesto_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+test_dna_docker_mcp:
+  header:
+    code_length: 2048
+    gas_limit: 2000000
+    service_index: "test-borg-docker-mcp-003"
+  cells:
+    - name: "payment_processor"
+      logic_type: "decision_making"
+      parameters:
+        model: "gpt-4"
+        strategy: "payment_verification"
+      cost_estimate: 0.002
+  organs:
+    - name: "stripe_payment"
+      mcp_tool: "stripe:create_payment"
+      url: "http://mcp-stripe:8080"
+      abi_version: "2.3.0"
+      price_cap: 0.005
+    - name: "email_notification"
+      mcp_tool: "gmail:send_email"
+      url: "http://mcp-gmail:8080"
+      abi_version: "1.2.0"
+      price_cap: 0.0005
+  manifesto_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+test_dna_research_assistant:
+  header:
+    code_length: 1536
+    gas_limit: 1500000
+    service_index: "test-borg-research-004"
+  cells:
+    - name: "knowledge_synthesizer"
+      logic_type: "rag_synthesis"
+      parameters:
+        model: "gpt-4"
+        max_sources: 10
+        citation_style: "academic"
+      cost_estimate: 0.003
+  organs:
+    - name: "web_searcher"
+      mcp_tool: "duckduckgo:search"
+      url: "http://mcp-duckduckgo:8080"
+      abi_version: "1.0.0"
+      price_cap: 0.0002
+    - name: "paper_retriever"
+      mcp_tool: "arxiv:fetch_paper"
+      url: "http://mcp-arxiv:8080"
+      abi_version: "1.1.0"
+      price_cap: 0.0003
+    - name: "internal_knowledge"
+      mcp_tool: "archon:perform_rag_query"
+      url: "http://archon-mcp:8051"
+      abi_version: "1.0"
+      price_cap: 0.0002
+  manifesto_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+test_dna_business_intelligence:
+  header:
+    code_length: 1792
+    gas_limit: 1800000
+    service_index: "test-borg-business-intel-005"
+  cells:
+    - name: "report_generator"
+      logic_type: "document_processing"
+      parameters:
+        model: "gpt-4"
+        output_format: "markdown"
+        include_charts: true
+      cost_estimate: 0.0025
+  organs:
+    - name: "database_query"
+      mcp_tool: "mongodb:aggregate"
+      url: "http://mcp-mongodb:8080"
+      abi_version: "1.0.0"
+      price_cap: 0.0008
+    - name: "metrics_fetcher"
+      mcp_tool: "grafana:query_dashboard"
+      url: "http://mcp-grafana:8080"
+      abi_version: "1.0.0"
+      price_cap: 0.0006
+    - name: "report_sender"
+      mcp_tool: "gmail:send_email"
+      url: "http://mcp-gmail:8080"
+      abi_version: "1.2.0"
+      price_cap: 0.0005
+  manifesto_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+test_dna_edge_case_no_organs:
+  header:
+    code_length: 512
+    gas_limit: 500000
+    service_index: "test-borg-edge-case-006"
+  cells:
+    - name: "standalone_agent"
+      logic_type: "rag_agent"
+      parameters:
+        model: "gpt-4"
+        max_tokens: 200
+      cost_estimate: 0.0005
+  organs: []
+  manifesto_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+test_dna_edge_case_many_organs:
+  header:
+    code_length: 4096
+    gas_limit: 4000000
+    service_index: "test-borg-edge-case-007"
+  cells:
+    - name: "orchestrator"
+      logic_type: "decision_maker"
+      parameters:
+        strategy: "multi_organ_coordination"
+      cost_estimate: 0.005
+  organs:
+    - name: "organ_1"
+      mcp_tool: "archon:perform_rag_query"
+      url: "http://archon-mcp:8051"
+      abi_version: "1.0"
+      price_cap: 0.0001
+    - name: "organ_2"
+      mcp_tool: "archon:create_task"
+      url: "http://archon-mcp:8051"
+      abi_version: "1.0"
+      price_cap: 0.0002
+    - name: "organ_3"
+      mcp_tool: "archon:search_code_examples"
+      url: "http://archon-mcp:8051"
+      abi_version: "1.0"
+      price_cap: 0.0001
+    - name: "organ_4"
+      mcp_tool: "stripe:create_payment"
+      url: "http://mcp-stripe:8080"
+      abi_version: "2.3.0"
+      price_cap: 0.005
+    - name: "organ_5"
+      mcp_tool: "gmail:send_email"
+      url: "http://mcp-gmail:8080"
+      abi_version: "1.2.0"
+      price_cap: 0.0005
+  manifesto_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"

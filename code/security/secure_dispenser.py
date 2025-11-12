@@ -28,14 +28,19 @@ class SecureDispenser:
     during borg creation and DNA anchoring operations.
     """
 
-    def __init__(self, keystore_path: str = "code/jam_mock/.dispenser_keystore.enc"):
+    def __init__(self, keystore_path: str = None):
         """
         Initialize secure dispenser.
 
         Args:
             keystore_path: Path to encrypted keystore file
         """
-        self.keystore_path = keystore_path
+        if keystore_path is None:
+            # Use relative path from this file's directory
+            keystore_dir = os.path.join(os.path.dirname(__file__), '..', 'jam_mock')
+            self.keystore_path = os.path.join(keystore_dir, '.dispenser_keystore.enc')
+        else:
+            self.keystore_path = keystore_path
         self.audit_logger = DemoAuditLogger()
         self.dna_anchor = DNAAanchor()
 
@@ -222,9 +227,10 @@ class SecureDispenser:
             with open(self.keystore_path, 'r') as f:
                 keystore_data = json.load(f)
 
-            # Verify setup version compatibility
-            if keystore_data.get('setup_version') != '3.0':
-                raise ValueError("Incompatible keystore version - please recreate keystore")
+            # Verify setup version compatibility (accept 3.0 and 4.0)
+            setup_version = keystore_data.get('setup_version')
+            if setup_version not in ['3.0', '4.0']:
+                raise ValueError(f"Incompatible keystore version {setup_version} - please recreate keystore")
 
             # Load keypair from macOS Keychain
             service_name = self._get_keyring_service_name()
@@ -359,6 +365,16 @@ class SecureDispenser:
                 # Update daily usage
                 self.daily_usage[today] = daily_used + amount_decimal
 
+                # Update Supabase metadata if available
+                await self._update_transfer_metadata(
+                    from_borg_id='dispenser',
+                    to_borg_id=borg_id,
+                    currency='WND',
+                    amount_wei=amount_planck,
+                    transaction_hash=transfer_result['transaction_hash'],
+                    block_number=transfer_result.get('block_number')
+                )
+
                 # Log successful transfer
                 self.audit_logger.log_event(
                     "dispenser_wnd_transfer_completed",
@@ -406,6 +422,190 @@ class SecureDispenser:
                 }
             )
             return result
+
+    async def transfer_wnd_from_borg(self, borg_id: str, amount_wnd: float) -> Dict[str, Any]:
+        """
+        Transfer WND tokens from a borg address to dispenser using live Westend network.
+
+        Args:
+            borg_id: Borg identifier (used to lookup keypair in keyring)
+            amount_wnd: Amount of WND to transfer
+
+        Returns:
+            Transfer result with success status and transaction details
+        """
+        result = {
+            'success': False,
+            'error': None,
+            'transaction_hash': None,
+            'amount_transferred': None,
+            'from_address': None,
+            'to_address': self.unlocked_keypair.ss58_address if self.unlocked_keypair else None,
+            'block_number': None,
+            'block_hash': None
+        }
+
+        try:
+            # Validate session
+            if not self.is_session_active():
+                result['error'] = 'Dispenser session not active - unlock required'
+                return result
+
+            # Validate inputs
+            if amount_wnd <= 0:
+                result['error'] = 'Transfer amount must be positive'
+                return result
+
+            if amount_wnd > float(self.max_transfer_amount):
+                result['error'] = f'Transfer amount {amount_wnd} exceeds maximum {self.max_transfer_amount}'
+                return result
+
+            # Load borg keypair from keyring
+            borg_service_name = f"borglife-borg-{borg_id}"
+            borg_keypair = self._load_keypair_from_keyring(borg_service_name)
+
+            if not borg_keypair:
+                result['error'] = f'Could not load keypair for borg {borg_id} from keyring'
+                return result
+
+            # Initialize WestendAdapter for live transfer
+            from jam_mock.kusama_adapter import WestendAdapter
+            westend_adapter = WestendAdapter("https://westend.api.onfinality.io/public-ws")
+            westend_adapter.set_keypair(borg_keypair)
+
+            # Convert WND to planck units
+            amount_planck = int(amount_wnd * (10 ** 12))
+
+            # Check borg balance before transfer
+            borg_balance = await westend_adapter.get_wnd_balance(borg_keypair.ss58_address)
+            if borg_balance < amount_planck:
+                result['error'] = f'Insufficient borg balance: {borg_balance} < {amount_planck} planck'
+                return result
+
+            # Execute transfer from borg to dispenser
+            transfer_result = await westend_adapter.transfer_wnd(
+                borg_keypair.ss58_address,
+                self.unlocked_keypair.ss58_address,
+                amount_planck
+            )
+
+            if transfer_result.get('success'):
+                # Update Supabase metadata
+                await self._update_transfer_metadata(
+                    from_borg_id=borg_id,
+                    to_borg_id='dispenser',
+                    currency='WND',
+                    amount_wei=amount_planck,
+                    transaction_hash=transfer_result['transaction_hash'],
+                    block_number=transfer_result.get('block_number')
+                )
+
+                # Log successful transfer
+                self.audit_logger.log_event(
+                    "borg_wnd_transfer_completed",
+                    f"Transferred {amount_wnd} WND from borg {borg_id} to dispenser",
+                    {
+                        'borg_id': borg_id,
+                        'borg_address': borg_keypair.ss58_address,
+                        'dispenser_address': self.unlocked_keypair.ss58_address,
+                        'amount_wnd': amount_wnd,
+                        'amount_planck': amount_planck,
+                        'transaction_hash': transfer_result['transaction_hash'],
+                        'block_number': transfer_result.get('block_number'),
+                        'block_hash': transfer_result.get('block_hash')
+                    }
+                )
+
+                result.update({
+                    'success': True,
+                    'transaction_hash': transfer_result['transaction_hash'],
+                    'amount_transferred': amount_planck,
+                    'from_address': borg_keypair.ss58_address,
+                    'block_number': transfer_result.get('block_number'),
+                    'block_hash': transfer_result.get('block_hash')
+                })
+
+                print(f"✅ Transferred {amount_wnd} WND from borg {borg_id} to dispenser")
+                print(f"   Transaction: {transfer_result['transaction_hash']}")
+                print(f"   Block: {transfer_result.get('block_number')}")
+                return result
+
+            else:
+                result['error'] = transfer_result.get('error', 'Transfer failed')
+                return result
+
+        except Exception as e:
+            result['error'] = str(e)
+            self.audit_logger.log_event(
+                "borg_wnd_transfer_failed",
+                f"Failed to transfer WND from borg {borg_id} to dispenser: {str(e)}",
+                {
+                    'borg_id': borg_id,
+                    'amount_requested': amount_wnd,
+                    'error': str(e)
+                }
+            )
+            return result
+    
+    async def _update_transfer_metadata(self, from_borg_id: str, to_borg_id: str, currency: str,
+                                       amount_wei: int, transaction_hash: str, block_number: Optional[int] = None):
+        """Update Supabase with transfer metadata."""
+        try:
+            # Check if we have Supabase access
+            supabase_url = os.getenv('SUPABASE_URL')
+            supabase_key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_SECRET_KEY')
+
+            if not supabase_url or not supabase_key:
+                return  # No Supabase access
+
+            from supabase import create_client, Client
+            supabase: Client = create_client(supabase_url, supabase_key)
+
+            # Create transfer transaction record
+            tx_record = {
+                'tx_id': transaction_hash,
+                'from_borg_id': from_borg_id,
+                'to_borg_id': to_borg_id,
+                'currency': currency,
+                'amount_wei': amount_wei,
+                'transaction_hash': transaction_hash,
+                'block_number': block_number,
+                'status': 'confirmed'
+            }
+
+            # Insert transfer transaction
+            supabase.table('transfer_transactions').upsert(tx_record, on_conflict='tx_id').execute()
+
+            # Update borg balances
+            # Deduct from sender
+            if from_borg_id != 'dispenser':  # Don't update dispenser balance in borg_balances
+                try:
+                    current_from_balance = supabase.table('borg_balances').select('balance_wei').eq('borg_id', from_borg_id).eq('currency', currency).execute()
+                    if current_from_balance.data:
+                        new_from_balance = max(0, current_from_balance.data[0]['balance_wei'] - amount_wei)
+                        supabase.table('borg_balances').update({'balance_wei': new_from_balance, 'last_updated': 'NOW()'}).eq('borg_id', from_borg_id).eq('currency', currency).execute()
+                except Exception as e:
+                    print(f"Warning: Could not update sender balance: {e}")
+
+            # Add to recipient
+            try:
+                current_to_balance = supabase.table('borg_balances').select('balance_wei').eq('borg_id', to_borg_id).eq('currency', currency).execute()
+                if current_to_balance.data:
+                    new_to_balance = current_to_balance.data[0]['balance_wei'] + amount_wei
+                    supabase.table('borg_balances').update({'balance_wei': new_to_balance, 'last_updated': 'NOW()'}).eq('borg_id', to_borg_id).eq('currency', currency).execute()
+                else:
+                    # Create balance record if it doesn't exist
+                    balance_record = {
+                        'borg_id': to_borg_id,
+                        'currency': currency,
+                        'balance_wei': amount_wei
+                    }
+                    supabase.table('borg_balances').insert(balance_record).execute()
+            except Exception as e:
+                print(f"Warning: Could not update recipient balance: {e}")
+
+        except Exception as e:
+            print(f"Warning: Could not update transfer metadata: {e}")
 
     def transfer_wnd_fee(self, borg_address: str, borg_id: str, dna_hash: str) -> Dict[str, Any]:
         """

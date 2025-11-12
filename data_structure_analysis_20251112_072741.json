@@ -1,0 +1,255 @@
+{
+  "timestamp": "2025-11-12T07:27:40.960705",
+  "borg_id_references": {
+    "code/jam_mock/end_to_end_test.py": []
+  },
+  "address_references": {
+    "code/jam_mock/secure_borg_creation.py": [],
+    "code/jam_mock/inter_borg_transfer.py": []
+  },
+  "database_queries": {
+    "borg_addresses_table": [],
+    "borg_balances_table": [],
+    "transfer_transactions_table": [],
+    "other_tables": []
+  },
+  "keyring_patterns": {
+    "current_patterns": {
+      "borg_service": "borglife-borg-{borg_id}",
+      "dispenser_service": "borglife-dispenser",
+      "address_service": "borglife-address-{address}"
+    },
+    "key_types": [
+      "private_key",
+      "public_key",
+      "address"
+    ],
+    "service_discovery": [],
+    "migration_path": {
+      "phase_1": "Maintain dual keyring entries during transition",
+      "phase_2": "Migrate to address-based services",
+      "phase_3": "Remove borg_id-based services",
+      "rollback": "Restore borg_id-based services from backup"
+    }
+  },
+  "file_locations": {
+    "core_files": [
+      {
+        "path": "code/jam_mock/borg_address_manager.py",
+        "type": "core",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/jam_mock/secure_borg_creation.py",
+        "type": "core",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/security/secure_dispenser.py",
+        "type": "core",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/jam_mock/inter_borg_transfer.py",
+        "type": "core",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      }
+    ],
+    "dependent_files": [],
+    "test_files": [
+      {
+        "path": "code/tests/conftest.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/tests/test_error_handling.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/tests/__init__.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/tests/test_economic_model.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/tests/test_dna_integrity.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/tests/e2e_test_suite.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/tests/test_service_integration.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/tests/mocks/docker_mock.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/tests/mocks/jam_mock.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/tests/mocks/__init__.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/tests/mocks/docker_services.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/tests/mocks/archon_mock.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/tests/config/test_env.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/tests/integration/__init__.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/tests/integration/test_docker_mcp_integration.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/tests/integration/test_archon_integration.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      }
+    ],
+    "script_files": [
+      {
+        "path": "code/scripts/check_keyring.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/scripts/end_to_end_test.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/scripts/dispenser_wnd_transfer_test.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/scripts/setup_phase2a_database.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/scripts/mint_usdb_to_dispenser.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/scripts/usdb_faucet.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/scripts/test_dispenser_keyring_access.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/scripts/live_westend_test.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/scripts/create_usdb_asset.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/scripts/create_borg_tester.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/scripts/end_to_end_demo.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/scripts/borg_to_dispenser_transfer.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/scripts/borg_to_borg_transfer_test.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/scripts/westend_balance_check.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/scripts/wnd_transfer_test.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/scripts/usdb_distribution.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/scripts/inter_borg_transfer_test.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/scripts/create_borgs_and_transfer_test.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      },
+      {
+        "path": "code/scripts/execute_usdb_dispenser_workflow.py",
+        "borg_id_refs": 0,
+        "address_refs": 0
+      }
+    ]
+  },
+  "dependency_map": {},
+  "migration_complexity": {
+    "total_borg_id_references": 0,
+    "total_address_references": 0,
+    "files_affected": 1,
+    "database_queries_affected": 0,
+    "complexity_level": "low",
+    "estimated_effort_days": 0.0,
+    "risk_areas": [
+      "Many test files need updates"
+    ]
+  }
+}

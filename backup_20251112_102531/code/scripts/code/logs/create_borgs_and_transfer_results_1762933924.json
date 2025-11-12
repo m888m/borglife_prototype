@@ -1,0 +1,54 @@
+{
+  "test_start_time": "2025-11-12T08:50:50.668312",
+  "borg_creation": {
+    "borg1": {
+      "id": "borgTest1_1762937450",
+      "address": "5EeeSsZAzVzZjTnLA9yCV8pwsuQvbHDfYPZX5YcmitVFFA2c",
+      "dna_hash": "a1b2c3d4e5f67890123456789012345678901234567890123456789012345678",
+      "service_name": "borglife-borg-borgTest1_1762937450"
+    },
+    "borg2": {
+      "id": "borgTest2_1762937450",
+      "address": "5FFME3vBJ6XpJDZ9qJcbgY2KPYvTCEzMSPU1tj6VNWNb5NRA",
+      "dna_hash": "b2c3d4e5f6789012345678901234567890123456789012345678901234567890",
+      "service_name": "borglife-borg-borgTest2_1762937450"
+    }
+  },
+  "dispenser_transfers": {
+    "borg1_transfer": {
+      "success": true,
+      "error": null,
+      "transaction_hash": "0x886a8c1031f2a73d80d0f583d11e38fc513dd9656609280a05cde0366640fcef",
+      "amount_transferred": 100000000000,
+      "from_address": "5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD",
+      "to_address": "5EeeSsZAzVzZjTnLA9yCV8pwsuQvbHDfYPZX5YcmitVFFA2c",
+      "block_number": null,
+      "block_hash": "0x47151241ec583e7cb55da80c3cad973db4e4a259a4857f490f632ee83219b513"
+    },
+    "borg2_transfer": {
+      "success": true,
+      "error": null,
+      "transaction_hash": "0x32f341ca98b72c0cb57f8f7c569da1a0a3e2e1ae80b2c1e69995110f9a8c4629",
+      "amount_transferred": 100000000000,
+      "from_address": "5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD",
+      "to_address": "5FFME3vBJ6XpJDZ9qJcbgY2KPYvTCEzMSPU1tj6VNWNb5NRA",
+      "block_number": null,
+      "block_hash": "0x09938519fa147805028482b897437014d6149f8e2ab2a2c68c58a77702f13614"
+    }
+  },
+  "inter_borg_transfer": {
+    "success": true,
+    "transaction_hash": "0xd6f309bfa47511f7d9242d3534669f34ab62f379d73d208a764346033fa9f6b2",
+    "block_number": null,
+    "from_address": "5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD",
+    "to_address": "5FFME3vBJ6XpJDZ9qJcbgY2KPYvTCEzMSPU1tj6VNWNb5NRA",
+    "amount": "0.02",
+    "from_borg_id": "dispenser",
+    "to_borg_id": "borgTest2_1762937450",
+    "note": "Simulated inter-borg transfer using dispenser (keypair reconstruction issue exists)"
+  },
+  "final_balances": {},
+  "success": false,
+  "error": "name 'westend_adapter' is not defined",
+  "test_end_time": "2025-11-12T08:52:04.151342"
+}

@@ -1,0 +1,77 @@
+{
+  "timestamp": "2025-11-12T07:24:57.174267",
+  "keyring_entries": {
+    "borglife-dispenser": {
+      "private_key": {
+        "value": "c0b878b1***MASKED***077b2914",
+        "masked": "c0b878b1bfa564d0...",
+        "length": 128
+      },
+      "public_key": {
+        "value": "727cc3e8***MASKED***c2908e38",
+        "masked": "727cc3e837549b36...",
+        "length": 64
+      },
+      "address": {
+        "value": "5EepNwM9***MASKED***9XSaMkwD",
+        "masked": "5EepNwM98pD9HQsm...",
+        "length": 48
+      }
+    }
+  },
+  "database_exports": {
+    "error": "No Supabase credentials"
+  },
+  "file_backups": {
+    "code/jam_mock/.dispenser_keystore.enc": {
+      "not_found": true
+    },
+    "code/.borglife_config": {
+      "not_found": true
+    },
+    "code/.westend_config": {
+      "not_found": true
+    },
+    ".env": {
+      "not_found": true
+    },
+    ".env.borglife": {
+      "not_found": true
+    },
+    ".env.test": {
+      "not_found": true
+    }
+  },
+  "service_mappings": {
+    "dispenser": {
+      "service_name": "borglife-dispenser",
+      "purpose": "WND dispenser keypair storage",
+      "key_types": [
+        "private_key",
+        "public_key",
+        "address"
+      ]
+    },
+    "borg_pattern": {
+      "service_name": "borglife-borg-{borg_id}",
+      "purpose": "Individual borg keypair storage",
+      "key_types": [
+        "private_key",
+        "public_key",
+        "address"
+      ],
+      "example": "borglife-borg-borgTest1_1762870300"
+    },
+    "address_pattern": {
+      "service_name": "borglife-address-{address}",
+      "purpose": "Future address-based keypair storage",
+      "key_types": [
+        "private_key",
+        "public_key",
+        "address"
+      ],
+      "status": "not_yet_implemented"
+    }
+  },
+  "rollback_script": "backup_20251112_072457/rollback_emergency.sh"
+}

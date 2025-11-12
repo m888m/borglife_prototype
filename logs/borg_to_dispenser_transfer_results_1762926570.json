@@ -1,0 +1,24 @@
+{
+  "test_start_time": "2025-11-12T06:49:14.921747",
+  "borg_address": "5EeeSsZAzVzZjTnLA9yCV8pwsuQvbHDfYPZX5YcmitVFFA2c",
+  "dispenser_address": "5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD",
+  "transfer_amount_wnd": 2.0,
+  "service_name": "borglife-borg-borgTest1_1762870300",
+  "keypair_access": true,
+  "balance_check": {
+    "balance_planck": 4517945177416,
+    "balance_wnd": 4.517945177416
+  },
+  "transfer_result": {
+    "success": true,
+    "transaction_hash": "0x3a95655c0dd50b55c1301a0d5411e799fe640c79950df1fd24d61f94fd0c1b1e",
+    "block_hash": "0x31ac83e742cfe89211bbe59f97034045549d58fd0a56f89ee3afa8764c28e8b9",
+    "block_number": null,
+    "from_address": "5EeeSsZAzVzZjTnLA9yCV8pwsuQvbHDfYPZX5YcmitVFFA2c",
+    "to_address": "5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD",
+    "amount": 2000000000000
+  },
+  "success": true,
+  "error": null,
+  "test_end_time": "2025-11-12T06:49:30.547476"
+}

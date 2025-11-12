@@ -1,0 +1,10 @@
+{
+  "test_start_time": "2025-11-11T14:03:15.370139",
+  "borg_creation": {},
+  "dispenser_transfers": {},
+  "inter_borg_transfer": {},
+  "final_balances": {},
+  "success": false,
+  "error": "Borg 1 creation failed: Borg creation error: Invalid DNA hash format: a1b2c3d4e5f6789012345678901234567890123456789012345678901234567817628697951",
+  "test_end_time": "2025-11-11T14:03:15.395845"
+}

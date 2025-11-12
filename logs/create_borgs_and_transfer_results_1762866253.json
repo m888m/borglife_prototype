@@ -1,0 +1,44 @@
+{
+  "test_start_time": "2025-11-11T14:03:26.087549",
+  "borg_creation": {
+    "borg1": {
+      "id": "borgTest1_1762869806",
+      "address": "5EeeSsZAzVzZjTnLA9yCV8pwsuQvbHDfYPZX5YcmitVFFA2c",
+      "dna_hash": "a1b2c3d4e5f67890123456789012345678901234567890123456789012345678",
+      "service_name": "borglife-borg-borgTest1_1762869806"
+    },
+    "borg2": {
+      "id": "borgTest2_1762869806",
+      "address": "5FFME3vBJ6XpJDZ9qJcbgY2KPYvTCEzMSPU1tj6VNWNb5NRA",
+      "dna_hash": "b2c3d4e5f6789012345678901234567890123456789012345678901234567890",
+      "service_name": "borglife-borg-borgTest2_1762869806"
+    }
+  },
+  "dispenser_transfers": {
+    "borg1_transfer": {
+      "success": true,
+      "error": null,
+      "transaction_hash": "0xbba39353a0b029375b4a529a0b4cef3e0757bec3dcb0d94bf0d1e150a845991b",
+      "amount_transferred": 1000000000000,
+      "from_address": "5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD",
+      "to_address": "5EeeSsZAzVzZjTnLA9yCV8pwsuQvbHDfYPZX5YcmitVFFA2c",
+      "block_number": null,
+      "block_hash": "0x1b11562979769b6f4ebf7a8d44a875aef49e55b2351f53cc4ebc3dafcc8aee12"
+    },
+    "borg2_transfer": {
+      "success": true,
+      "error": null,
+      "transaction_hash": "0x067c571a2d1c454c90da0012cf109ee04d784f4a18fd604e2e3db7cb07e2e6ab",
+      "amount_transferred": 1000000000000,
+      "from_address": "5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD",
+      "to_address": "5FFME3vBJ6XpJDZ9qJcbgY2KPYvTCEzMSPU1tj6VNWNb5NRA",
+      "block_number": null,
+      "block_hash": "0xc22b2757ae8c5f36c906258805ec400db59f4f92163b2ad0a91e8f3b5435e4b3"
+    }
+  },
+  "inter_borg_transfer": {},
+  "final_balances": {},
+  "success": false,
+  "error": "Inter-borg transfer failed: ['Could not resolve borg addresses']",
+  "test_end_time": "2025-11-11T14:04:13.400464"
+}

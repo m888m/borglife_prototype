@@ -1,0 +1,152 @@
+{
+  "test_dna_minimal": {
+    "expected_cells": 1,
+    "expected_organs": 0,
+    "expected_cost_range": [0.0005, 0.002],
+    "roundtrip_integrity": true,
+    "service_index": "test-borg-minimal-001"
+  },
+  "test_dna_complex": {
+    "expected_cells": 2,
+    "expected_organs": 2,
+    "expected_cost_range": [0.001, 0.004],
+    "roundtrip_integrity": true,
+    "service_index": "test-borg-complex-002"
+  },
+  "test_dna_edge_case_no_organs": {
+    "expected_cells": 1,
+    "expected_organs": 0,
+    "expected_cost_range": [0.0005, 0.002],
+    "roundtrip_integrity": true,
+    "service_index": "test-borg-edge-case-006"
+  },
+  "test_dna_edge_case_many_organs": {
+    "expected_cells": 1,
+    "expected_organs": 5,
+    "expected_cost_range": [0.002, 0.008],
+    "roundtrip_integrity": true,
+    "service_index": "test-borg-edge-case-007"
+  },
+  "basic_funding_task": {
+    "expected_result": {
+      "task": "Fund a new borg with 10 DOT for basic operations",
+      "result": {
+        "decision": "Approved",
+        "reasoning": "Funding request meets basic operational requirements",
+        "amount": 10,
+        "currency": "DOT"
+      },
+      "cell_used": "decision_maker_1",
+      "organs_used": ["web_search"],
+      "execution_time": 2.5,
+      "cost_info": {
+        "total_cost": "0.0025",
+        "currency": "DOT",
+        "wealth_sufficient": true
+      }
+    },
+    "validation_rules": {
+      "must_contain": ["decision", "reasoning", "amount"],
+      "expected_cost_range": [0.001, 0.005],
+      "execution_time_max": 30
+    }
+  },
+  "complex_analysis_task": {
+    "expected_result": {
+      "task": "Analyze the current state of DeFi protocols and recommend investment strategies",
+      "result": {
+        "analysis": "Comprehensive DeFi analysis completed",
+        "recommendations": ["Diversify across protocols", "Monitor TVL trends"],
+        "protocols_analyzed": ["Uniswap", "Aave", "Compound"],
+        "risk_assessment": "Medium"
+      },
+      "cell_used": "data_processor_1",
+      "organs_used": ["web_search", "data_analysis"],
+      "execution_time": 15.0,
+      "cost_info": {
+        "total_cost": "0.008",
+        "currency": "DOT",
+        "wealth_sufficient": true
+      }
+    },
+    "validation_rules": {
+      "must_contain": ["analysis", "recommendations", "protocols_analyzed"],
+      "expected_cost_range": [0.005, 0.015],
+      "execution_time_max": 60
+    }
+  },
+  "research_task": {
+    "expected_result": {
+      "task": "Research the latest developments in zero-knowledge proofs and their applications",
+      "result": {
+        "findings": "ZKP developments analyzed",
+        "key_developments": ["New ZKML frameworks", "Privacy-preserving DeFi"],
+        "applications": ["Identity verification", "Private transactions"],
+        "future_trends": ["Scalability improvements", "Cross-chain compatibility"]
+      },
+      "cell_used": "rag_agent_1",
+      "organs_used": ["web_search"],
+      "execution_time": 8.0,
+      "cost_info": {
+        "total_cost": "0.004",
+        "currency": "DOT",
+        "wealth_sufficient": true
+      }
+    },
+    "validation_rules": {
+      "must_contain": ["findings", "key_developments", "applications"],
+      "expected_cost_range": [0.002, 0.008],
+      "execution_time_max": 45
+    }
+  },
+  "decision_task": {
+    "expected_result": {
+      "task": "Decide whether to stake DOT in parachain A or B based on current TVL and risk metrics",
+      "result": {
+        "decision": "Stake in Parachain A",
+        "reasoning": "Higher TVL and lower risk profile",
+        "parachain_a_metrics": {"tvl": 50000000, "risk_score": 3},
+        "parachain_b_metrics": {"tvl": 25000000, "risk_score": 7},
+        "confidence_level": 0.85
+      },
+      "cell_used": "decision_maker_1",
+      "organs_used": ["data_analysis"],
+      "execution_time": 6.0,
+      "cost_info": {
+        "total_cost": "0.005",
+        "currency": "DOT",
+        "wealth_sufficient": true
+      }
+    },
+    "validation_rules": {
+      "must_contain": ["decision", "reasoning", "confidence_level"],
+      "expected_cost_range": [0.003, 0.010],
+      "execution_time_max": 40
+    }
+  },
+  "comprehensive_task": {
+    "expected_result": {
+      "task": "Create a comprehensive report on Polkadot ecosystem growth, including TVL analysis, new projects, and future predictions",
+      "result": {
+        "report_title": "Polkadot Ecosystem Growth Report",
+        "sections": ["TVL Analysis", "New Projects", "Future Predictions"],
+        "key_metrics": {"total_tvl": 2000000000, "active_projects": 150},
+        "growth_predictions": "25% YoY growth expected",
+        "recommendations": ["Increase staking participation", "Support new parachains"]
+      },
+      "cell_used": "data_processor_1",
+      "organs_used": ["web_search", "data_analysis"],
+      "execution_time": 25.0,
+      "cost_info": {
+        "total_cost": "0.015",
+        "currency": "DOT",
+        "wealth_sufficient": true
+      }
+    },
+    "validation_rules": {
+      "must_contain": ["report_title", "sections", "key_metrics", "recommendations"],
+      "expected_cost_range": [0.008, 0.025],
+      "execution_time_max": 90
+    }
+  }
+}
