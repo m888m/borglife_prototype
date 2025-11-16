@@ -102,7 +102,7 @@ class KeypairManager:
             Dictionary with keypair information
         """
         if len(seed_hex) != 64:
-            raise ValueError("Seed must be 64 hex characters (256 bits)")
+            raise KeypairSecurityError("Seed must be 64 hex characters (256 bits)")
 
         try:
             keypair = Keypair.create_from_seed(
@@ -326,10 +326,11 @@ class KeypairManager:
             raise KeypairSecurityError(f"Keypair '{name}' not found")
 
         export_data = metadata[name].copy()
+        keypair = self.load_keypair(name)
+        seed_hex = keypair.seed_hex if isinstance(keypair.seed_hex, str) else keypair.seed_hex.hex()
+        export_data['seed_hex'] = seed_hex
 
         if include_private:
-            keypair = self.load_keypair(name)
-            export_data['seed_hex'] = keypair.seed_hex
             export_data['private_key'] = keypair.private_key.hex()
 
         return export_data

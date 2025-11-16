@@ -25,10 +25,12 @@ BorgLife implements a three-layer architecture:
 
 ### Prerequisites
 
-- Docker Desktop
+- macOS 13+ with an unlocked Keychain (automatic keystore integration relies on [`SecureKeyStore`](code/jam_mock/secure_key_storage.py:16)); Linux/Windows users must provide their own keyring implementation before running live flows
+- Docker Desktop (or Docker Engine) running with at least 4 GB RAM available
 - Python 3.9+
 - OpenAI API key
-- Supabase account (for shared database)
+- Supabase service credentials (set in `.env`) if you want audit logs and balances persisted
+- Optionally, funded Westend dispenser credentials stored in the Keychain (see the Westend workflow section)
 
 ### Installation
 
@@ -48,16 +50,17 @@ BorgLife implements a three-layer architecture:
    ```bash
    ./scripts/dev.sh start
    ```
-
    This will:
-   - Validate dependencies and configuration
-   - Start Archon services
-   - Launch BorgLife UI at http://localhost:8501
-   - Start Docker MCP organs
+   - Verify Docker, docker-compose, and Python availability
+   - Create/upgrade a virtual environment and install [`requirements.txt`](code/requirements.txt)
+   - Launch BorgLife core services (UI, MCP, Archon stack, Redis). Add `full` to include Docker MCP organs, or `minimal` to skip the MCP/agent containers.
+   - Wait for http://localhost:8501 to become reachable
 
 ### Alternative Startup Modes
 
 ```bash
+# Prepare dependencies without launching containers
+./scripts/dev.sh setup
 # Start core services only (no Docker MCP organs)
 ./scripts/dev.sh start core
 
@@ -73,6 +76,44 @@ BorgLife implements a three-layer architecture:
 # Stop all services
 ./scripts/dev.sh stop
 ```
+
+## 🔐 Keyring-Backed Security
+
+Borg wallet material is stored in macOS Keychain entries created by [`SecureKeypairManager`](code/jam_mock/secure_key_storage.py:183) and [`SecureBorgCreator`](code/jam_mock/secure_borg_creation.py:52). Ensure the following before running live demos:
+
+1. Keep your macOS session unlocked so `security find-generic-password` calls succeed.
+2. Populate `.env` with Supabase keys (optional) and keep `.borglife_config` aligned with your dispenser values.
+3. Verify the `borglife-keystore` service contains a `dispenser_wallet` entry:
+   ```bash
+   security find-generic-password -s borglife-keystore -a dispenser_wallet
+   ```
+4. To recreate demo keys, run:
+   ```python
+   from jam_mock.secure_key_storage import SecureKeypairManager
+
+   manager = SecureKeypairManager()
+   manager.unlock_keystore()
+   manager.create_demo_keypair("dispenser_wallet")
+   ```
+   The call reuses the deterministic seed embedded in `.borglife_config` so it matches the funded dispenser address.
+
+Audit events for every unlock/load operation are written to [`DemoAuditLogger`](code/jam_mock/demo_audit_logger.py:13), making the security posture observable even during demos.
+
+## 🌐 Westend Workflow
+
+Live Westend interactions are handled by [`WestendAdapter`](code/jam_mock/kusama_adapter.py:21) and the scripts under [`code/scripts`](code/scripts). To execute the funded Phase 1 demo:
+
+1. Confirm `.borglife_config` contains the funded `WND_DISPENSER_ADDRESS`, `WND_DISPENSER_SEED`, and `USDB_ASSET_ID` values (a ready-to-use configuration is shipped in the repository).
+2. Unlock the macOS Keychain session (see the keyring section) so the dispenser keypair can be loaded.
+3. Run the live demo:
+   ```bash
+   python code/scripts/end_to_end_demo.py
+   ```
+   - If the dispenser key is present, transfers run against `wss://westend-rpc.polkadot.io`.
+   - Missing keys trigger a simulated fallback and the script prints a warning (`⚠️ No dispenser keypair available - simulating transfer`), so treat simulations as incomplete coverage.
+4. Use the generated `code/demo_results.json` and audit logs in `code/jam_mock/logs/demo_audit.jsonl` to validate on-chain hashes and wealth movements.
+
+To promote Westend flows into CI, feed the same credentials to the integration tests in [`code/tests/integration/test_docker_mcp_integration.py`](code/tests/integration/test_docker_mcp_integration.py:1) after providing a CI-safe keyring alternative.
 
 ## 🎨 Using the Borg Designer UI
 
@@ -232,19 +273,20 @@ borglife_prototype/
 ### Development Setup
 
 ```bash
-# Install development dependencies
+# Install dependencies inside (or outside) the managed virtualenv
 pip install -r requirements.txt
-pip install -r requirements-dev.txt
 
 # Run tests
 pytest
 
 # Format code
+pip install black isort
 black .
 isort .
 
 # Type checking
-mypy borglife_prototype/
+pip install mypy
+mypy code/
 ```
 
 ## 📝 License
@@ -255,7 +297,7 @@ This project is licensed under the MIT License - see the LICENSE.md file for det
 
 - [BorgLife Whitepaper](https://borglife.io/whitepaper)
 - [Archon Documentation](https://archon.org/docs)
-- [API Reference](./docs/api.md)
+- [Functional Architecture Overview](./FUNCTION_ARCHITECTURE_OVERVIEW.md)
 - [Troubleshooting](./TROUBLESHOOTING.md)
 
 ## 🆘 Troubleshooting
