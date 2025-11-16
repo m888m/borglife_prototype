@@ -17,7 +17,7 @@ from typing import Optional, Dict, Any
 import time
 
 # Import BorgLife components
-from jam_mock import JAMInterface, LocalJAMMock, KusamaAdapter
+from jam_mock import JAMInterface, LocalJAMMock, WestendAdapter
 from synthesis import DNAParser, PhenotypeBuilder, BorgDNA
 from archon_adapter import ArchonServiceAdapter, ArchonConfig
 
@@ -58,8 +58,8 @@ class SponsorUI:
         # JAM Mode selection
         jam_mode = st.sidebar.selectbox(
             "JAM Mode",
-            ["local", "kusama", "hybrid"],
-            help="Local for development, Kusama for production validation"
+            ["local", "westend", "hybrid"],
+            help="Local for development, Westend for production validation"
         )
 
         # Initialize components based on mode
@@ -78,12 +78,12 @@ class SponsorUI:
             # Initialize JAM
             if jam_mode == "local":
                 self.jam = LocalJAMMock()
-            elif jam_mode == "kusama":
+            elif jam_mode == "westend":
                 # Note: In real implementation, would need keypair from wallet
-                kusama_adapter = KusamaAdapter(rpc_url="wss://kusama-rpc.polkadot.io")
-                self.jam = kusama_adapter
+                westend_adapter = WestendAdapter(rpc_url="wss://westend-rpc.polkadot.io")
+                self.jam = westend_adapter
             else:  # hybrid
-                self.jam = LocalJAMMock()  # Primary local, could add Kusama validation
+                self.jam = LocalJAMMock()  # Primary local, could add Westend validation
 
             # Initialize Archon adapter
             config = ArchonConfig()

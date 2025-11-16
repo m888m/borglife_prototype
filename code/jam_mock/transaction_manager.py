@@ -1,8 +1,8 @@
 """
-Transaction Manager for Kusama Testnet Operations
+Transaction Manager for Westend Testnet Operations
 
 Provides comprehensive transaction validation, signing, submission, and monitoring
-for BorgLife DNA storage operations on Kusama testnet.
+for BorgLife DNA storage operations on Westend testnet.
 """
 
 import asyncio
@@ -94,7 +94,7 @@ class TransactionValidationError(Exception):
 
 class TransactionManager:
     """
-    Comprehensive transaction manager for Kusama operations.
+    Comprehensive transaction manager for Westend operations.
 
     Handles validation, signing, submission, monitoring, and recovery
     for all BorgLife blockchain transactions.
@@ -102,12 +102,12 @@ class TransactionManager:
 
     def __init__(
         self,
-        kusama_adapter,
+        westend_adapter,
         keypair_manager: AdvancedKeypairManager,
         confirmation_timeout_seconds: int = 300,  # 5 minutes
         max_retry_attempts: int = 3
     ):
-        self.kusama_adapter = kusama_adapter
+        self.westend_adapter = westend_adapter
         self.keypair_manager = keypair_manager
         self.transaction_signer = TransactionSigner(keypair_manager)
 
@@ -207,17 +207,17 @@ class TransactionManager:
 
             if estimated_fee > max_fee:
                 validation_results['errors'].append(
-                    f"Estimated fee {estimated_fee} KSM exceeds maximum {max_fee} KSM"
+                    f"Estimated fee {estimated_fee} WND exceeds maximum {max_fee} WND"
                 )
                 validation_results['valid'] = False
             elif estimated_fee > max_fee * Decimal('0.8'):
                 validation_results['warnings'].append(
-                    f"High fee: {estimated_fee} KSM (close to maximum {max_fee} KSM)"
+                    f"High fee: {estimated_fee} WND (close to maximum {max_fee} WND)"
                 )
 
         # Network health check
         try:
-            health = asyncio.run(self.kusama_adapter.health_check())
+            health = asyncio.run(self.westend_adapter.health_check())
             validation_results['checks']['network'] = health
 
             if health.get('status') != 'healthy':
@@ -285,7 +285,7 @@ class TransactionManager:
             tx_record.submitted_at = datetime.utcnow()
 
             result = await self.transaction_signer.sign_and_submit_transaction(
-                keypair_name, transaction_data, self.kusama_adapter
+                keypair_name, transaction_data, self.westend_adapter
             )
 
             if result.get('success'):
@@ -293,7 +293,7 @@ class TransactionManager:
                 tx_record.confirmed_at = datetime.utcnow()
                 tx_record.transaction_hash = result.get('transaction_hash')
                 tx_record.block_hash = result.get('block')
-                tx_record.block_number = result.get('kusama_block_number')
+                tx_record.block_number = result.get('westend_block_number')
                 tx_record.fee_paid = result.get('cost', Decimal('0'))
 
                 # Move to completed

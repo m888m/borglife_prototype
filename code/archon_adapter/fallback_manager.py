@@ -52,7 +52,7 @@ class OrganFallbackManager:
 
     def __init__(self, archon_adapter, cache_manager=None):
         self.archon_adapter = archon_adapter
-        self.cache_manager = cache_manager
+        self.cache_manager = cache_manager or getattr(archon_adapter, "cache_manager", None)
         self.fallback_stats = {}  # Track fallback usage
 
     async def execute_with_fallback(
@@ -61,7 +61,8 @@ class OrganFallbackManager:
         primary_organ: str,
         tool: str,
         params: Dict[str, Any],
-        max_fallbacks: int = 3
+        max_fallbacks: int = 3,
+        wealth: Optional[float] = None
     ) -> Tuple[Any, FallbackLevel, str]:
         """
         Execute organ call with automatic fallback
@@ -76,8 +77,12 @@ class OrganFallbackManager:
 
         # Try primary organ first
         try:
-            result = await self.archon_adapter.call_organ(
-                borg_id, primary_organ, tool, params
+            result = await self.archon_adapter.invoke_primary_organ(
+                borg_id=borg_id,
+                organ_name=primary_organ,
+                tool=tool,
+                params=params,
+                wealth=wealth
             )
             return result, FallbackLevel.PRIMARY, f"Primary organ: {primary_organ}"
         except Exception as e:
@@ -92,8 +97,12 @@ class OrganFallbackManager:
                 alt_organ = fallback.get('organ')
                 if alt_organ:
                     try:
-                        result = await self.archon_adapter.call_organ(
-                            borg_id, alt_organ, tool, params
+                        result = await self.archon_adapter.invoke_primary_organ(
+                            borg_id=borg_id,
+                            organ_name=alt_organ,
+                            tool=tool,
+                            params=params,
+                            wealth=wealth
                         )
                         self._record_fallback_usage(primary_organ, fallback['level'])
                         return result, fallback['level'], fallback['description']

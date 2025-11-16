@@ -15,12 +15,12 @@ import logging
 from datetime import datetime, timedelta
 
 from .config import ArchonConfig
-from .exceptions import ArchonError, ServiceUnavailableError
+from .exceptions import ArchonError, ServiceUnavailableError, RateLimitExceededError
 from .health import HealthChecker
 from .version import VersionCompatibility
 from .fallback_manager import OrganFallbackManager
 from .cache_manager import CacheManager
-# from .rate_limiter import OrganRateLimiter  # Not implemented yet
+from .rate_limiter import OrganRateLimiter
 from .docker_mcp_billing import DockerMCPBilling
 
 logger = logging.getLogger(__name__)
@@ -48,8 +48,7 @@ class ArchonServiceAdapter:
         self.version_compat = VersionCompatibility()
         self.fallback_manager = OrganFallbackManager(self)
         self.cache_manager = CacheManager()
-        # self.rate_limiter = OrganRateLimiter()  # Not implemented yet
-        self.rate_limiter = None
+        self.rate_limiter = OrganRateLimiter(self.config.supabase_client)
         self.billing_manager = DockerMCPBilling(self.config.supabase_client)
 
         # Service endpoints
@@ -347,126 +346,93 @@ class ArchonServiceAdapter:
         use_fallbacks: bool = True
     ) -> Any:
         """
-        Call Docker MCP organ with fallback support.
-
-        Args:
-            borg_id: Borg identifier
-            organ_name: Docker MCP organ name
-            tool: Tool/operation to execute
-            params: Tool parameters
-            wealth: Current borg wealth for billing
-            use_fallbacks: Whether to use fallback strategies
-
-        Returns:
-            Tool execution result
+        Call Docker MCP organ with optional fallback support.
         """
-        # Check rate limit (disabled for now)
-        # allowed, current_usage, limit = await self.rate_limiter.check_limit(
-        #     borg_id, organ_name, wealth
-        # )
-        allowed = True
-        current_usage = 0
-        limit = 100
+        result, _, _ = await self.fallback_manager.execute_with_fallback(
+            borg_id=borg_id,
+            primary_organ=organ_name,
+            tool=tool,
+            params=params,
+            max_fallbacks=3 if use_fallbacks else 0,
+            wealth=wealth
+        )
+        return result
 
-        if not allowed:
-            raise ArchonError(
-                f"Rate limit exceeded for {organ_name}. "
-                f"Used {current_usage}/{limit} requests"
-            )
-
-        # Execute with fallbacks
-        try:
-            result, level, description = await self.fallback_manager.execute_with_fallback(
-                borg_id, organ_name, tool, params, max_fallbacks=3 if use_fallbacks else 0
-            )
-
-            # Track billing
-            if wealth is not None:
-                cost = await self.billing_manager.track_organ_usage(
-                    borg_id=borg_id,
-                    organ_name=organ_name,
-                    operation=tool,
-                    response_size=len(str(result)),
-                    execution_time=0.0  # Would be measured
-                )
-
-                # Deduct from wealth
-                success = await self.billing_manager.deduct_from_borg_wealth(
-                    borg_id, cost, f"{organ_name}:{tool}"
-                )
-
-                if not success:
-                    logger.warning(f"Failed to deduct {cost} DOT from borg {borg_id}")
-
-            return result
-
-        except Exception as e:
-            logger.error(f"Organ call failed for {organ_name}:{tool}: {e}")
-            raise
-
-    async def call_organ(
+    async def invoke_primary_organ(
         self,
         borg_id: str,
         organ_name: str,
         tool: str,
         params: Dict[str, Any],
-        wealth: Optional[float] = None,
-        use_fallbacks: bool = True
+        wealth: Optional[float] = None
     ) -> Any:
         """
-        Call Docker MCP organ with fallback support.
-
-        Args:
-            borg_id: Borg identifier
-            organ_name: Docker MCP organ name
-            tool: Tool/operation to execute
-            params: Tool parameters
-            wealth: Current borg wealth for billing
-            use_fallbacks: Whether to use fallback strategies
-
-        Returns:
-            Tool execution result
+        Execute a Docker MCP organ without engaging fallback logic.
         """
-        # Check rate limit
-        allowed, current_usage, limit = await self.rate_limiter.check_limit(
-            borg_id, organ_name, wealth
+        return await self._call_organ_primary(
+            borg_id=borg_id,
+            organ_name=organ_name,
+            tool=tool,
+            params=params,
+            wealth=wealth
         )
 
-        if not allowed:
-            raise ArchonError(
-                f"Rate limit exceeded for {organ_name}. "
-                f"Used {current_usage}/{limit} requests"
+    async def _call_organ_primary(
+        self,
+        borg_id: str,
+        organ_name: str,
+        tool: str,
+        params: Dict[str, Any],
+        wealth: Optional[float] = None
+    ) -> Any:
+        """
+        Execute the requested Docker MCP organ without invoking the fallback manager.
+        """
+        if self.rate_limiter:
+            allowed, current_usage, limit = await self.rate_limiter.check_limit(
+                borg_id, organ_name, wealth
             )
-
-        # Execute with fallbacks
-        try:
-            result, level, description = await self.fallback_manager.execute_with_fallback(
-                borg_id, organ_name, tool, params, max_fallbacks=3 if use_fallbacks else 0
-            )
-
-            # Track billing
-            if wealth is not None:
-                cost = await self.billing_manager.track_organ_usage(
-                    borg_id=borg_id,
-                    organ_name=organ_name,
-                    operation=tool,
-                    response_size=len(str(result)),
-                    execution_time=0.0  # Would be measured
+            if not allowed:
+                raise RateLimitExceededError(
+                    service=organ_name,
+                    limit=limit,
+                    reset_time=(await self.rate_limiter.get_reset_time(borg_id, organ_name)).isoformat()
                 )
 
-                # Deduct from wealth
-                success = await self.billing_manager.deduct_from_borg_wealth(
-                    borg_id, cost, f"{organ_name}:{tool}"
-                )
+        result = await self._invoke_docker_organ(organ_name, tool, params)
 
-                if not success:
-                    logger.warning(f"Failed to deduct {cost} DOT from borg {borg_id}")
+        if wealth is not None:
+            cost = await self.billing_manager.track_organ_usage(
+                borg_id=borg_id,
+                organ_name=organ_name,
+                operation=tool,
+                response_size=len(str(result)),
+                execution_time=0.0
+            )
+            success = await self.billing_manager.deduct_from_borg_wealth(
+                borg_id, cost, f"{organ_name}:{tool}"
+            )
+            if not success:
+                logger.warning(f"Failed to deduct {cost} DOT from borg {borg_id}")
 
-            return result
+        return result
 
-        except Exception as e:
-            logger.error(f"Organ call failed for {organ_name}:{tool}: {e}")
-            raise
+    async def _invoke_docker_organ(
+        self,
+        organ_name: str,
+        tool: str,
+        params: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Invoke the underlying Docker MCP organ. This currently acts as a placeholder
+        until direct container communication is wired in.
+        """
+        return {
+            "organ": organ_name,
+            "tool": tool,
+            "params": params,
+            "executed_at": datetime.utcnow().isoformat()
+        }
 
     async def call_archon_tool(
         self,

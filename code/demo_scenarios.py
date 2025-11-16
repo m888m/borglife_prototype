@@ -16,7 +16,7 @@ from decimal import Decimal
 from typing import Dict, List, Any
 from pathlib import Path
 
-from jam_mock import LocalJAMMock, KusamaAdapter
+from jam_mock import LocalJAMMock, WestendAdapter
 from synthesis import DNAParser, PhenotypeBuilder, BorgDNA
 from archon_adapter import ArchonServiceAdapter, ArchonConfig
 
@@ -107,18 +107,18 @@ class BorgLifeDemo:
     Runs end-to-end scenarios demonstrating the full workflow.
     """
 
-    def __init__(self, jam_mode: str = "local", use_kusama: bool = False):
+    def __init__(self, jam_mode: str = "local", use_westend: bool = False):
         """
         Initialize demo environment.
 
         Args:
-            jam_mode: JAM implementation mode ("local", "kusama", "hybrid")
-            use_kusama: Whether to include Kusama validation
+            jam_mode: JAM implementation mode ("local", "westend", "hybrid")
+            use_westend: Whether to include Westend validation
         """
         self.jam_mode = jam_mode
-        self.use_kusama = use_kusama
+        self.use_westend = use_westend
         self.jam: LocalJAMMock = None
-        self.kusama_adapter: KusamaAdapter = None
+        self.westend_adapter: WestendAdapter = None
         self.archon_adapter: ArchonServiceAdapter = None
         self.phenotype_builder: PhenotypeBuilder = None
         self.metrics = DemoMetrics()
@@ -128,14 +128,14 @@ class BorgLifeDemo:
         # Initialize JAM
         if self.jam_mode == "local":
             self.jam = LocalJAMMock()
-        elif self.jam_mode == "kusama":
+        elif self.jam_mode == "westend":
             # In real implementation, would need keypair
-            self.kusama_adapter = KusamaAdapter(rpc_url="wss://kusama-rpc.polkadot.io")
-            self.jam = self.kusama_adapter
+            self.westend_adapter = WestendAdapter(rpc_url="wss://westend-rpc.polkadot.io")
+            self.jam = self.westend_adapter
         else:  # hybrid
             self.jam = LocalJAMMock()
-            if self.use_kusama:
-                self.kusama_adapter = KusamaAdapter(rpc_url="wss://kusama-rpc.polkadot.io")
+            if self.use_westend:
+                self.westend_adapter = WestendAdapter(rpc_url="wss://westend-rpc.polkadot.io")
 
         # Initialize Archon adapter
         config = ArchonConfig()
@@ -311,7 +311,7 @@ class BorgLifeDemo:
         output = {
             'timestamp': time.time(),
             'jam_mode': self.jam_mode,
-            'use_kusama': self.use_kusama,
+            'use_westend': self.use_westend,
             'metrics': self.metrics.get_summary(),
             'results': results
         }
@@ -349,15 +349,15 @@ async def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="BorgLife Phase 1 Demo")
-    parser.add_argument('--mode', choices=['local', 'kusama', 'hybrid'], default='local')
+    parser.add_argument('--mode', choices=['local', 'westend', 'hybrid'], default='local')
     parser.add_argument('--count', type=int, default=5, help='Number of demo runs')
     parser.add_argument('--stress-test', type=int, help='Run stress test with N concurrent borgs')
-    parser.add_argument('--kusama', action='store_true', help='Include Kusama validation')
+    parser.add_argument('--westend', action='store_true', help='Include Westend validation')
 
     args = parser.parse_args()
 
     # Initialize demo
-    demo = BorgLifeDemo(jam_mode=args.mode, use_kusama=args.kusama)
+    demo = BorgLifeDemo(jam_mode=args.mode, use_westend=args.westend)
     await demo.setup()
 
     try:

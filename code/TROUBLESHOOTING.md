@@ -4,9 +4,26 @@ This guide helps you diagnose and resolve common issues with the BorgLife protot
 
 ## 🚀 Quick Diagnosis
 
-Run the diagnostic script:
+Run the built-in status checks before digging deeper:
+
 ```bash
-./scripts/validate_prerequisites.py
+# Verify core services and ports
+./scripts/dev.sh status
+
+# Tail logs for the service you care about
+./scripts/dev.sh logs borglife-ui
+```
+
+For repeatable environment validation (Docker, Python, virtualenv), re-run the setup workflow:
+
+```bash
+./scripts/dev.sh setup
+```
+
+If you are attempting live blockchain flows, confirm the macOS Keychain exposes the dispenser entry:
+
+```bash
+security find-generic-password -s borglife-keystore -a dispenser_wallet
 ```
 
 ## 🔍 Common Issues
@@ -73,7 +90,7 @@ cat .env | grep SUPABASE
 
 **Restart Archon services:**
 ```bash
-docker-compose restart archon-server archon-mcp archon-agents
+docker compose restart archon-server archon-mcp archon-agents
 ```
 
 **Check logs:**
@@ -123,7 +140,7 @@ print(f"DNA valid: {dna.validate_integrity()}")
 
 **Solutions:**
 
-**Check borg wealth:**
+**Check borg wealth cache (JAM mock):**
 ```python
 from proto_borg import create_proto_borg
 import asyncio
@@ -136,20 +153,31 @@ async def check_wealth():
 asyncio.run(check_wealth())
 ```
 
-**Add funding:**
+**Add funding via ledger:**
 ```python
-# In UI: Go to Funding tab and add DOT
-# Or programmatically:
 borg.wealth.log_transaction("funding", 1.0, "DOT", "Manual funding")
 ```
 
-**Check rate limits:**
+**Westend transfer diagnostics (live mode):**
+```bash
+# Ensure dispenser credentials are visible
+security find-generic-password -s borglife-keystore -a dispenser_wallet
+
+# Dry run the demo (shows simulated vs live execution)
+python code/scripts/end_to_end_demo.py --dry-run
+```
+
+**Rate limiter status (Archon adapter):**
 ```python
-# Check if rate limited
-from archon_adapter import ArchonServiceAdapter
-adapter = ArchonServiceAdapter()
-allowed, usage, limit = await adapter.rate_limiter.check_limit("borg-id", "organ-name", 1.0)
-print(f"Rate limit: {usage}/{limit}")
+import asyncio
+from archon_adapter.adapter import ArchonServiceAdapter
+
+async def check_rate_limit():
+    adapter = ArchonServiceAdapter()
+    allowed, usage, limit = await adapter.rate_limiter.check_limit("borg-id", "organ-name", 1.0)
+    print(f"Rate limit allowed={allowed} usage={usage} limit={limit}")
+
+asyncio.run(check_rate_limit())
 ```
 
 ### 5. Docker MCP Organs Not Working
@@ -275,6 +303,79 @@ docker stats
 ./scripts/dev.sh clean
 ./scripts/dev.sh start
 ```
+
+## 🔐 Keyring Access Issues (macOS)
+
+**Symptoms:**
+- `Failed to unlock keystore` messages
+- End-to-end demo prints `⚠️ No dispenser keypair available - simulating transfer`
+- `security` CLI prompts for permission each run
+
+**Solutions:**
+
+1. **Confirm the dispenser entry exists:**
+   ```bash
+   security find-generic-password -s borglife-keystore -a dispenser_wallet
+   ```
+
+2. **Regenerate demo keys using [`SecureKeypairManager`](code/jam_mock/secure_key_storage.py:183):**
+   ```python
+   from jam_mock.secure_key_storage import SecureKeypairManager
+
+   manager = SecureKeypairManager()
+   manager.unlock_keystore()
+   manager.create_demo_keypair("dispenser_wallet")
+   ```
+
+3. **Ensure the session is unlocked:** macOS screensaver/fast user switching can revoke Keychain access mid-run.
+
+4. **Inspect audit trail:** [`DemoAuditLogger`](code/jam_mock/demo_audit_logger.py:13) writes to `code/jam_mock/logs/demo_audit.jsonl`; search for `keypair_access` events to verify successful loads.
+
+5. **Reset Keychain entry (last resort):**
+   ```bash
+   security delete-generic-password -s borglife-keystore -a dispenser_wallet
+   python -m jam_mock.secure_borg_creation  # recreate entries
+   ```
+
+## 🌐 Westend Connectivity Problems
+
+**Symptoms:**
+- `ERROR: All Westend endpoints failed`
+- Transfers marked as `simulated` in `demo_results.json`
+- Repeated websocket disconnects
+
+**Solutions:**
+
+1. **Check `.borglife_config`:**
+   ```bash
+   grep -E "WND_DISPENSER|USDB_ASSET_ID" code/.borglife_config
+   ```
+
+2. **Probe RPC endpoints manually:**
+   ```bash
+   websocat wss://westend-rpc.polkadot.io/state_getMetadata
+   ```
+
+3. **Run the demo with verbose logging:**
+   ```bash
+   LOG_LEVEL=DEBUG python code/scripts/end_to_end_demo.py
+   ```
+
+4. **Fallback to alternate endpoints referenced in [`WestendAdapter`](code/jam_mock/kusama_adapter.py:68) by exporting `WESTEND_RPC_URL`.
+
+5. **Verify keypair availability before transfers:**
+   ```python
+   from jam_mock.kusama_adapter import WestendAdapter
+   adapter = WestendAdapter("wss://westend-rpc.polkadot.io", connect_immediately=False)
+   adapter.set_keypair_from_seed("0x1234...")  # matching WND_DISPENSER_SEED
+   ```
+
+6. **Review audit logs for blockchain operations:**
+   ```
+   jq 'select(.operation=="transaction")' code/jam_mock/logs/demo_audit.jsonl
+   ```
+
+If Westend remains unreachable, the demo script automatically falls back to simulated transfers and flags them in the output—treat those runs as partial success only.
 
 ## 🛠️ Advanced Troubleshooting
 

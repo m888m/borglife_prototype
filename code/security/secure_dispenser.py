@@ -18,6 +18,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from jam_mock.demo_audit_logger import DemoAuditLogger
+from .keyring_service import KeyringService, KeyringServiceError
 
 
 class SecureDispenser:
@@ -42,6 +43,7 @@ class SecureDispenser:
         else:
             self.keystore_path = keystore_path
         self.audit_logger = DemoAuditLogger()
+        self.keyring_service = KeyringService(ss58_format=42, address_prefix="5")
         self.dna_anchor = DNAAanchor()
 
         # Transfer limits and controls
@@ -69,77 +71,30 @@ class SecureDispenser:
         """Get the keyring service name for dispenser keys."""
         return "borglife-dispenser"
 
-    def _store_keypair_atomic(self, keypair: Keypair, service_name: str) -> bool:
-        """Store keypair with rollback on failure."""
-        stored_keys = []
+    def _process_seed_securely(self, seed: str) -> Keypair:
+        """Process seed with secure cleanup."""
         try:
-            # Store each component
-            for key_type, value in [
-                ('private_key', keypair.private_key.hex()),
-                ('public_key', keypair.public_key.hex()),
-                ('address', keypair.ss58_address)
-            ]:
-                keyring.set_password(service_name, key_type, value)
-                stored_keys.append(key_type)
-
-            return True
-        except Exception as e:
-            # Rollback on failure
-            for key_type in stored_keys:
-                try:
-                    keyring.delete_password(service_name, key_type)
-                except:
-                    pass  # Best effort cleanup
-            print(f"Failed to store keypair in keyring: {e}")
-            return False
-
-    def _safe_load_keypair(self, private_key_hex: str) -> Optional[Keypair]:
-        """Safely reconstruct keypair with validation."""
-        try:
-            # Validate hex format and length (64 hex chars = 32 bytes)
-            if not re.match(r'^[0-9a-fA-F]{128}$', private_key_hex):
-                raise ValueError("Invalid private key format - must be 128 hex characters (64 bytes)")
-
-            private_key = bytes.fromhex(private_key_hex)
-            keypair = Keypair(private_key=private_key, ss58_format=42)
-
-            # Verify keypair integrity
-            if not keypair.public_key or not keypair.ss58_address:
-                raise ValueError("Invalid keypair generated")
-
+            keypair = Keypair.create_from_seed(seed)
+            # Immediately clear seed from memory
+            seed = '\x00' * len(seed)
             return keypair
         except Exception as e:
-            self.audit_logger.log_event(
-                "keypair_reconstruction_failed",
-                f"Failed to reconstruct keypair: {str(e)}",
-                {"error": str(e)}
-            )
-            return None
+            seed = '\x00' * len(seed)
+            raise
 
-    def _load_keypair_from_keyring(self, service_name: str) -> Optional[Keypair]:
-        """Load keypair from macOS Keychain with safe reconstruction."""
+    def _get_usdb_asset_id(self) -> Optional[int]:
+        """Get USDB asset ID from configuration."""
         try:
-            private_key_hex = keyring.get_password(service_name, "private_key")
-            public_key_hex = keyring.get_password(service_name, "public_key")
-
-            if not private_key_hex or not public_key_hex:
-                return None
-
-            # Use safe keypair reconstruction
-            keypair = self._safe_load_keypair(private_key_hex)
-            if not keypair:
-                return None
-
-            # Verify keys match
-            if keypair.public_key.hex() != public_key_hex:
-                print("Keyring keypair integrity check failed")
-                return None
-
-            return keypair
-
+            config_path = os.path.join(os.path.dirname(__file__), '..', '.borglife_config')
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    for line in f:
+                        if line.startswith('USDB_ASSET_ID='):
+                            return int(line.split('=', 1)[1].strip())
         except Exception as e:
-            print(f"Failed to load keypair from keyring: {e}")
-            return None
+            print(f"Warning: Could not read USDB asset ID from config: {e}")
+
+        return None
 
     def setup_keystore(self, dispenser_seed: Optional[str] = None) -> bool:
         """
@@ -170,8 +125,14 @@ class SecureDispenser:
 
             # Store keypair in macOS Keychain atomically
             service_name = self._get_keyring_service_name()
-            if not self._store_keypair_atomic(keypair, service_name):
-                raise ValueError("Failed to store keypair in macOS Keychain")
+            try:
+                self.keyring_service.store_keypair(
+                    service_name,
+                    keypair,
+                    metadata={"role": "dispenser", "created_at": datetime.utcnow().isoformat()},
+                )
+            except KeyringServiceError as exc:
+                raise ValueError("Failed to store keypair in macOS Keychain") from exc
 
             # Store metadata in keystore file (no sensitive data)
             keystore_data = {
@@ -234,7 +195,10 @@ class SecureDispenser:
 
             # Load keypair from macOS Keychain
             service_name = self._get_keyring_service_name()
-            self.unlocked_keypair = self._load_keypair_from_keyring(service_name)
+            try:
+                self.unlocked_keypair = self.keyring_service.load_keypair(service_name)
+            except KeyringServiceError as exc:
+                raise ValueError("Failed to load keypair from macOS Keychain") from exc
 
             if not self.unlocked_keypair:
                 raise ValueError("Failed to load keypair from macOS Keychain")
@@ -341,7 +305,7 @@ class SecureDispenser:
                 return result
 
             # Initialize WestendAdapter for live transfer
-            from jam_mock.kusama_adapter import WestendAdapter
+            from jam_mock.westend_adapter import WestendAdapter
             westend_adapter = WestendAdapter("https://westend.api.onfinality.io/public-ws")
             westend_adapter.set_keypair(self.unlocked_keypair)
 
@@ -462,14 +426,18 @@ class SecureDispenser:
 
             # Load borg keypair from keyring
             borg_service_name = f"borglife-borg-{borg_id}"
-            borg_keypair = self._load_keypair_from_keyring(borg_service_name)
+            try:
+                borg_keypair = self.keyring_service.load_keypair(borg_service_name)
+            except KeyringServiceError as exc:
+                result['error'] = f'Failed to load keypair for borg {borg_id}: {exc}'
+                return result
 
             if not borg_keypair:
                 result['error'] = f'Could not load keypair for borg {borg_id} from keyring'
                 return result
 
             # Initialize WestendAdapter for live transfer
-            from jam_mock.kusama_adapter import WestendAdapter
+            from jam_mock.westend_adapter import WestendAdapter
             westend_adapter = WestendAdapter("https://westend.api.onfinality.io/public-ws")
             westend_adapter.set_keypair(borg_keypair)
 
@@ -724,7 +692,7 @@ class SecureDispenser:
 
     async def connect_to_asset_hub(self):
         """Connect to Westend Asset Hub for USDB operations."""
-        from jam_mock.kusama_adapter import WestendAdapter
+        from jam_mock.westend_adapter import WestendAdapter
         import asyncio
 
         # Initialize Asset Hub connection (different endpoint than main Westend)
@@ -968,28 +936,3 @@ class SecureDispenser:
         except Exception as e:
             print(f"Error getting USDB balance for {address}: {e}")
             return 0
-
-    def _process_seed_securely(self, seed: str) -> Keypair:
-        """Process seed with secure cleanup."""
-        try:
-            keypair = Keypair.create_from_seed(seed)
-            # Immediately clear seed from memory
-            seed = '\x00' * len(seed)
-            return keypair
-        except Exception as e:
-            seed = '\x00' * len(seed)
-            raise
-
-    def _get_usdb_asset_id(self) -> Optional[int]:
-        """Get USDB asset ID from configuration."""
-        try:
-            config_path = os.path.join(os.path.dirname(__file__), '..', '.borglife_config')
-            if os.path.exists(config_path):
-                with open(config_path, 'r') as f:
-                    for line in f:
-                        if line.startswith('USDB_ASSET_ID='):
-                            return int(line.split('=', 1)[1].strip())
-        except Exception as e:
-            print(f"Warning: Could not read USDB asset ID from config: {e}")
-
-        return None

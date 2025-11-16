@@ -1,5 +1,5 @@
 """
-Advanced Keypair Features for Kusama Testnet Operations
+Advanced Keypair Features for Westend Testnet Operations
 
 Extends basic keypair management with secure key derivation, address generation,
 transaction validation, and development mode features.
@@ -22,14 +22,14 @@ from .keypair_manager import KeypairManager, KeypairSecurityError
 
 class AdvancedKeypairManager(KeypairManager):
     """
-    Extended keypair manager with advanced features for Kusama operations.
+    Extended keypair manager with advanced features for Westend operations.
 
     Adds secure key derivation, transaction validation, fee estimation,
     and development mode capabilities.
     """
 
-    def __init__(self, storage_path: Optional[str] = None, encryption_key: Optional[str] = None):
-        super().__init__(storage_path, encryption_key)
+    def __init__(self, storage_path: Optional[str] = None):
+        super().__init__(storage_path)
 
         # Development mode settings
         self.development_mode = os.getenv('BORGLIFE_ENV', 'development').lower() == 'development'
@@ -37,7 +37,7 @@ class AdvancedKeypairManager(KeypairManager):
 
         # Transaction settings
         self.default_priority = 'normal'  # low, normal, high
-        self.max_transaction_fee = Decimal('0.1')  # Max 0.1 KSM per transaction
+        self.max_transaction_fee = Decimal('0.1')  # Max 0.1 WND per transaction
 
         # Network parameters
         self.network_prefix = 42  # Westend SS58 prefix (testnet)
@@ -167,7 +167,7 @@ class AdvancedKeypairManager(KeypairManager):
 
     def estimate_transaction_fee(self, keypair_name: str, transaction_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Estimate transaction fee for a Kusama transaction.
+        Estimate transaction fee for a Westend transaction.
 
         Args:
             keypair_name: Keypair to use for estimation
@@ -180,7 +180,7 @@ class AdvancedKeypairManager(KeypairManager):
             keypair = self.load_keypair(keypair_name)
 
             # Base fee calculation (simplified for Phase 1)
-            base_fee = Decimal('0.0001')  # Base fee in KSM
+            base_fee = Decimal('0.0001')  # Base fee in WND
 
             # Size-based fee
             tx_size = self._estimate_transaction_size(transaction_data)
@@ -206,14 +206,14 @@ class AdvancedKeypairManager(KeypairManager):
                 'priority_multiplier': priority_multiplier,
                 'priority': self.default_priority,
                 'max_fee': self.max_transaction_fee,
-                'currency': 'KSM'
+                'currency': 'WND'
             }
 
         except Exception as e:
             return {
                 'error': f"Fee estimation failed: {e}",
                 'estimated_fee': Decimal('0'),
-                'currency': 'KSM'
+                'currency': 'WND'
             }
 
     def validate_transaction(self, keypair_name: str, transaction_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -261,7 +261,7 @@ class AdvancedKeypairManager(KeypairManager):
             if 'error' in fee_info:
                 validation_results['warnings'].append(f"Fee estimation failed: {fee_info['error']}")
             elif fee_info['estimated_fee'] > self.max_transaction_fee:
-                validation_results['warnings'].append(f"High fee: {fee_info['estimated_fee']} KSM")
+                validation_results['warnings'].append(f"High fee: {fee_info['estimated_fee']} WND")
 
             # Development mode warnings
             if self.development_mode:
@@ -387,7 +387,7 @@ class AdvancedKeypairManager(KeypairManager):
 
 class TransactionSigner:
     """
-    Handles transaction signing and submission for Kusama operations.
+    Handles transaction signing and submission for Westend operations.
     """
 
     def __init__(self, keypair_manager: AdvancedKeypairManager):
@@ -397,15 +397,15 @@ class TransactionSigner:
         self,
         keypair_name: str,
         transaction_data: Dict[str, Any],
-        kusama_adapter
+        westend_adapter
     ) -> Dict[str, Any]:
         """
-        Sign and submit a transaction to Kusama.
+        Sign and submit a transaction to Westend.
 
         Args:
             keypair_name: Keypair to use for signing
             transaction_data: Transaction details
-            kusama_adapter: KusamaAdapter instance
+            westend_adapter: WestendAdapter instance
 
         Returns:
             Transaction result
@@ -425,7 +425,7 @@ class TransactionSigner:
 
         # Submit transaction via adapter
         try:
-            result = await kusama_adapter.store_dna_hash(
+            result = await westend_adapter.store_dna_hash(
                 borg_id=transaction_data['borg_id'],
                 dna_hash=transaction_data['dna_hash'],
                 metadata=transaction_data.get('metadata')

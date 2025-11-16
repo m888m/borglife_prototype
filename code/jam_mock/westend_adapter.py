@@ -1060,3 +1060,8 @@ class WestendAdapter(JAMInterface):
             'WND': await self.get_wealth_balance_dual(borg_id, 'WND'),
             'USDB': await self.get_wealth_balance_dual(borg_id, 'USDB')
         }
+
+
+class KusamaAdapter(WestendAdapter):
+    """Backward compatibility alias for legacy imports."""
+    pass

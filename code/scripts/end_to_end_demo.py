@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from jam_mock.borg_address_manager import BorgAddressManager
 # from jam_mock.transaction_manager import TransactionManager  # Full version needs kusama_adapter
 from jam_mock.kusama_adapter import WestendAdapter
+from jam_mock.westend_adapter import WestendAdapter
 from jam_mock.advanced_keypair_features import AdvancedKeypairManager, TransactionSigner
 
 class RealTransactionManager:

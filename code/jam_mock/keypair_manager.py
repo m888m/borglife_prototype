@@ -1,19 +1,19 @@
 """
-Keypair Management for Kusama Testnet Operations
+Keypair Management for Westend Testnet Operations
 
 Provides secure keypair creation, management, and transaction signing capabilities
-for BorgLife Phase 1 DNA storage operations on Kusama testnet.
+for BorgLife Phase 1 DNA storage operations on Westend testnet.
 """
 
-import os
 import json
 import hashlib
 import secrets
 from typing import Dict, Any, Optional, Tuple, List
 from pathlib import Path
-import base64
 from substrateinterface import Keypair
 from substrateinterface.utils.ss58 import ss58_encode
+
+from security.keyring_service import KeyringService, KeyringServiceError
 
 
 class KeypairSecurityError(Exception):
@@ -23,39 +23,35 @@ class KeypairSecurityError(Exception):
 
 class KeypairManager:
     """
-    Secure keypair management for Kusama testnet operations.
+    Secure keypair management for Westend testnet operations.
 
     Handles keypair creation, storage, retrieval, and transaction signing
     with security best practices for development and testing environments.
     """
 
-    def __init__(self, storage_path: Optional[str] = None, encryption_key: Optional[str] = None):
+    def __init__(self, storage_path: Optional[str] = None):
         """
         Initialize keypair manager.
 
         Args:
-            storage_path: Directory to store encrypted keypairs (optional)
-            encryption_key: Master encryption key (optional, will generate if not provided)
+            storage_path: Directory to store keypair metadata (optional)
         """
         self.storage_path = Path(storage_path) if storage_path else Path.home() / ".borglife" / "keys"
         self.storage_path.mkdir(parents=True, exist_ok=True)
 
-        # Generate or use provided encryption key
-        if encryption_key:
-            self.encryption_key = encryption_key.encode()[:32].ljust(32, b'\0')
-        else:
-            # Generate a secure encryption key
-            self.encryption_key = secrets.token_bytes(32)
-
         # In-memory keypair cache (not persisted)
         self._keypair_cache: Dict[str, Keypair] = {}
 
-        # Keypair metadata storage
+        # Keypair metadata storage (non-sensitive)
         self._metadata_file = self.storage_path / "keypairs.json"
+
+        # Centralized keyring helper
+        self._keyring = KeyringService(ss58_format=42, address_prefix="5")
+        self._service_prefix = "borglife-keypair"
 
     def create_keypair(self, name: str, save_to_disk: bool = True) -> Dict[str, Any]:
         """
-        Create a new keypair for Kusama testnet.
+        Create a new keypair for Westend testnet.
 
         Args:
             name: Human-readable name for the keypair
@@ -83,9 +79,9 @@ class KeypairManager:
         # Cache the keypair in memory
         self._keypair_cache[name] = keypair
 
-        # Save to disk if requested
+        # Save to secure storage if requested
         if save_to_disk:
-            self._save_keypair_to_disk(name, keypair, public_info)
+            self._store_keypair(name, keypair, public_info)
 
         return public_info
 
@@ -124,7 +120,7 @@ class KeypairManager:
         self._keypair_cache[name] = keypair
 
         if save_to_disk:
-            self._save_keypair_to_disk(name, keypair, public_info)
+            self._store_keypair(name, keypair, public_info)
 
         return public_info
 
@@ -160,7 +156,7 @@ class KeypairManager:
         self._keypair_cache[name] = keypair
 
         if save_to_disk:
-            self._save_keypair_to_disk(name, keypair, public_info)
+            self._store_keypair(name, keypair, public_info)
 
         return public_info
 
@@ -181,8 +177,8 @@ class KeypairManager:
         if name in self._keypair_cache:
             return self._keypair_cache[name]
 
-        # Load from disk
-        return self._load_keypair_from_disk(name)
+        # Load from secure storage
+        return self._load_keypair_from_keyring(name)
 
     def list_keypairs(self) -> List[Dict[str, Any]]:
         """
@@ -227,10 +223,12 @@ class KeypairManager:
                 del metadata[name]
                 self._save_metadata(metadata)
 
-            # Remove encrypted keypair file
-            keypair_file = self.storage_path / f"{name}.enc"
-            if keypair_file.exists():
-                keypair_file.unlink()
+            # Remove secure keyring entries
+            service_name = self._service_name(name)
+            try:
+                self._keyring.delete_keypair(service_name)
+            except KeyringServiceError as exc:
+                print(f"Warning: failed to delete keypair {name} from keyring: {exc}")
 
             return True
 
@@ -352,128 +350,46 @@ class KeypairManager:
 
         return self.create_keypair_from_seed(name, import_data['seed_hex'], save_to_disk)
 
-    def _save_keypair_to_disk(self, name: str, keypair: Keypair, public_info: Dict[str, Any]):
-        """
-        Encrypt and save keypair to disk using PBKDF2 + Fernet (production secure).
-        """
-        # Prepare data to encrypt
-        keypair_data = {
-            'seed_hex': keypair.seed_hex.hex() if hasattr(keypair.seed_hex, 'hex') else str(keypair.seed_hex),
-            'public_key': keypair.public_key.hex(),
+    def _store_keypair(self, name: str, keypair: Keypair, public_info: Dict[str, Any]):
+        """Persist keypair via KeyringService and update metadata."""
+        service_name = self._service_name(name)
+        metadata = {
+            'name': name,
             'ss58_address': keypair.ss58_address,
             'ss58_format': keypair.ss58_format,
-            'encrypted_at': self._get_timestamp(),
-            'encryption_version': 'pbkdf2_fernet'
+            'fingerprint': public_info.get('fingerprint'),
+            'stored_at': self._get_timestamp(),
         }
+        try:
+            self._keyring.store_keypair(service_name, keypair, metadata=metadata)
+        except KeyringServiceError as exc:
+            raise KeypairSecurityError(f"Failed to store keypair '{name}': {exc}") from exc
 
-        # Use PBKDF2 + Fernet encryption (production secure)
-        from cryptography.fernet import Fernet
-        from cryptography.hazmat.primitives import hashes
-        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-
-        # Generate random salt for this keypair
-        salt = os.urandom(16)
-
-        # Derive encryption key from master encryption key using PBKDF2
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=salt,
-            iterations=100000,  # High iteration count for security
-        )
-        derived_key = base64.urlsafe_b64encode(kdf.derive(self.encryption_key))
-
-        # Encrypt data with Fernet
-        cipher = Fernet(derived_key)
-        json_str = json.dumps(keypair_data, indent=2)
-        encrypted_data = cipher.encrypt(json_str.encode())
-
-        # Store encrypted data with salt
-        keystore_data = {
-            'encrypted_data': base64.b64encode(encrypted_data).decode(),
-            'salt': base64.b64encode(salt).decode(),
-            'created_at': self._get_timestamp(),
-            'encryption_version': 'pbkdf2_fernet'
+        local_metadata = self._load_metadata()
+        local_metadata[name] = {
+            'ss58_address': keypair.ss58_address,
+            'fingerprint': public_info.get('fingerprint'),
+            'created_at': metadata['stored_at']
         }
+        self._save_metadata(local_metadata)
 
-        # Save encrypted keystore
-        keypair_file = self.storage_path / f"{name}.enc"
-        with open(keypair_file, 'w') as f:
-            json.dump(keystore_data, f, indent=2)
+    def _load_keypair_from_keyring(self, name: str) -> Keypair:
+        """Load keypair from KeyringService."""
+        service_name = self._service_name(name)
+        try:
+            keypair = self._keyring.load_keypair(service_name)
+        except KeyringServiceError as exc:
+            raise KeypairSecurityError(f"Failed to load keypair '{name}': {exc}") from exc
 
-        # Set secure file permissions
-        os.chmod(keypair_file, 0o600)
-
-        # Update metadata
-        metadata = self._load_metadata()
-        metadata[name] = public_info
-        self._save_metadata(metadata)
-
-    def _load_keypair_from_disk(self, name: str) -> Keypair:
-        """
-        Load and decrypt keypair from disk using PBKDF2 + Fernet.
-        """
-        keypair_file = self.storage_path / f"{name}.enc"
-
-        if not keypair_file.exists():
+        if not keypair:
             raise KeypairSecurityError(f"Keypair '{name}' not found")
 
-        # Load keystore data
-        with open(keypair_file, 'r') as f:
-            keystore_data = json.load(f)
-
-        # Check encryption version
-        if keystore_data.get('encryption_version') != 'pbkdf2_fernet':
-            # Fallback to old XOR encryption for backward compatibility
-            # Load encrypted data
-            with open(keypair_file, 'rb') as f:
-                encrypted_data = f.read()
-
-            # Decrypt with XOR (legacy)
-            json_bytes = self._xor_decrypt(encrypted_data, self.encryption_key)
-            keypair_data = json.loads(json_bytes.decode())
-        else:
-            # Use PBKDF2 + Fernet decryption
-            from cryptography.fernet import Fernet
-            from cryptography.hazmat.primitives import hashes
-            from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-
-            # Get salt and encrypted data
-            salt = base64.b64decode(keystore_data['salt'])
-            encrypted_data = base64.b64decode(keystore_data['encrypted_data'])
-
-            # Derive decryption key
-            kdf = PBKDF2HMAC(
-                algorithm=hashes.SHA256(),
-                length=32,
-                salt=salt,
-                iterations=100000,
-            )
-            derived_key = base64.urlsafe_b64encode(kdf.derive(self.encryption_key))
-
-            # Decrypt data
-            cipher = Fernet(derived_key)
-            decrypted_data = cipher.decrypt(encrypted_data)
-            keypair_data = json.loads(decrypted_data.decode())
-
-        # Recreate keypair
-        keypair = Keypair.create_from_seed(
-            seed_hex=keypair_data['seed_hex'],
-            ss58_format=keypair_data['ss58_format']
-        )
-
-        # Cache it
         self._keypair_cache[name] = keypair
-
         return keypair
 
-    def _xor_encrypt(self, data: bytes, key: bytes) -> bytes:
-        """Simple XOR encryption for development use."""
-        return bytes(b ^ key[i % len(key)] for i, b in enumerate(data))
-
-    def _xor_decrypt(self, data: bytes, key: bytes) -> bytes:
-        """Simple XOR decryption for development use."""
-        return self._xor_encrypt(data, key)  # XOR is symmetric
+    def _service_name(self, name: str) -> str:
+        """Produce deterministic keyring service names."""
+        return f"{self._service_prefix}-{name}"
 
     def _load_metadata(self) -> Dict[str, Dict[str, Any]]:
         """Load keypair metadata."""

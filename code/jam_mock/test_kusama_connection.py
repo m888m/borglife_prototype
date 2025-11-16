@@ -1,37 +1,31 @@
 #!/usr/bin/env python3
 """
-Test Kusama testnet connection using the enhanced KusamaAdapter.
+Test Westend testnet connection using the enhanced WestendAdapter.
 
 This script tests the SSL/TLS compatibility and connection capabilities
-of the KusamaAdapter with real Kusama testnet endpoints.
+of the WestendAdapter with real Westend testnet endpoints.
 """
 
 import asyncio
-import sys
-import os
 
-# Add the jam_mock directory to Python path for imports
-sys.path.insert(0, os.path.dirname(__file__))
-
-# Direct imports to avoid relative import issues
-from interface import JAMInterface, JAMMode
-from kusama_adapter import KusamaAdapter
+from jam_mock.interface import JAMInterface, JAMMode
+from jam_mock.westend_adapter import WestendAdapter
 
 
 async def test_kusama_connection():
-    """Test connection to Kusama testnet."""
-    print("🧪 Testing Kusama Testnet Connection")
+    """Test connection to Westend testnet."""
+    print("🧪 Testing Westend Testnet Connection")
     print("=" * 50)
 
-    # Test with the working endpoint (OnFinality)
-    rpc_url = "wss://kusama.api.onfinality.io/public-ws"
+    # Test with a working endpoint (OnFinality)
+    rpc_url = "wss://westend.api.onfinality.io/public-ws"
 
     print(f"📡 Connecting to: {rpc_url}")
     print("This may take a few seconds...")
 
     try:
         # Initialize adapter without keypair for basic connectivity test
-        adapter = KusamaAdapter(rpc_url, keypair=None, connect_immediately=True)
+        adapter = WestendAdapter(rpc_url, keypair=None, connect_immediately=True)
 
         # Perform health check
         print("🏥 Performing health check...")
@@ -46,8 +40,8 @@ async def test_kusama_connection():
         print(f"   TLS Min: {health['ssl_config']['min_tls_version']}")
 
         if health['status'] == 'healthy':
-            print("\n✅ SUCCESS: Kusama testnet connection established!")
-            print("🎉 BorgLife can now connect to Kusama for Phase 1 validation!")
+            print("\n✅ SUCCESS: Westend testnet connection established!")
+            print("🎉 BorgLife can now connect to Westend for Phase 1 validation!")
             return True
         else:
             print(f"\n❌ FAILED: {health.get('error', 'Unknown error')}")
@@ -74,7 +68,7 @@ async def test_dna_operations():
 
 async def main():
     """Main test function."""
-    print("🚀 BorgLife Kusama Testnet Connection Test")
+    print("🚀 BorgLife Westend Testnet Connection Test")
     print("Testing SSL/TLS compatibility and blockchain connectivity\n")
 
     # Test basic connection
@@ -85,7 +79,7 @@ async def main():
 
     print("\n" + "=" * 50)
     if connection_success:
-        print("🎯 RESULT: Kusama testnet connectivity VERIFIED")
+        print("🎯 RESULT: Westend testnet connectivity VERIFIED")
         print("📈 Ready for Phase 1 DNA storage operations!")
         sys.exit(0)
     else:

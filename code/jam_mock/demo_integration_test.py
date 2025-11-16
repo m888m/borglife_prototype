@@ -11,11 +11,11 @@ from pathlib import Path
 import statistics
 from datetime import datetime
 
-from .dna_storage_demo import BorgLifeDNADemo
-from production_metrics_collector import ProductionMetricsCollector
-from demo_alert_manager import DemoAlertManager
-from user_friendly_error_handler import UserFriendlyErrorHandler
-from demo_progress_reporter import BorgLifeDemoProgress
+from jam_mock.dna_storage_demo import BorgLifeDNADemo
+from jam_mock.production_metrics_collector import ProductionMetricsCollector
+from jam_mock.demo_alert_manager import DemoAlertManager
+from jam_mock.user_friendly_error_handler import UserFriendlyErrorHandler
+from jam_mock.demo_progress_reporter import BorgLifeDemoProgress
 
 
 class DemoIntegrationTester:

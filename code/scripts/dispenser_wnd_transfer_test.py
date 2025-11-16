@@ -67,8 +67,9 @@ async def test_dispenser_wnd_transfer():
 
         # Check initial balances using WestendAdapter
         print("\n💰 Checking initial balances...")
-        from jam_mock.kusama_adapter import WestendAdapter
-        westend_adapter = WestendAdapter("https://westend.api.onfinality.io/public")
+        from jam_mock.westend_adapter import WestendAdapter
+        westend_adapter = WestendAdapter(
+            "https://westend.api.onfinality.io/public")
         dispenser_balance = await westend_adapter.get_wnd_balance(dispenser_address)
         borg_balance = await westend_adapter.get_wnd_balance(borg_1_address)
 
@@ -80,8 +81,8 @@ async def test_dispenser_wnd_transfer():
             'borg_1': {'planck': borg_balance, 'wnd': borg_wnd}
         }
 
-        print(".6f")
-        print(".6f")
+        print(f"Dispenser balance: {dispenser_wnd:.6f}")
+        print(f"Borg 1 balance: {borg_wnd:.6f}")
 
         # Verify dispenser has enough balance
         if dispenser_wnd < 1.1:  # Need at least 1.1 WND for transfer + fees
@@ -123,16 +124,16 @@ async def test_dispenser_wnd_transfer():
             'borg_1': {'planck': final_borg_balance, 'wnd': final_borg_wnd}
         }
 
-        print(".6f")
-        print(".6f")
+        print(f"Final dispenser balance: {final_dispenser_wnd:.6f}")
+        print(f"Final borg 1 balance: {final_borg_wnd:.6f}")
 
         # Validate transfer
         dispenser_change = final_dispenser_wnd - dispenser_wnd
         borg_change = final_borg_wnd - borg_wnd
 
         print("\n📊 Transfer validation:")
-        print(".6f")
-        print(".6f")
+        print(f"Dispenser change: {dispenser_change:.6f}")
+        print(f"Borg change: {borg_change:.6f}")
         # Check if transfer was successful (allowing for fees)
         if borg_change >= 0.99:  # Should receive at least 0.99 WND
             results['success'] = True

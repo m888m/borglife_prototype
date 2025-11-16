@@ -15,6 +15,7 @@ from typing import Optional
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from jam_mock.kusama_adapter import WestendAdapter
+from jam_mock.westend_adapter import WestendAdapter
 from jam_mock.borg_address_manager_address_primary import BorgAddressManagerAddressPrimary as BorgAddressManager
 from jam_mock.demo_audit_logger import DemoAuditLogger
 import keyring

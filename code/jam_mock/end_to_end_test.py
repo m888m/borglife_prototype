@@ -1,35 +1,29 @@
 #!/usr/bin/env python3
 """
-End-to-End Test for Kusama Connection and Key Management
+End-to-End Test for Westend Connection and Key Management
 
 This test validates the complete workflow from keypair creation through
-Kusama testnet connection to DNA storage operations.
+Westend testnet connection to DNA storage operations.
 """
 
 import asyncio
-import sys
-import os
-from pathlib import Path
 
-# Add jam_mock to path
-sys.path.insert(0, os.path.dirname(__file__))
-
-from keypair_manager import KeypairManager
-from advanced_keypair_features import AdvancedKeypairManager, TransactionSigner
-from kusama_adapter import KusamaAdapter
+from jam_mock.keypair_manager import KeypairManager
+from jam_mock.advanced_keypair_features import AdvancedKeypairManager, TransactionSigner
+from jam_mock.westend_adapter import WestendAdapter
 
 
 async def test_end_to_end_kusama_workflow():
     """
     Complete end-to-end test of Kusama connection and key management.
     """
-    print("🚀 BorgLife Kusama End-to-End Test")
+    print("🚀 BorgLife Westend End-to-End Test")
     print("=" * 45)
 
     results = {
         'keypair_creation': False,
         'address_validation': False,
-        'kusama_connection': False,
+        'westend_connection': False,
         'transaction_validation': False,
         'wealth_tracking': False,
         'dna_storage_simulation': False
@@ -56,19 +50,19 @@ async def test_end_to_end_kusama_workflow():
             print(f"   ❌ Address validation failed: {message}")
             return results
 
-        # Step 2: Kusama Connection Test
-        print("\n2. 🌐 Kusama Testnet Connection")
+        # Step 2: Westend Connection Test
+        print("\n2. 🌐 Westend Testnet Connection")
         print("-" * 32)
 
-        adapter = KusamaAdapter("wss://kusama.api.onfinality.io/public-ws", connect_immediately=True)
+        adapter = WestendAdapter("wss://westend.api.onfinality.io/public-ws", connect_immediately=True)
 
         # Test connection
         health = await adapter.health_check()
         if health['status'] == 'healthy':
-            print("   ✅ Connected to Kusama testnet")
+            print("   ✅ Connected to Westend testnet")
             print(f"   📊 Chain: {health.get('chain_name', 'Unknown')}")
             print(f"   🔢 Block: {health.get('block_number', 'Unknown')}")
-            results['kusama_connection'] = True
+            results['westend_connection'] = True
         else:
             print(f"   ❌ Connection failed: {health.get('error', 'Unknown error')}")
             # Continue with other tests even if connection fails
@@ -171,7 +165,7 @@ async def test_end_to_end_kusama_workflow():
         print(f"\n🎯 Overall: {passed}/{total} tests passed")
 
         if passed == total:
-            print("🎉 ALL TESTS PASSED - Kusama integration ready!")
+            print("🎉 ALL TESTS PASSED - Westend integration ready!")
             return True
         elif passed >= total * 0.8:  # 80% success rate
             print("⚠️  MOST TESTS PASSED - Minor issues to resolve")
@@ -193,7 +187,7 @@ async def main():
 
     if success:
         print("\n🚀 Ready for GitHub push!")
-        print("Run: git add . && git commit -m 'feat: Complete Kusama testnet integration'")
+        print("Run: git add . && git commit -m 'feat: Complete Westend testnet integration'")
         print("     git push")
         sys.exit(0)
     else:

@@ -63,6 +63,7 @@ class SecureDispenserAddressPrimary:
         self.keystore_path = keystore_path
         self.audit_logger = DemoAuditLogger()
         self.dna_anchor = DNAAanchor()
+        self.keyring_service = KeyringService(ss58_format=42, address_prefix="5")
 
         # Transfer limits and controls
         self.max_transfer_amount = Decimal('3.0')   # Max 3.0 WND per transfer
@@ -92,78 +93,6 @@ class SecureDispenserAddressPrimary:
         """Get the keyring service name for dispenser keys."""
         # Dispenser uses its own service name (not address-based since it's not a borg)
         return "borglife-dispenser"
-
-    def _store_keypair_atomic(self, keypair: Keypair, service_name: str) -> bool:
-        """Store keypair with rollback on failure."""
-        stored_keys = []
-        try:
-            # Store each component
-            for key_type, value in [
-                ('private_key', keypair.private_key.hex()),
-                ('public_key', keypair.public_key.hex()),
-                ('address', keypair.ss58_address)
-            ]:
-                keyring.set_password(service_name, key_type, value)
-                stored_keys.append(key_type)
-
-            return True
-        except Exception as e:
-            # Rollback on failure
-            for key_type in stored_keys:
-                try:
-                    keyring.delete_password(service_name, key_type)
-                except:
-                    pass  # Best effort cleanup
-            print(f"Failed to store keypair in keyring: {e}")
-            return False
-
-    def _safe_load_keypair(self, private_key_hex: str) -> Optional[Keypair]:
-        """Safely reconstruct keypair with validation."""
-        try:
-            # Validate hex format and length (64 hex chars = 32 bytes)
-            if not re.match(r'^[0-9a-fA-F]{128}$', private_key_hex):
-                raise ValueError("Invalid private key format - must be 128 hex characters (64 bytes)")
-
-            private_key = bytes.fromhex(private_key_hex)
-            keypair = Keypair(private_key=private_key, ss58_format=42)
-
-            # Verify keypair integrity
-            if not keypair.public_key or not keypair.ss58_address:
-                raise ValueError("Invalid keypair generated")
-
-            return keypair
-        except Exception as e:
-            self.audit_logger.log_event(
-                "keypair_reconstruction_failed",
-                f"Failed to reconstruct dispenser keypair: {str(e)}",
-                {"error": str(e)}
-            )
-            return None
-
-    def _load_keypair_from_keyring(self, service_name: str) -> Optional[Keypair]:
-        """Load keypair from macOS Keychain with safe reconstruction."""
-        try:
-            private_key_hex = keyring.get_password(service_name, "private_key")
-            public_key_hex = keyring.get_password(service_name, "public_key")
-
-            if not private_key_hex or not public_key_hex:
-                return None
-
-            # Use safe keypair reconstruction
-            keypair = self._safe_load_keypair(private_key_hex)
-            if not keypair:
-                return None
-
-            # Verify keys match
-            if keypair.public_key.hex() != public_key_hex:
-                print("Keyring keypair integrity check failed")
-                return None
-
-            return keypair
-
-        except Exception as e:
-            print(f"Failed to load keypair from keyring: {e}")
-            return None
 
     def _resolve_borg_address(self, borg_identifier: str) -> Optional[str]:
         """
@@ -237,8 +166,18 @@ class SecureDispenserAddressPrimary:
 
             # Store keypair in macOS Keychain atomically
             service_name = self._get_keyring_service_name()
-            if not self._store_keypair_atomic(keypair, service_name):
-                raise ValueError("Failed to store keypair in macOS Keychain")
+            try:
+                self.keyring_service.store_keypair(
+                    service_name,
+                    keypair,
+                    metadata={
+                        "role": "dispenser",
+                        "compatibility": "address_primary",
+                        "created_at": datetime.utcnow().isoformat(),
+                    },
+                )
+            except KeyringServiceError as exc:
+                raise ValueError("Failed to store keypair in macOS Keychain") from exc
 
             # Store metadata in keystore file (no sensitive data)
             keystore_data = {
@@ -300,7 +239,10 @@ class SecureDispenserAddressPrimary:
 
             # Load keypair from macOS Keychain
             service_name = self._get_keyring_service_name()
-            self.unlocked_keypair = self._load_keypair_from_keyring(service_name)
+            try:
+                self.unlocked_keypair = self.keyring_service.load_keypair(service_name)
+            except KeyringServiceError as exc:
+                raise ValueError("Failed to load keypair from macOS Keychain") from exc
 
             if not self.unlocked_keypair:
                 raise ValueError("Failed to load keypair from macOS Keychain")
@@ -419,7 +361,7 @@ class SecureDispenserAddressPrimary:
                 return result
 
             # Initialize WestendAdapter for live transfer
-            from jam_mock.kusama_adapter import WestendAdapter
+            from jam_mock.westend_adapter import WestendAdapter
             westend_adapter = WestendAdapter("https://westend.api.onfinality.io/public-ws")
             westend_adapter.set_keypair(self.unlocked_keypair)
 

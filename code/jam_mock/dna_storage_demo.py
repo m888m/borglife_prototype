@@ -28,10 +28,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from proto_borg import ProtoBorgAgent, BorgConfig
 from synthesis.dna_parser import DNAParser
 from synthesis.phenotype_encoder import PhenotypeEncoder
-from transaction_manager import TransactionManager
-from advanced_keypair_features import AdvancedKeypairManager
-from .kusama_adapter import WestendAdapter
-from demo_metrics import DemoMetricsCollector, DemoAlertManager
+from jam_mock.transaction_manager import TransactionManager
+from jam_mock.advanced_keypair_features import AdvancedKeypairManager
+from jam_mock.westend_adapter import WestendAdapter
+from jam_mock.demo_metrics import DemoMetricsCollector, DemoAlertManager
 
 
 class BorgLifeDNADemo:
@@ -149,7 +149,7 @@ class BorgLifeDNADemo:
             # Create borg configuration with real Westend endpoint
             config = BorgConfig(
                 service_index='borg-demo-001',
-                kusama_endpoint='wss://westend-rpc.polkadot.io',
+                westend_endpoint='wss://westend-rpc.polkadot.io',
                 initial_wealth=Decimal('1.0')
             )
 

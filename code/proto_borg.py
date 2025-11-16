@@ -70,17 +70,17 @@ class MockWealthTracker:
 
 class BorgConfig:
     """Configuration for Proto-Borg."""
-
+    
     def __init__(
         self,
         service_index: str = "proto-borg-001",
-        kusama_endpoint: str = "wss://kusama-rpc.polkadot.io",
+        westend_endpoint: str = "wss://westend-rpc.polkadot.io",
         initial_wealth: Decimal = Decimal('1.0'),
         max_task_time: int = 300,
         enable_fallbacks: bool = True
     ):
         self.service_index = service_index
-        self.kusama_endpoint = kusama_endpoint
+        self.westend_endpoint = westend_endpoint
         self.initial_wealth = initial_wealth
         self.max_task_time = max_task_time
         self.enable_fallbacks = enable_fallbacks

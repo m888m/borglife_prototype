@@ -13,10 +13,8 @@ from typing import Dict, Any, Optional, List
 from decimal import Decimal
 import json
 
-# Add the code directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
-from jam_mock.kusama_adapter import WestendAdapter
+from jam_mock.westend_adapter import WestendAdapter, USDB
 from jam_mock.borg_address_manager import BorgAddressManager
 from jam_mock.inter_borg_transfer import InterBorgTransfer
 from jam_mock.economic_validator import EconomicValidator

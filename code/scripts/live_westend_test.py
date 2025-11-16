@@ -16,7 +16,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from security.secure_dispenser import SecureDispenser
 from jam_mock.borg_address_manager import BorgAddressManager
-from jam_mock.kusama_adapter import WestendAdapter
+from jam_mock.westend_adapter import WestendAdapter
 from synthesis.dna_parser import DNAParser
 # from synthesis.phenotype_builder import PhenotypeBuilder  # Skip for live test
 

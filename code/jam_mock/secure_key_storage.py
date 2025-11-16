@@ -12,6 +12,8 @@ from datetime import datetime
 from substrateinterface import Keypair
 import keyring
 
+from security.keyring_service import KeyringService, KeyringServiceError
+
 
 class SecureKeyStore:
     """Keypair storage using macOS Keychain"""
@@ -22,6 +24,7 @@ class SecureKeyStore:
         self._session_timeout = session_timeout_minutes * 60  # Convert minutes to seconds
         self._ensure_store_directory()
         self._service_name = "borglife-keystore"
+        self.keyring_service = KeyringService(ss58_format=42, address_prefix="5")
 
     def _store_keypair_atomic(self, name: str, keypair: Keypair, metadata: Dict[str, Any] = None) -> bool:
         """Store keypair with rollback on failure."""
@@ -129,7 +132,16 @@ class SecureKeyStore:
             self._check_session_timeout()
 
             # Store in keyring atomically
-            success = self._store_keypair_atomic(name, keypair, metadata)
+            try:
+                success = self.keyring_service.store_keypair(
+                    f"{self._service_name}_{name}",
+                    keypair,
+                    metadata=metadata,
+                )
+            except KeyringServiceError as exc:
+                print(f"Failed to store keypair {name}: {exc}")
+                return False
+
             if success:
                 # Store metadata in keystore file (no sensitive data)
                 keystore_data = {
@@ -154,7 +166,13 @@ class SecureKeyStore:
             self._check_session_timeout()
 
             # Load from keyring
-            keypair = self._load_keypair_from_keyring(name)
+            service_name = f"{self._service_name}_{name}"
+            try:
+                keypair = self.keyring_service.load_keypair(service_name)
+            except KeyringServiceError as exc:
+                print(f"Failed to load keypair {name}: {exc}")
+                return None
+
             return keypair
         except Exception as e:
             print(f"Failed to load keypair {name}: {e}")

@@ -19,6 +19,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from jam_mock.secure_borg_creation import create_secure_borg
 from security.secure_dispenser import SecureDispenser
 from jam_mock.kusama_adapter import WestendAdapter
+from jam_mock.westend_adapter import WestendAdapter
 from jam_mock.borg_address_manager import BorgAddressManager
 from jam_mock.demo_audit_logger import DemoAuditLogger
 import keyring
@@ -243,7 +244,7 @@ async def main():
         print("\n💸 STEP 4: Sending available WND from borg 2 to dispenser...")
 
         # First check borg 2's balance
-        from jam_mock.kusama_adapter import WestendAdapter
+        from jam_mock.westend_adapter import WestendAdapter
         westend_adapter = WestendAdapter("https://westend.api.onfinality.io/public-ws")
 
         borg2_balance = await westend_adapter.get_wnd_balance(borg2_address)
