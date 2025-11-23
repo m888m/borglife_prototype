@@ -1,12 +1,13 @@
 from datetime import datetime, timedelta
 
+
 class CredentialRotationManager:
     """Manage credential rotation for Docker MCP organs"""
 
     ROTATION_INTERVALS = {
-        'gmail': timedelta(days=90),
-        'stripe': timedelta(days=30),
-        'bitcoin': timedelta(days=180)
+        "gmail": timedelta(days=90),
+        "stripe": timedelta(days=30),
+        "bitcoin": timedelta(days=180),
     }
 
     def check_rotation_needed(self, organ_name: str) -> bool:

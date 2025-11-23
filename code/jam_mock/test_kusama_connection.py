@@ -39,7 +39,7 @@ async def test_kusama_connection():
         print(f"   TLS Max: {health['ssl_config']['max_tls_version']}")
         print(f"   TLS Min: {health['ssl_config']['min_tls_version']}")
 
-        if health['status'] == 'healthy':
+        if health["status"] == "healthy":
             print("\n✅ SUCCESS: Westend testnet connection established!")
             print("🎉 BorgLife can now connect to Westend for Phase 1 validation!")
             return True

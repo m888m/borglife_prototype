@@ -60,8 +60,8 @@ services:
     ports:
       - "8181:8181"
     environment:
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - SUPABASE_URL=${ARCHON_SUPABASE_URL:-${SUPABASE_URL}}
+      - SUPABASE_SERVICE_KEY=${ARCHON_SUPABASE_SERVICE_KEY:-${SUPABASE_SERVICE_KEY}}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
       - archon_data:/app/data
@@ -73,8 +73,8 @@ services:
     ports:
       - "8051:8051"
     environment:
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - SUPABASE_URL=${ARCHON_SUPABASE_URL:-${SUPABASE_URL}}
+      - SUPABASE_SERVICE_KEY=${ARCHON_SUPABASE_SERVICE_KEY:-${SUPABASE_SERVICE_KEY}}
     depends_on:
       - archon-server
     networks:
@@ -85,8 +85,8 @@ services:
     ports:
       - "8052:8052"
     environment:
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - SUPABASE_URL=${ARCHON_SUPABASE_URL:-${SUPABASE_URL}}
+      - SUPABASE_SERVICE_KEY=${ARCHON_SUPABASE_SERVICE_KEY:-${SUPABASE_SERVICE_KEY}}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - archon-server
@@ -178,13 +178,3 @@ volumes:
   archon_data:
   redis_data:
   postgres_data:
-
-    # Environment file
-    # Create .env file with:
-    # SUPABASE_URL=your_supabase_url
-    # SUPABASE_SERVICE_KEY=your_service_key
-    # OPENAI_API_KEY=your_openai_key
-    # GMAIL_CREDENTIALS=base64_encoded_credentials
-    # STRIPE_SECRET_KEY=your_stripe_key
-    # MONGODB_CONNECTION_STRING=your_mongodb_uri
-    # POSTGRES_PASSWORD=secure_password

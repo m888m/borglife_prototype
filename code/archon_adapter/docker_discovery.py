@@ -1,5 +1,7 @@
-import docker
 from typing import Dict, List
+
+import docker
+
 
 class DockerMCPDiscovery:
     """Discover and catalog Docker MCP organs"""
@@ -26,22 +28,22 @@ class DockerMCPDiscovery:
 
         # Find containers with MCP labels
         containers = self.docker_client.containers.list(
-            filters={'label': 'mcp.server=true'}
+            filters={"label": "mcp.server=true"}
         )
 
         for container in containers:
-            organ_name = container.labels.get('mcp.organ_name')
+            organ_name = container.labels.get("mcp.organ_name")
             if not organ_name:
                 continue
 
             # Extract metadata from labels
             mcp_containers[organ_name] = {
-                'container_id': container.id,
-                'endpoint': self._get_endpoint(container),
-                'category': container.labels.get('mcp.category'),
-                'version': container.labels.get('mcp.version'),
-                'tools': self._discover_tools(container),
-                'health': container.status
+                "container_id": container.id,
+                "endpoint": self._get_endpoint(container),
+                "category": container.labels.get("mcp.category"),
+                "version": container.labels.get("mcp.version"),
+                "tools": self._discover_tools(container),
+                "health": container.status,
             }
 
         return mcp_containers
@@ -50,8 +52,8 @@ class DockerMCPDiscovery:
         """Extract HTTP endpoint from container"""
         # Get port mapping
         ports = container.ports
-        if '8080/tcp' in ports:
-            host_port = ports['8080/tcp'][0]['HostPort']
+        if "8080/tcp" in ports:
+            host_port = ports["8080/tcp"][0]["HostPort"]
             return f"http://localhost:{host_port}"
         return None
 

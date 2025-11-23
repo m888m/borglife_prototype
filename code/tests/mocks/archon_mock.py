@@ -7,7 +7,7 @@ requiring actual network connections or running services.
 """
 
 import asyncio
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
 from unittest.mock import AsyncMock, MagicMock
 
 from ...archon_adapter.config import ArchonConfig
@@ -35,131 +35,144 @@ class ArchonServiceMock:
         """Mock health check with configurable responses."""
         if self.should_fail:
             return {
-                'overall': False,
-                'server': False,
-                'mcp': False,
-                'agents': False,
-                'details': {'error': 'Mock failure configured'}
+                "overall": False,
+                "server": False,
+                "mcp": False,
+                "agents": False,
+                "details": {"error": "Mock failure configured"},
             }
 
         return {
-            'overall': True,
-            'server': True,
-            'mcp': True,
-            'agents': True,
-            'details': {
-                'server': {'status': 'healthy', 'version': '1.0.0'},
-                'mcp': {'status': 'healthy', 'tools': 15},
-                'agents': {'status': 'healthy', 'models': ['gpt-4', 'claude-3']}
-            }
+            "overall": True,
+            "server": True,
+            "mcp": True,
+            "agents": True,
+            "details": {
+                "server": {"status": "healthy", "version": "1.0.0"},
+                "mcp": {"status": "healthy", "tools": 15},
+                "agents": {"status": "healthy", "models": ["gpt-4", "claude-3"]},
+            },
         }
 
     async def perform_rag_query(self, query: str, **kwargs) -> Dict[str, Any]:
         """Mock RAG query with sample response."""
-        self._record_call('perform_rag_query', query=query, **kwargs)
+        self._record_call("perform_rag_query", query=query, **kwargs)
 
         if self._should_fail():
             raise Exception("Mock RAG query failure")
 
         return {
-            'query': query,
-            'results': [
+            "query": query,
+            "results": [
                 {
-                    'content': f'Mock RAG response for: {query}',
-                    'source': 'mock_source',
-                    'relevance': 0.95,
-                    'metadata': {'type': 'mock'}
+                    "content": f"Mock RAG response for: {query}",
+                    "source": "mock_source",
+                    "relevance": 0.95,
+                    "metadata": {"type": "mock"},
                 }
             ],
-            'total_results': 1,
-            'processing_time': 0.1
+            "total_results": 1,
+            "processing_time": 0.1,
         }
 
-    async def create_task(self, title: str, description: str, **kwargs) -> Dict[str, Any]:
+    async def create_task(
+        self, title: str, description: str, **kwargs
+    ) -> Dict[str, Any]:
         """Mock task creation."""
-        self._record_call('create_task', title=title, description=description, **kwargs)
+        self._record_call("create_task", title=title, description=description, **kwargs)
 
         if self._should_fail():
             raise Exception("Mock task creation failure")
 
         return {
-            'id': f'mock_task_{len(self.call_history)}',
-            'title': title,
-            'description': description,
-            'status': 'todo',
-            'assignee': kwargs.get('assignee', 'User'),
-            'created_at': '2025-10-30T12:00:00Z'
+            "id": f"mock_task_{len(self.call_history)}",
+            "title": title,
+            "description": description,
+            "status": "todo",
+            "assignee": kwargs.get("assignee", "User"),
+            "created_at": "2025-10-30T12:00:00Z",
         }
 
     async def list_tasks(self, **kwargs) -> List[Dict[str, Any]]:
         """Mock task listing."""
-        self._record_call('list_tasks', **kwargs)
+        self._record_call("list_tasks", **kwargs)
 
         if self._should_fail():
             raise Exception("Mock task listing failure")
 
         return [
             {
-                'id': 'mock_task_1',
-                'title': 'Mock Task 1',
-                'description': 'Mock task for testing',
-                'status': 'todo',
-                'assignee': 'User'
+                "id": "mock_task_1",
+                "title": "Mock Task 1",
+                "description": "Mock task for testing",
+                "status": "todo",
+                "assignee": "User",
             }
         ]
 
     async def call_mcp_tool(self, tool_name: str, parameters: Dict[str, Any]) -> Any:
         """Mock MCP tool call."""
-        self._record_call('call_mcp_tool', tool_name=tool_name, parameters=parameters)
+        self._record_call("call_mcp_tool", tool_name=tool_name, parameters=parameters)
 
         if self._should_fail():
             raise Exception(f"Mock MCP tool failure: {tool_name}")
 
         # Return mock responses based on tool name
         mock_responses = {
-            'web_search': {'results': ['Mock web result'], 'total': 1},
-            'data_analysis': {'analysis': 'Mock data analysis', 'insights': []},
-            'document_search': {'documents': [], 'total': 0}
+            "web_search": {"results": ["Mock web result"], "total": 1},
+            "data_analysis": {"analysis": "Mock data analysis", "insights": []},
+            "document_search": {"documents": [], "total": 0},
         }
 
-        return mock_responses.get(tool_name, {'result': f'Mock {tool_name} response'})
+        return mock_responses.get(tool_name, {"result": f"Mock {tool_name} response"})
 
     async def run_agent(self, agent_type: str, prompt: str, **kwargs) -> Dict[str, Any]:
         """Mock agent execution."""
-        self._record_call('run_agent', agent_type=agent_type, prompt=prompt, **kwargs)
+        self._record_call("run_agent", agent_type=agent_type, prompt=prompt, **kwargs)
 
         if self._should_fail():
             raise Exception(f"Mock agent failure: {agent_type}")
 
         return {
-            'agent_type': agent_type,
-            'prompt': prompt,
-            'response': f'Mock {agent_type} response to: {prompt[:50]}...',
-            'model_used': kwargs.get('model', 'gpt-4'),
-            'processing_time': 0.5
+            "agent_type": agent_type,
+            "prompt": prompt,
+            "response": f"Mock {agent_type} response to: {prompt[:50]}...",
+            "model_used": kwargs.get("model", "gpt-4"),
+            "processing_time": 0.5,
         }
 
-    async def call_organ(self, borg_id: str, organ_name: str, tool: str, params: Dict[str, Any], **kwargs) -> Any:
+    async def call_organ(
+        self, borg_id: str, organ_name: str, tool: str, params: Dict[str, Any], **kwargs
+    ) -> Any:
         """Mock organ call."""
-        self._record_call('call_organ', borg_id=borg_id, organ_name=organ_name, tool=tool, params=params, **kwargs)
+        self._record_call(
+            "call_organ",
+            borg_id=borg_id,
+            organ_name=organ_name,
+            tool=tool,
+            params=params,
+            **kwargs,
+        )
 
         if self._should_fail():
             raise Exception(f"Mock organ failure: {organ_name}")
 
         return {
-            'organ': organ_name,
-            'tool': tool,
-            'result': f'Mock {organ_name} result for {tool}',
-            'params': params
+            "organ": organ_name,
+            "tool": tool,
+            "result": f"Mock {organ_name} result for {tool}",
+            "params": params,
         }
 
     def _record_call(self, method: str, **kwargs):
         """Record method call for testing verification."""
-        self.call_history.append({
-            'method': method,
-            'args': kwargs,
-            'timestamp': asyncio.get_event_loop().time()
-        })
+        self.call_history.append(
+            {
+                "method": method,
+                "args": kwargs,
+                "timestamp": asyncio.get_event_loop().time(),
+            }
+        )
 
     def _should_fail(self) -> bool:
         """Determine if current call should fail."""

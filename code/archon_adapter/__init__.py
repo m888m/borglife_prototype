@@ -6,38 +6,34 @@ enabling loose coupling and independent evolution of both systems.
 """
 
 from .adapter import ArchonServiceAdapter
-from .config import ArchonConfig
-from .exceptions import (
-    OrganUnavailableError,
-    RateLimitExceededError,
-    InsufficientFundsError,
-    AllFallbacksFailedError
-)
-from .fallback_manager import OrganFallbackManager, FallbackLevel
 from .cache_manager import CacheManager
-from .docker_discovery import DockerMCPDiscovery
 from .compatibility_matrix import DockerMCPCompatibilityMatrix
-from .mcp_client import MCPClient
+from .config import ArchonConfig
+from .dependency_monitor import ArchonDependencyMonitor
+from .docker_discovery import DockerMCPDiscovery
 from .docker_mcp_auth import DockerMCPAuthManager
 from .docker_monitor import DockerMCPMonitor
-from .dependency_monitor import ArchonDependencyMonitor
+from .exceptions import (AllFallbacksFailedError, InsufficientFundsError,
+                         OrganUnavailableError, RateLimitExceededError)
+from .fallback_manager import FallbackLevel, OrganFallbackManager
+from .mcp_client import MCPClient
 from .rate_limiter import OrganRateLimiter
 
 __all__ = [
-    'ArchonServiceAdapter',
-    'ArchonConfig',
-    'OrganUnavailableError',
-    'RateLimitExceededError',
-    'InsufficientFundsError',
-    'AllFallbacksFailedError',
-    'OrganFallbackManager',
-    'FallbackLevel',
-    'CacheManager',
-    'DockerMCPDiscovery',
-    'DockerMCPCompatibilityMatrix',
-    'MCPClient',
-    'DockerMCPAuthManager',
-    'DockerMCPMonitor',
-    'ArchonDependencyMonitor',
-    'OrganRateLimiter'
+    "ArchonServiceAdapter",
+    "ArchonConfig",
+    "OrganUnavailableError",
+    "RateLimitExceededError",
+    "InsufficientFundsError",
+    "AllFallbacksFailedError",
+    "OrganFallbackManager",
+    "FallbackLevel",
+    "CacheManager",
+    "DockerMCPDiscovery",
+    "DockerMCPCompatibilityMatrix",
+    "MCPClient",
+    "DockerMCPAuthManager",
+    "DockerMCPMonitor",
+    "ArchonDependencyMonitor",
+    "OrganRateLimiter",
 ]

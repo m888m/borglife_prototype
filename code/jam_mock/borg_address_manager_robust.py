@@ -6,22 +6,29 @@ This version prevents None comparison errors and provides detailed error message
 for all failure scenarios in keypair reconstruction.
 """
 
-import os
 import hashlib
 import json
-from typing import Dict, Any, Optional, List, Tuple
+import os
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
+from security.dna_anchor import DNAAanchor
 from substrateinterface import Keypair
 
-from .secure_key_storage import SecureKeyStore
 from .demo_audit_logger import DemoAuditLogger
-from security.dna_anchor import DNAAanchor
+from .secure_key_storage import SecureKeyStore
 
 
 class KeypairReconstructionError(Exception):
     """Custom exception for keypair reconstruction failures."""
 
-    def __init__(self, message: str, identifier: str = None, error_code: str = None, details: Dict[str, Any] = None):
+    def __init__(
+        self,
+        message: str,
+        identifier: str = None,
+        error_code: str = None,
+        details: Dict[str, Any] = None,
+    ):
         self.identifier = identifier
         self.error_code = error_code
         self.details = details or {}
@@ -36,7 +43,12 @@ class BorgAddressManagerRobust:
     comprehensive validation and error reporting.
     """
 
-    def __init__(self, supabase_client=None, audit_logger: Optional[DemoAuditLogger] = None, keystore: Optional[SecureKeyStore] = None):
+    def __init__(
+        self,
+        supabase_client=None,
+        audit_logger: Optional[DemoAuditLogger] = None,
+        keystore: Optional[SecureKeyStore] = None,
+    ):
         """
         Initialize robust BorgAddressManager.
 
@@ -56,6 +68,7 @@ class BorgAddressManagerRobust:
             # Use unique keystore path to avoid conflicts
             import tempfile
             import uuid
+
             temp_dir = tempfile.gettempdir()
             unique_id = str(uuid.uuid4())[:8]
             keystore_path = f"{temp_dir}/borglife_keystore_{unique_id}.enc"
@@ -68,13 +81,13 @@ class BorgAddressManagerRobust:
             self.audit_logger.log_event(
                 "keystore_auto_unlocked",
                 "Keystore automatically unlocked using macOS Keychain",
-                {"demo_mode": True, "storage": "macos_keychain"}
+                {"demo_mode": True, "storage": "macos_keychain"},
             )
         except Exception as e:
             self.audit_logger.log_event(
                 "keystore_unlock_failed",
                 f"Failed to auto-unlock keystore: {str(e)}",
-                {"error": str(e)}
+                {"error": str(e)},
             )
 
         self.dna_anchor = DNAAanchor(audit_logger)
@@ -98,8 +111,7 @@ class BorgAddressManagerRobust:
         """
         if not identifier:
             raise KeypairReconstructionError(
-                "Identifier cannot be None or empty",
-                error_code="INVALID_IDENTIFIER"
+                "Identifier cannot be None or empty", error_code="INVALID_IDENTIFIER"
             )
 
         try:
@@ -109,7 +121,7 @@ class BorgAddressManagerRobust:
                 raise KeypairReconstructionError(
                     f"Could not resolve service name for identifier: {identifier}",
                     identifier=identifier,
-                    error_code="SERVICE_NAME_RESOLUTION_FAILED"
+                    error_code="SERVICE_NAME_RESOLUTION_FAILED",
                 )
 
             # Retrieve and validate keypair components
@@ -118,7 +130,7 @@ class BorgAddressManagerRobust:
                 raise KeypairReconstructionError(
                     f"No keypair data found for identifier: {identifier}",
                     identifier=identifier,
-                    error_code="KEYPAIR_DATA_NOT_FOUND"
+                    error_code="KEYPAIR_DATA_NOT_FOUND",
                 )
 
             # Reconstruct and validate keypair
@@ -127,7 +139,7 @@ class BorgAddressManagerRobust:
                 raise KeypairReconstructionError(
                     f"Keypair reconstruction failed for identifier: {identifier}",
                     identifier=identifier,
-                    error_code="KEYPAIR_RECONSTRUCTION_FAILED"
+                    error_code="KEYPAIR_RECONSTRUCTION_FAILED",
                 )
 
             # Final validation
@@ -136,7 +148,7 @@ class BorgAddressManagerRobust:
             self.audit_logger.log_event(
                 "keypair_retrieved_robust",
                 f"Keypair successfully retrieved with robust error handling for {identifier}",
-                {"identifier": identifier, "service_name": service_name}
+                {"identifier": identifier, "service_name": service_name},
             )
 
             return keypair
@@ -150,7 +162,7 @@ class BorgAddressManagerRobust:
                 f"Unexpected error retrieving keypair for {identifier}: {str(e)}",
                 identifier=identifier,
                 error_code="UNEXPECTED_ERROR",
-                details={"original_error": str(e), "error_type": type(e).__name__}
+                details={"original_error": str(e), "error_type": type(e).__name__},
             ) from e
 
     def _resolve_service_name(self, identifier: str) -> Optional[str]:
@@ -160,7 +172,7 @@ class BorgAddressManagerRobust:
         Supports both borg_id and address-based lookups with fallback.
         """
         # Check if it's an SS58 address
-        if identifier.startswith('5') and len(identifier) == 48:
+        if identifier.startswith("5") and len(identifier) == 48:
             # Address-based service (new format)
             return f"borglife-address-{identifier}"
         else:
@@ -172,7 +184,9 @@ class BorgAddressManagerRobust:
             # Fallback to old service name for backward compatibility
             return f"borglife-borg-{identifier}"
 
-    def _retrieve_keypair_data(self, service_name: str, identifier: str) -> Optional[Dict[str, str]]:
+    def _retrieve_keypair_data(
+        self, service_name: str, identifier: str
+    ) -> Optional[Dict[str, str]]:
         """
         Retrieve keypair data from keyring with validation.
 
@@ -182,7 +196,7 @@ class BorgAddressManagerRobust:
         import keyring
 
         keypair_data = {}
-        required_keys = ['private_key', 'public_key', 'address']
+        required_keys = ["private_key", "public_key", "address"]
 
         for key_type in required_keys:
             try:
@@ -191,30 +205,34 @@ class BorgAddressManagerRobust:
                     self.audit_logger.log_event(
                         "keyring_key_missing",
                         f"Key {key_type} not found in service {service_name} for {identifier}",
-                        {"service_name": service_name, "key_type": key_type, "identifier": identifier}
+                        {
+                            "service_name": service_name,
+                            "key_type": key_type,
+                            "identifier": identifier,
+                        },
                     )
                     return None
 
                 # Basic validation
-                if key_type == 'private_key' and len(value) != 128:
+                if key_type == "private_key" and len(value) != 128:
                     raise KeypairReconstructionError(
                         f"Invalid private key length: expected 128 chars, got {len(value)}",
                         identifier=identifier,
-                        error_code="INVALID_PRIVATE_KEY_LENGTH"
+                        error_code="INVALID_PRIVATE_KEY_LENGTH",
                     )
 
-                if key_type == 'public_key' and len(value) != 64:
+                if key_type == "public_key" and len(value) != 64:
                     raise KeypairReconstructionError(
                         f"Invalid public key length: expected 64 chars, got {len(value)}",
                         identifier=identifier,
-                        error_code="INVALID_PUBLIC_KEY_LENGTH"
+                        error_code="INVALID_PUBLIC_KEY_LENGTH",
                     )
 
-                if key_type == 'address' and not value.startswith('5'):
+                if key_type == "address" and not value.startswith("5"):
                     raise KeypairReconstructionError(
                         f"Invalid address format: expected SS58 address starting with '5', got {value[:10]}...",
                         identifier=identifier,
-                        error_code="INVALID_ADDRESS_FORMAT"
+                        error_code="INVALID_ADDRESS_FORMAT",
                     )
 
                 keypair_data[key_type] = value
@@ -224,12 +242,14 @@ class BorgAddressManagerRobust:
                     f"Keyring access error for {key_type} in {service_name}: {str(e)}",
                     identifier=identifier,
                     error_code="KEYRING_ACCESS_ERROR",
-                    details={"key_type": key_type, "service_name": service_name}
+                    details={"key_type": key_type, "service_name": service_name},
                 ) from e
 
         return keypair_data
 
-    def _reconstruct_keypair(self, keypair_data: Dict[str, str], identifier: str) -> Optional[Keypair]:
+    def _reconstruct_keypair(
+        self, keypair_data: Dict[str, str], identifier: str
+    ) -> Optional[Keypair]:
         """
         Reconstruct keypair from hex data with comprehensive validation.
 
@@ -237,9 +257,9 @@ class BorgAddressManagerRobust:
             Keypair object or None if reconstruction fails
         """
         try:
-            private_key_hex = keypair_data['private_key']
-            public_key_hex = keypair_data['public_key']
-            address = keypair_data['address']
+            private_key_hex = keypair_data["private_key"]
+            public_key_hex = keypair_data["public_key"]
+            address = keypair_data["address"]
 
             # Convert private key from hex
             try:
@@ -248,7 +268,7 @@ class BorgAddressManagerRobust:
                 raise KeypairReconstructionError(
                     f"Invalid private key hex format: {str(e)}",
                     identifier=identifier,
-                    error_code="INVALID_PRIVATE_KEY_HEX"
+                    error_code="INVALID_PRIVATE_KEY_HEX",
                 ) from e
 
             # Validate private key length (should be 64 bytes for ed25519)
@@ -256,7 +276,7 @@ class BorgAddressManagerRobust:
                 raise KeypairReconstructionError(
                     f"Invalid private key byte length: expected 64, got {len(private_key_bytes)}",
                     identifier=identifier,
-                    error_code="INVALID_PRIVATE_KEY_BYTES"
+                    error_code="INVALID_PRIVATE_KEY_BYTES",
                 )
 
             # Reconstruct keypair
@@ -267,29 +287,29 @@ class BorgAddressManagerRobust:
                     f"Keypair creation failed: {str(e)}",
                     identifier=identifier,
                     error_code="KEYPAIR_CREATION_FAILED",
-                    details={"error_type": type(e).__name__}
+                    details={"error_type": type(e).__name__},
                 ) from e
 
             # Validate reconstructed keypair
-            if not hasattr(keypair, 'private_key') or keypair.private_key is None:
+            if not hasattr(keypair, "private_key") or keypair.private_key is None:
                 raise KeypairReconstructionError(
                     "Reconstructed keypair missing private key",
                     identifier=identifier,
-                    error_code="MISSING_PRIVATE_KEY"
+                    error_code="MISSING_PRIVATE_KEY",
                 )
 
-            if not hasattr(keypair, 'public_key') or keypair.public_key is None:
+            if not hasattr(keypair, "public_key") or keypair.public_key is None:
                 raise KeypairReconstructionError(
                     "Reconstructed keypair missing public key",
                     identifier=identifier,
-                    error_code="MISSING_PUBLIC_KEY"
+                    error_code="MISSING_PUBLIC_KEY",
                 )
 
-            if not hasattr(keypair, 'ss58_address') or not keypair.ss58_address:
+            if not hasattr(keypair, "ss58_address") or not keypair.ss58_address:
                 raise KeypairReconstructionError(
                     "Reconstructed keypair missing SS58 address",
                     identifier=identifier,
-                    error_code="MISSING_SS58_ADDRESS"
+                    error_code="MISSING_SS58_ADDRESS",
                 )
 
             # Verify public key matches expected
@@ -301,8 +321,8 @@ class BorgAddressManagerRobust:
                     error_code="PUBLIC_KEY_MISMATCH",
                     details={
                         "expected": public_key_hex,
-                        "reconstructed": reconstructed_public_hex
-                    }
+                        "reconstructed": reconstructed_public_hex,
+                    },
                 )
 
             # Verify address matches expected
@@ -313,8 +333,8 @@ class BorgAddressManagerRobust:
                     error_code="ADDRESS_MISMATCH",
                     details={
                         "expected": address,
-                        "reconstructed": keypair.ss58_address
-                    }
+                        "reconstructed": keypair.ss58_address,
+                    },
                 )
 
             return keypair
@@ -326,7 +346,7 @@ class BorgAddressManagerRobust:
                 f"Unexpected error during keypair reconstruction: {str(e)}",
                 identifier=identifier,
                 error_code="UNEXPECTED_RECONSTRUCTION_ERROR",
-                details={"error_type": type(e).__name__}
+                details={"error_type": type(e).__name__},
             ) from e
 
     def _validate_final_keypair(self, keypair: Keypair, identifier: str) -> None:
@@ -344,7 +364,7 @@ class BorgAddressManagerRobust:
                 raise KeypairReconstructionError(
                     "Keypair signing test failed - no signature produced",
                     identifier=identifier,
-                    error_code="SIGNING_TEST_FAILED"
+                    error_code="SIGNING_TEST_FAILED",
                 )
 
             # Test signature verification
@@ -354,15 +374,17 @@ class BorgAddressManagerRobust:
                 raise KeypairReconstructionError(
                     "Keypair signature verification failed",
                     identifier=identifier,
-                    error_code="SIGNATURE_VERIFICATION_FAILED"
+                    error_code="SIGNATURE_VERIFICATION_FAILED",
                 )
 
             # Additional validation: ensure address is valid SS58
-            if not (keypair.ss58_address.startswith('5') and len(keypair.ss58_address) == 48):
+            if not (
+                keypair.ss58_address.startswith("5") and len(keypair.ss58_address) == 48
+            ):
                 raise KeypairReconstructionError(
                     f"Invalid SS58 address format: {keypair.ss58_address}",
                     identifier=identifier,
-                    error_code="INVALID_SS58_FORMAT"
+                    error_code="INVALID_SS58_FORMAT",
                 )
 
         except KeypairReconstructionError:
@@ -372,7 +394,7 @@ class BorgAddressManagerRobust:
                 f"Final keypair validation failed: {str(e)}",
                 identifier=identifier,
                 error_code="FINAL_VALIDATION_FAILED",
-                details={"error_type": type(e).__name__}
+                details={"error_type": type(e).__name__},
             ) from e
 
     # Legacy methods for backward compatibility
@@ -383,16 +405,21 @@ class BorgAddressManagerRobust:
 
         if self.supabase:
             try:
-                rest_result = self.supabase.table('borg_addresses').select('substrate_address').eq('borg_id', borg_id).execute()
+                rest_result = (
+                    self.supabase.table("borg_addresses")
+                    .select("substrate_address")
+                    .eq("borg_id", borg_id)
+                    .execute()
+                )
                 if rest_result.data:
-                    address = rest_result.data[0]['substrate_address']
+                    address = rest_result.data[0]["substrate_address"]
                     self._borg_id_cache[borg_id] = address
                     return address
             except Exception as e:
                 self.audit_logger.log_event(
                     "address_lookup_failed",
                     f"Failed to lookup address for borg {borg_id}: {str(e)}",
-                    {"borg_id": borg_id, "error": str(e)}
+                    {"borg_id": borg_id, "error": str(e)},
                 )
 
         return None
@@ -408,8 +435,8 @@ class BorgAddressManagerRobust:
                 {
                     "identifier": identifier,
                     "error_code": e.error_code,
-                    "details": e.details
-                }
+                    "details": e.details,
+                },
             )
             return None
 
@@ -422,32 +449,32 @@ class BorgAddressManagerRobust:
             Dict with validation results and any error details
         """
         result = {
-            'identifier': identifier,
-            'accessible': False,
-            'service_name': None,
-            'error': None,
-            'error_code': None
+            "identifier": identifier,
+            "accessible": False,
+            "service_name": None,
+            "error": None,
+            "error_code": None,
         }
 
         try:
             service_name = self._resolve_service_name(identifier)
-            result['service_name'] = service_name
+            result["service_name"] = service_name
 
             if not service_name:
-                result['error'] = "Could not resolve service name"
-                result['error_code'] = "SERVICE_NAME_RESOLUTION_FAILED"
+                result["error"] = "Could not resolve service name"
+                result["error_code"] = "SERVICE_NAME_RESOLUTION_FAILED"
                 return result
 
             # Try to access keypair
             keypair = self.get_borg_keypair_robust(identifier)
-            result['accessible'] = True
+            result["accessible"] = True
 
         except KeypairReconstructionError as e:
-            result['error'] = str(e)
-            result['error_code'] = e.error_code
+            result["error"] = str(e)
+            result["error_code"] = e.error_code
         except Exception as e:
-            result['error'] = f"Unexpected error: {str(e)}"
-            result['error_code'] = "UNEXPECTED_ERROR"
+            result["error"] = f"Unexpected error: {str(e)}"
+            result["error_code"] = "UNEXPECTED_ERROR"
 
         return result
 
@@ -458,57 +485,66 @@ class BorgAddressManagerRobust:
         Returns:
             Detailed diagnostic information
         """
-        diagnosis = {
-            'identifier': identifier,
-            'issues': [],
-            'recommendations': []
-        }
+        diagnosis = {"identifier": identifier, "issues": [], "recommendations": []}
 
         # Check service name resolution
         service_name = self._resolve_service_name(identifier)
         if not service_name:
-            diagnosis['issues'].append("Cannot resolve keyring service name")
-            diagnosis['recommendations'].append("Check if borg is registered in database")
+            diagnosis["issues"].append("Cannot resolve keyring service name")
+            diagnosis["recommendations"].append(
+                "Check if borg is registered in database"
+            )
             return diagnosis
 
-        diagnosis['service_name'] = service_name
+        diagnosis["service_name"] = service_name
 
         # Check individual key access
         import keyring
-        key_types = ['private_key', 'public_key', 'address']
+
+        key_types = ["private_key", "public_key", "address"]
 
         for key_type in key_types:
             try:
                 value = keyring.get_password(service_name, key_type)
                 if value is None:
-                    diagnosis['issues'].append(f"Missing {key_type} in keyring")
-                    diagnosis['recommendations'].append(f"Check if {key_type} was stored correctly")
-                elif key_type == 'private_key' and len(value) != 128:
-                    diagnosis['issues'].append(f"Invalid {key_type} length: {len(value)} (expected 128)")
-                elif key_type == 'public_key' and len(value) != 64:
-                    diagnosis['issues'].append(f"Invalid {key_type} length: {len(value)} (expected 64)")
-                elif key_type == 'address' and not value.startswith('5'):
-                    diagnosis['issues'].append(f"Invalid address format: {value[:10]}...")
+                    diagnosis["issues"].append(f"Missing {key_type} in keyring")
+                    diagnosis["recommendations"].append(
+                        f"Check if {key_type} was stored correctly"
+                    )
+                elif key_type == "private_key" and len(value) != 128:
+                    diagnosis["issues"].append(
+                        f"Invalid {key_type} length: {len(value)} (expected 128)"
+                    )
+                elif key_type == "public_key" and len(value) != 64:
+                    diagnosis["issues"].append(
+                        f"Invalid {key_type} length: {len(value)} (expected 64)"
+                    )
+                elif key_type == "address" and not value.startswith("5"):
+                    diagnosis["issues"].append(
+                        f"Invalid address format: {value[:10]}..."
+                    )
             except Exception as e:
-                diagnosis['issues'].append(f"Error accessing {key_type}: {str(e)}")
+                diagnosis["issues"].append(f"Error accessing {key_type}: {str(e)}")
 
         # Check database consistency
-        if identifier.startswith('5'):
+        if identifier.startswith("5"):
             borg_id = self.get_borg_id(identifier)
             if not borg_id:
-                diagnosis['issues'].append("Address not found in database")
-                diagnosis['recommendations'].append("Register borg in database")
+                diagnosis["issues"].append("Address not found in database")
+                diagnosis["recommendations"].append("Register borg in database")
         else:
             address = self.get_borg_address(identifier)
             if not address:
-                diagnosis['issues'].append("Borg ID not found in database")
-                diagnosis['recommendations'].append("Register borg in database")
+                diagnosis["issues"].append("Borg ID not found in database")
+                diagnosis["recommendations"].append("Register borg in database")
 
         return diagnosis
 
 
 # Convenience functions
-def get_borg_keypair_safe(identifier: str, address_manager=None) -> Tuple[Optional[Keypair], Optional[str]]:
+def get_borg_keypair_safe(
+    identifier: str, address_manager=None
+) -> Tuple[Optional[Keypair], Optional[str]]:
     """
     Safe keypair retrieval with error handling.
 

@@ -4,9 +4,9 @@ Synthesis Module Type Definitions
 Type hints and data structures for the BorgLife synthesis pipeline.
 """
 
-from typing import Dict, Any, Optional, List, Callable, Union, Protocol
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
+from typing import Any, Callable, Dict, List, Optional, Protocol, Union
 
 # Core DNA types
 DNAHash = str  # SHA256 hash as hex string
@@ -42,6 +42,7 @@ IntegrityCheck = bool  # True if integrity verified
 JAMStorageFormat = Dict[str, Any]  # Format for on-chain storage
 JAMRetrievalResult = Optional[Dict[str, Any]]  # Result of JAM retrieval
 
+
 # Protocol definitions
 class ExecutableCell(Protocol):
     """Protocol for executable cell instances."""
@@ -54,10 +55,11 @@ class ExecutableCell(Protocol):
         """Execute a task using this cell."""
         ...
 
+
 class CostCalculator(Protocol):
     """Protocol for cost calculation implementations."""
 
-    def calculate_phenotype_cost(self, dna: 'BorgDNA') -> Dict[str, Any]:
+    def calculate_phenotype_cost(self, dna: "BorgDNA") -> Dict[str, Any]:
         """Calculate total cost of phenotype."""
         ...
 
@@ -65,24 +67,28 @@ class CostCalculator(Protocol):
         self,
         result: ExecutionResult,
         execution_time: ExecutionTime,
-        wealth: Optional[DOTAmount]
+        wealth: Optional[DOTAmount],
     ) -> Dict[str, Any]:
         """Calculate cost of task execution."""
         ...
 
+
 class DNAEncoder(Protocol):
     """Protocol for DNA encoding implementations."""
 
-    def encode(self, phenotype: 'BorgPhenotype') -> 'BorgDNA':
+    def encode(self, phenotype: "BorgPhenotype") -> "BorgDNA":
         """Encode phenotype back to DNA."""
         ...
 
-    def prepare_for_jam_storage(self, dna: 'BorgDNA') -> JAMStorageFormat:
+    def prepare_for_jam_storage(self, dna: "BorgDNA") -> JAMStorageFormat:
         """Prepare DNA for JAM storage."""
         ...
 
+
 # Type aliases for complex structures
-PhenotypeCostInfo = Dict[str, Union[DOTAmount, CostBreakdown, Dict[str, DOTAmount], str, int, bool]]
+PhenotypeCostInfo = Dict[
+    str, Union[DOTAmount, CostBreakdown, Dict[str, DOTAmount], str, int, bool]
+]
 TaskCostInfo = Dict[str, Union[DOTAmount, CostBreakdown, ExecutionTime, str, bool]]
 EncodingStats = Dict[str, Union[int, float]]
 

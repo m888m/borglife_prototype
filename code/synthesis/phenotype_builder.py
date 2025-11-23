@@ -6,11 +6,12 @@ Builds BorgPhenotype objects from BorgDNA by creating cells (PydanticAI agents)
 and registering organs (MCP tool callables).
 """
 
-from typing import Dict, Any, Optional, Callable, List
 import asyncio
 import logging
+from typing import Any, Callable, Dict, List, Optional
 
 from .dna_parser import BorgDNA, Cell, Organ
+
 try:
     from ..archon_adapter import ArchonServiceAdapter
     from ..archon_adapter.exceptions import PhenotypeBuildError
@@ -18,10 +19,13 @@ except ImportError:
     # Mock for testing when archon_adapter is not available
     class ArchonServiceAdapter:
         pass
+
     class PhenotypeBuildError(Exception):
         pass
 
+
 logger = logging.getLogger(__name__)
+
 
 class BorgPhenotype:
     """Executable borg phenotype (body) built from DNA."""
@@ -38,7 +42,9 @@ class BorgPhenotype:
         self.build_timestamp = None
         self.is_built = False
 
-    async def execute_task(self, task_description: str, wealth: Optional[float] = None) -> Dict[str, Any]:
+    async def execute_task(
+        self, task_description: str, wealth: Optional[float] = None
+    ) -> Dict[str, Any]:
         """
         Execute a task using the phenotype's cells and organs with economic tracking.
 
@@ -51,16 +57,14 @@ class BorgPhenotype:
         """
         if not self.is_built:
             raise PhenotypeBuildError(
-                self.dna.header.service_index,
-                "Phenotype not fully built"
+                self.dna.header.service_index, "Phenotype not fully built"
             )
 
         # Route task to appropriate cell based on task type
         # This is a simplified routing - in production would be more sophisticated
         if not self.cells:
             raise PhenotypeBuildError(
-                self.dna.header.service_index,
-                "No cells available for task execution"
+                self.dna.header.service_index, "No cells available for task execution"
             )
 
         # Use first available cell for now
@@ -79,19 +83,20 @@ class BorgPhenotype:
             cost_info = await self._calculate_task_cost(result, execution_time, wealth)
 
             # Enhance result with cost information
-            result.update({
-                'execution_time': execution_time,
-                'cost_info': cost_info,
-                'borg_id': self.dna.header.service_index
-            })
+            result.update(
+                {
+                    "execution_time": execution_time,
+                    "cost_info": cost_info,
+                    "borg_id": self.dna.header.service_index,
+                }
+            )
 
             return result
 
         except Exception as e:
             logger.error(f"Task execution failed: {e}")
             raise PhenotypeBuildError(
-                self.dna.header.service_index,
-                f"Task execution failed: {e}"
+                self.dna.header.service_index, f"Task execution failed: {e}"
             )
 
     async def _execute_via_cell(self, cell, task_description: str) -> Dict[str, Any]:
@@ -111,13 +116,13 @@ class BorgPhenotype:
 
             # Enhance result with phenotype context
             enhanced_result = {
-                'task': task_description,
-                'result': cell_result,
-                'cell_used': getattr(cell, 'name', 'unknown'),
-                'organs_used': list(self.organs.keys()),
-                'organs_available': len(self.organs),
-                'phenotype_built': self.is_built,
-                'timestamp': asyncio.get_event_loop().time()
+                "task": task_description,
+                "result": cell_result,
+                "cell_used": getattr(cell, "name", "unknown"),
+                "organs_used": list(self.organs.keys()),
+                "organs_available": len(self.organs),
+                "phenotype_built": self.is_built,
+                "timestamp": asyncio.get_event_loop().time(),
             }
 
             return enhanced_result
@@ -125,11 +130,11 @@ class BorgPhenotype:
         except Exception as e:
             logger.error(f"Cell execution failed: {e}")
             return {
-                'task': task_description,
-                'error': str(e),
-                'cell_used': getattr(cell, 'name', 'unknown'),
-                'organs_used': [],
-                'timestamp': asyncio.get_event_loop().time()
+                "task": task_description,
+                "error": str(e),
+                "cell_used": getattr(cell, "name", "unknown"),
+                "organs_used": [],
+                "timestamp": asyncio.get_event_loop().time(),
             }
 
     def get_cell(self, name: str) -> Optional[Any]:
@@ -147,6 +152,7 @@ class BorgPhenotype:
     def list_organs(self) -> List[str]:
         """List all organ names."""
         return list(self.organs.keys())
+
 
 class PhenotypeBuilder:
     """Builds executable phenotypes from DNA."""
@@ -196,7 +202,9 @@ class PhenotypeBuilder:
             phenotype.is_built = True
             phenotype.build_timestamp = asyncio.get_event_loop().time()
 
-            logger.info(f"Successfully built phenotype with {len(phenotype.cells)} cells and {len(phenotype.organs)} organs")
+            logger.info(
+                f"Successfully built phenotype with {len(phenotype.cells)} cells and {len(phenotype.organs)} organs"
+            )
             return phenotype
 
         except Exception as e:
@@ -216,14 +224,18 @@ class PhenotypeBuilder:
 
                 # Inject available organs into the cell
                 organ_names = [organ.name for organ in phenotype.dna.organs]
-                await self._inject_organs_into_cell(cell_instance, organ_names, phenotype.dna.header.service_index)
+                await self._inject_organs_into_cell(
+                    cell_instance, organ_names, phenotype.dna.header.service_index
+                )
 
                 phenotype.cells[cell.name] = cell_instance
-                logger.debug(f"Built cell: {cell.name} with {len(organ_names)} organs injected")
+                logger.debug(
+                    f"Built cell: {cell.name} with {len(organ_names)} organs injected"
+                )
             except Exception as e:
                 raise PhenotypeBuildError(
                     phenotype.dna.header.service_index,
-                    f"Failed to build cell '{cell.name}': {e}"
+                    f"Failed to build cell '{cell.name}': {e}",
                 )
 
     async def _build_cell(self, cell: Cell) -> Any:
@@ -238,15 +250,15 @@ class PhenotypeBuilder:
         """
         # Map logic types to agent types
         agent_type_map = {
-            'rag_agent': 'rag',
-            'document_agent': 'document',
-            'decision_maker': 'custom',
-            'data_processor': 'custom'
+            "rag_agent": "rag",
+            "document_agent": "document",
+            "decision_maker": "custom",
+            "data_processor": "custom",
         }
 
-        agent_type = agent_type_map.get(cell.logic_type, 'custom')
+        agent_type = agent_type_map.get(cell.logic_type, "custom")
 
-        if agent_type == 'custom':
+        if agent_type == "custom":
             # For custom logic types, create a basic agent
             return await self._create_custom_cell(cell)
         else:
@@ -264,6 +276,7 @@ class PhenotypeBuilder:
         Returns:
             Cell instance
         """
+
         # This would create a wrapper around Archon agent
         # For now, return a placeholder
         class ArchonCell:
@@ -275,9 +288,7 @@ class PhenotypeBuilder:
             async def execute(self, task: str) -> Dict[str, Any]:
                 # Call Archon agent
                 return await self.adapter.run_agent(
-                    agent_type=self.agent_type,
-                    prompt=task,
-                    context=self.parameters
+                    agent_type=self.agent_type, prompt=task, context=self.parameters
                 )
 
         return ArchonCell(cell.name, agent_type, cell.parameters)
@@ -293,14 +304,16 @@ class PhenotypeBuilder:
             Custom cell instance
         """
         # Create custom cell based on logic type
-        if cell.logic_type == 'decision_maker':
+        if cell.logic_type == "decision_maker":
             return await self._create_decision_maker_cell(cell)
-        elif cell.logic_type == 'data_processor':
+        elif cell.logic_type == "data_processor":
             return await self._create_data_processor_cell(cell)
         else:
             # Generic custom cell
             class CustomCell:
-                def __init__(self, name: str, logic_type: str, parameters: Dict[str, Any]):
+                def __init__(
+                    self, name: str, logic_type: str, parameters: Dict[str, Any]
+                ):
                     self.name = name
                     self.logic_type = logic_type
                     self.parameters = parameters
@@ -308,17 +321,23 @@ class PhenotypeBuilder:
                 async def execute(self, task: str) -> Dict[str, Any]:
                     # Use RagAgent for custom cells
                     return await self.adapter.run_agent(
-                        agent_type='rag',
+                        agent_type="rag",
                         prompt=f"Execute as {self.logic_type}: {task}",
-                        context=self.parameters
+                        context=self.parameters,
                     )
 
             return CustomCell(cell.name, cell.logic_type, cell.parameters)
 
     async def _create_decision_maker_cell(self, cell: Cell) -> Any:
         """Create decision maker cell with actual logic."""
+
         class DecisionMakerCell:
-            def __init__(self, name: str, parameters: Dict[str, Any], adapter: ArchonServiceAdapter):
+            def __init__(
+                self,
+                name: str,
+                parameters: Dict[str, Any],
+                adapter: ArchonServiceAdapter,
+            ):
                 self.name = name
                 self.parameters = parameters
                 self.adapter = adapter
@@ -327,7 +346,7 @@ class PhenotypeBuilder:
                 """Execute decision making logic using Archon agents."""
                 try:
                     # Enhanced decision making prompt
-                    strategy = self.parameters.get('strategy', 'utility_maximization')
+                    strategy = self.parameters.get("strategy", "utility_maximization")
                     prompt = f"""As a decision maker using {strategy} strategy, analyze and make a decision about:
 
 {task}
@@ -343,36 +362,42 @@ Provide a clear decision with reasoning."""
 
                     # Use Archon agent for decision making
                     result = await self.adapter.run_agent(
-                        agent_type='rag',
+                        agent_type="rag",
                         prompt=prompt,
                         context={
-                            'strategy': strategy,
-                            'model': self.parameters.get('model', 'gpt-4'),
-                            'max_tokens': self.parameters.get('max_tokens', 500)
-                        }
+                            "strategy": strategy,
+                            "model": self.parameters.get("model", "gpt-4"),
+                            "max_tokens": self.parameters.get("max_tokens", 500),
+                        },
                     )
 
                     return {
-                        'cell_type': 'decision_maker',
-                        'decision': result.get('response', result),
-                        'strategy_used': strategy,
-                        'timestamp': asyncio.get_event_loop().time()
+                        "cell_type": "decision_maker",
+                        "decision": result.get("response", result),
+                        "strategy_used": strategy,
+                        "timestamp": asyncio.get_event_loop().time(),
                     }
 
                 except Exception as e:
                     logger.error(f"Decision maker execution failed: {e}")
                     return {
-                        'cell_type': 'decision_maker',
-                        'error': str(e),
-                        'fallback_decision': 'Unable to make decision due to system error'
+                        "cell_type": "decision_maker",
+                        "error": str(e),
+                        "fallback_decision": "Unable to make decision due to system error",
                     }
 
         return DecisionMakerCell(cell.name, cell.parameters, self.adapter)
 
     async def _create_data_processor_cell(self, cell: Cell) -> Any:
         """Create data processor cell with actual logic."""
+
         class DataProcessorCell:
-            def __init__(self, name: str, parameters: Dict[str, Any], adapter: ArchonServiceAdapter):
+            def __init__(
+                self,
+                name: str,
+                parameters: Dict[str, Any],
+                adapter: ArchonServiceAdapter,
+            ):
                 self.name = name
                 self.parameters = parameters
                 self.adapter = adapter
@@ -396,33 +421,35 @@ Be thorough but concise in your analysis."""
 
                     # Use document agent for data processing
                     result = await self.adapter.run_agent(
-                        agent_type='document',
+                        agent_type="document",
                         prompt=prompt,
                         context={
-                            'model': self.parameters.get('model', 'gpt-4'),
-                            'max_tokens': self.parameters.get('max_tokens', 500),
-                            'processing_type': 'analysis'
-                        }
+                            "model": self.parameters.get("model", "gpt-4"),
+                            "max_tokens": self.parameters.get("max_tokens", 500),
+                            "processing_type": "analysis",
+                        },
                     )
 
                     return {
-                        'cell_type': 'data_processor',
-                        'processed_data': result.get('response', result),
-                        'insights': [],  # Would be extracted from result
-                        'timestamp': asyncio.get_event_loop().time()
+                        "cell_type": "data_processor",
+                        "processed_data": result.get("response", result),
+                        "insights": [],  # Would be extracted from result
+                        "timestamp": asyncio.get_event_loop().time(),
                     }
 
                 except Exception as e:
                     logger.error(f"Data processor execution failed: {e}")
                     return {
-                        'cell_type': 'data_processor',
-                        'error': str(e),
-                        'fallback_result': 'Unable to process data due to system error'
+                        "cell_type": "data_processor",
+                        "error": str(e),
+                        "fallback_result": "Unable to process data due to system error",
                     }
 
         return DataProcessorCell(cell.name, cell.parameters, self.adapter)
 
-    async def _inject_organs_into_cell(self, cell_instance, organ_names: List[str], borg_id: str):
+    async def _inject_organs_into_cell(
+        self, cell_instance, organ_names: List[str], borg_id: str
+    ):
         """
         Inject organ callables into a cell instance for seamless integration.
 
@@ -440,7 +467,7 @@ Be thorough but concise in your analysis."""
         for organ_name in organ_names:
             # Find the organ definition in current DNA
             organ_def = None
-            if hasattr(self, '_current_dna') and self._current_dna:
+            if hasattr(self, "_current_dna") and self._current_dna:
                 for organ in self._current_dna.organs:
                     if organ.name == organ_name:
                         organ_def = organ
@@ -452,10 +479,12 @@ Be thorough but concise in your analysis."""
                         organ_name=organ_name,
                         mcp_tool=organ_def.mcp_tool,
                         endpoint=organ_def.url,
-                        borg_id=borg_id
+                        borg_id=borg_id,
                     )
                     injected_organs[organ_name] = organ_callable
-                    logger.debug(f"Injected organ {organ_name} into cell {getattr(cell_instance, 'name', 'unknown')}")
+                    logger.debug(
+                        f"Injected organ {organ_name} into cell {getattr(cell_instance, 'name', 'unknown')}"
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to inject organ {organ_name}: {e}")
                     # Continue with other organs even if one fails
@@ -478,6 +507,7 @@ Be thorough but concise in your analysis."""
         Returns:
             Callable that allows easy organ invocation
         """
+
         async def call_organ(organ_name: str, **kwargs):
             """Call an organ by name with parameters."""
             if organ_name not in cell_instance.organs:
@@ -498,7 +528,7 @@ Be thorough but concise in your analysis."""
             except Exception as e:
                 raise PhenotypeBuildError(
                     phenotype.dna.header.service_index,
-                    f"Failed to register organ '{organ.name}': {e}"
+                    f"Failed to register organ '{organ.name}': {e}",
                 )
 
     async def _register_organ(self, organ: Organ) -> Callable:
@@ -519,7 +549,9 @@ Be thorough but concise in your analysis."""
             organ_name=organ.name,
             mcp_tool=organ.mcp_tool,
             endpoint=organ.url,
-            borg_id=getattr(self, '_current_borg_id', organ.name)  # Use organ name as fallback borg_id
+            borg_id=getattr(
+                self, "_current_borg_id", organ.name
+            ),  # Use organ name as fallback borg_id
         )
 
         # Store metadata on callable
@@ -548,7 +580,7 @@ Be thorough but concise in your analysis."""
 
         # Check cell validity
         for name, cell in phenotype.cells.items():
-            if not hasattr(cell, 'execute'):
+            if not hasattr(cell, "execute"):
                 errors.append(f"Cell '{name}' missing execute method")
 
         # Check organ validity
@@ -563,10 +595,12 @@ Be thorough but concise in your analysis."""
         if errors:
             raise PhenotypeBuildError(
                 phenotype.dna.header.service_index,
-                f"Phenotype validation failed: {'; '.join(errors)}"
+                f"Phenotype validation failed: {'; '.join(errors)}",
             )
 
-    async def rebuild_phenotype(self, phenotype: BorgPhenotype, dna_updates: Dict[str, Any]) -> BorgPhenotype:
+    async def rebuild_phenotype(
+        self, phenotype: BorgPhenotype, dna_updates: Dict[str, Any]
+    ) -> BorgPhenotype:
         """
         Rebuild phenotype with DNA updates (for evolution).
 
@@ -584,10 +618,7 @@ Be thorough but concise in your analysis."""
         return await self.build(updated_dna)
 
     async def _calculate_task_cost(
-        self,
-        result: Dict[str, Any],
-        execution_time: float,
-        wealth: Optional[float]
+        self, result: Dict[str, Any], execution_time: float, wealth: Optional[float]
     ) -> Dict[str, Any]:
         """
         Calculate task execution cost based on organs used and time.
@@ -602,15 +633,15 @@ Be thorough but concise in your analysis."""
         """
         from decimal import Decimal
 
-        total_cost = Decimal('0')
+        total_cost = Decimal("0")
         organ_costs = {}
 
         # Calculate costs for organs used during execution
-        organs_used = result.get('organs_used', [])
+        organs_used = result.get("organs_used", [])
         for organ_name in organs_used:
             # Get organ price cap from current DNA if available
-            price_cap = Decimal('0.001')  # Default fallback
-            if hasattr(self, '_current_dna') and self._current_dna:
+            price_cap = Decimal("0.001")  # Default fallback
+            if hasattr(self, "_current_dna") and self._current_dna:
                 for organ in self._current_dna.organs:
                     if organ.name == organ_name:
                         price_cap = Decimal(str(organ.price_cap))
@@ -621,29 +652,29 @@ Be thorough but concise in your analysis."""
             total_cost += price_cap
 
         # Add base execution cost (time-based)
-        base_execution_cost = Decimal('0.0001') * Decimal(str(execution_time))
+        base_execution_cost = Decimal("0.0001") * Decimal(str(execution_time))
         total_cost += base_execution_cost
 
         # Calculate cell costs from current DNA
         cell_costs = {}
-        if hasattr(self, '_current_dna') and self._current_dna:
+        if hasattr(self, "_current_dna") and self._current_dna:
             for cell in self._current_dna.cells:
                 cell_costs[cell.name] = Decimal(str(cell.cost_estimate))
                 total_cost += cell_costs[cell.name]
 
         cost_info = {
-            'total_cost': str(total_cost),
-            'organ_costs': {k: str(v) for k, v in organ_costs.items()},
-            'cell_costs': {k: str(v) for k, v in cell_costs.items()},
-            'execution_cost': str(base_execution_cost),
-            'execution_time': execution_time,
-            'currency': 'DOT',
-            'wealth_sufficient': wealth is None or float(wealth) >= float(total_cost),
-            'cost_breakdown': {
-                'organs': str(sum(Decimal(str(v)) for v in organ_costs.values())),
-                'cells': str(sum(Decimal(str(v)) for v in cell_costs.values())),
-                'execution': str(base_execution_cost)
-            }
+            "total_cost": str(total_cost),
+            "organ_costs": {k: str(v) for k, v in organ_costs.items()},
+            "cell_costs": {k: str(v) for k, v in cell_costs.items()},
+            "execution_cost": str(base_execution_cost),
+            "execution_time": execution_time,
+            "currency": "DOT",
+            "wealth_sufficient": wealth is None or float(wealth) >= float(total_cost),
+            "cost_breakdown": {
+                "organs": str(sum(Decimal(str(v)) for v in organ_costs.values())),
+                "cells": str(sum(Decimal(str(v)) for v in cell_costs.values())),
+                "execution": str(base_execution_cost),
+            },
         }
 
         return cost_info
@@ -663,7 +694,7 @@ Be thorough but concise in your analysis."""
         # Set high precision for DOT calculations
         getcontext().prec = 10
 
-        total_cost = Decimal('0')
+        total_cost = Decimal("0")
         cell_costs = {}
         organ_costs = {}
 
@@ -680,19 +711,19 @@ Be thorough but concise in your analysis."""
             total_cost += organ_cost
 
         # Add base phenotype maintenance cost
-        base_cost = Decimal('0.001')  # Fixed cost per phenotype
+        base_cost = Decimal("0.001")  # Fixed cost per phenotype
         total_cost += base_cost
 
         return {
-            'total_cost': str(total_cost),
-            'cell_costs': {k: str(v) for k, v in cell_costs.items()},
-            'organ_costs': {k: str(v) for k, v in organ_costs.items()},
-            'base_cost': str(base_cost),
-            'currency': 'DOT',
-            'cost_breakdown': {
-                'cells': str(sum(Decimal(str(v)) for v in cell_costs.values())),
-                'organs': str(sum(Decimal(str(v)) for v in organ_costs.values())),
-                'base': str(base_cost)
+            "total_cost": str(total_cost),
+            "cell_costs": {k: str(v) for k, v in cell_costs.items()},
+            "organ_costs": {k: str(v) for k, v in organ_costs.items()},
+            "base_cost": str(base_cost),
+            "currency": "DOT",
+            "cost_breakdown": {
+                "cells": str(sum(Decimal(str(v)) for v in cell_costs.values())),
+                "organs": str(sum(Decimal(str(v)) for v in organ_costs.values())),
+                "base": str(base_cost),
             },
-            'decimal_precision': getcontext().prec
+            "decimal_precision": getcontext().prec,
         }

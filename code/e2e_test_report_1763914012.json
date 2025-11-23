@@ -1,0 +1,85 @@
+{
+  "summary": {
+    "total_tests": 5,
+    "successful_tests": 0,
+    "failed_tests": 5,
+    "success_rate_percent": 0.0,
+    "total_execution_time_seconds": 0.0,
+    "avg_execution_time_seconds": 0.0,
+    "dna_integrity_rate_percent": 0.0,
+    "economic_accuracy_rate_percent": 0.0
+  },
+  "results": [
+    {
+      "borg_id": "e2e_test_basic_funding_task_1763914011974",
+      "scenario": "basic_funding_task",
+      "success": false,
+      "execution_time": 0.00034165382385253906,
+      "dna_integrity": false,
+      "economic_accuracy": false,
+      "errors": [
+        "object NoneType can't be used in 'await' expression"
+      ]
+    },
+    {
+      "borg_id": "e2e_test_complex_analysis_task_1763914012075",
+      "scenario": "complex_analysis_task",
+      "success": false,
+      "execution_time": 2.574920654296875e-05,
+      "dna_integrity": false,
+      "economic_accuracy": false,
+      "errors": [
+        "object NoneType can't be used in 'await' expression"
+      ]
+    },
+    {
+      "borg_id": "e2e_test_research_task_1763914012175",
+      "scenario": "research_task",
+      "success": false,
+      "execution_time": 2.7179718017578125e-05,
+      "dna_integrity": false,
+      "economic_accuracy": false,
+      "errors": [
+        "object NoneType can't be used in 'await' expression"
+      ]
+    },
+    {
+      "borg_id": "e2e_test_decision_task_1763914012275",
+      "scenario": "decision_task",
+      "success": false,
+      "execution_time": 1.6927719116210938e-05,
+      "dna_integrity": false,
+      "economic_accuracy": false,
+      "errors": [
+        "object NoneType can't be used in 'await' expression"
+      ]
+    },
+    {
+      "borg_id": "e2e_test_comprehensive_task_1763914012376",
+      "scenario": "comprehensive_task",
+      "success": false,
+      "execution_time": 1.5020370483398438e-05,
+      "dna_integrity": false,
+      "economic_accuracy": false,
+      "errors": [
+        "object NoneType can't be used in 'await' expression"
+      ]
+    }
+  ],
+  "validation_status": {
+    "all_5_scenarios_executed": true,
+    "dna_roundtrip_integrity_maintained": false,
+    "economic_accuracy_within_0_001_dot": false,
+    "execution_under_5_minutes": true,
+    "no_service_crashes": false,
+    "comprehensive_error_reporting": true
+  },
+  "prp_success_criteria": {
+    "all_5_core_demo_scenarios_execute_successfully": false,
+    "dna_round_trip_integrity_maintained": false,
+    "economic_calculations_accurate_within_0_001_dot": false,
+    "test_execution_completes_within_5_minutes": true,
+    "no_service_crashes_or_hangs": false,
+    "comprehensive_error_reporting_for_failures": true
+  }
+}

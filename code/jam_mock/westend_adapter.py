@@ -5,17 +5,19 @@ Provides real blockchain integration with Kusama testnet for Phase 1 validation.
 Uses system.remark extrinsics to store DNA hashes on-chain.
 """
 
-import time
 import asyncio
-from typing import Dict, Any, Optional, Tuple, List
-from decimal import Decimal
-import httpx
 import json
 import ssl
-from substrateinterface import SubstrateInterface, Keypair
+import time
+from decimal import Decimal
+from typing import Any, Dict, List, Optional, Tuple
+
+import httpx
+from substrateinterface import Keypair, SubstrateInterface
+
 from .interface import JAMInterface, JAMMode
-from .ssl_utils import SSLUtils
 from .keypair_manager import KeypairManager
+from .ssl_utils import SSLUtils
 
 
 class WestendAdapter(JAMInterface):
@@ -26,7 +28,12 @@ class WestendAdapter(JAMInterface):
     Provides verifiable proof of concept for on-chain DNA storage.
     """
 
-    def __init__(self, rpc_url: str, keypair: Optional[Keypair] = None, connect_immediately: bool = True):
+    def __init__(
+        self,
+        rpc_url: str,
+        keypair: Optional[Keypair] = None,
+        connect_immediately: bool = True,
+    ):
         """
         Initialize Kusama adapter.
 
@@ -43,13 +50,15 @@ class WestendAdapter(JAMInterface):
         self.keypair_manager = KeypairManager()
 
         # Dual-currency wealth tracking for Phase 2A
-        self.wealth_cache: Dict[str, Dict[str, Decimal]] = {}  # borg_id -> {currency: balance}
+        self.wealth_cache: Dict[str, Dict[str, Decimal]] = (
+            {}
+        )  # borg_id -> {currency: balance}
         self.transaction_cache: Dict[str, list] = {}
 
         # Block scanning configuration
         self.max_scan_blocks = 1000  # Maximum blocks to scan in one operation
-        self.scan_batch_size = 10    # Blocks to scan per batch
-        self.scan_delay = 0.1        # Delay between batches to avoid rate limiting
+        self.scan_batch_size = 10  # Blocks to scan per batch
+        self.scan_delay = 0.1  # Delay between batches to avoid rate limiting
 
         # Transaction cache for faster lookups
         self.tx_cache: Dict[str, Dict[str, Any]] = {}  # tx_hash -> tx_data
@@ -62,7 +71,7 @@ class WestendAdapter(JAMInterface):
 
         # Rate limiting configuration
         self.rate_limit_requests = 10  # requests per window
-        self.rate_limit_window = 60    # window in seconds
+        self.rate_limit_window = 60  # window in seconds
         self.request_history: List[float] = []  # timestamps of recent requests
 
         # Multi-endpoint configuration - prioritize working endpoints
@@ -84,28 +93,30 @@ class WestendAdapter(JAMInterface):
             for endpoint in self.endpoints:
                 try:
                     print(f"🔌 Attempting connection to {endpoint}...")
-                    
+
                     # Try without custom SSL context first (let substrate-interface handle it)
                     self.substrate = SubstrateInterface(
                         url=endpoint,
                         ss58_format=42,  # Westend address format
                         # Let substrate-interface use its own SSL handling
                     )
-                    
+
                     # Test the connection with proper API call
                     chain_name = self.substrate.chain
-                    block_num = self.substrate.get_block_number(None)  # Pass None for latest block
-                    
+                    block_num = self.substrate.get_block_number(
+                        None
+                    )  # Pass None for latest block
+
                     print(f"✅ Connected to Westend via {endpoint}")
                     print(f"   Chain: {chain_name}, Block: {block_num}")
                     self.rpc_url = endpoint  # Update to working endpoint
                     break
-                    
+
                 except Exception as e:
                     print(f"❌ Failed to connect to {endpoint}: {e}")
                     self.substrate = None
                     continue
-            
+
             if not self.substrate:
                 print("⚠️  WARNING: All Westend endpoints failed")
                 print("⚠️  Demo will run in offline mode (Steps 1-3 only)")
@@ -115,11 +126,12 @@ class WestendAdapter(JAMInterface):
         """Initialize HTTP client for fallback operations."""
         if self.http_client is None:
             self.http_client = httpx.AsyncClient(
-                timeout=self.http_timeout,
-                headers={'Content-Type': 'application/json'}
+                timeout=self.http_timeout, headers={"Content-Type": "application/json"}
             )
 
-    async def _make_http_request(self, method: str, params: List[Any] = None) -> Optional[Dict[str, Any]]:
+    async def _make_http_request(
+        self, method: str, params: List[Any] = None
+    ) -> Optional[Dict[str, Any]]:
         """
         Make HTTP JSON-RPC request with retry logic and rate limiting.
 
@@ -143,13 +155,15 @@ class WestendAdapter(JAMInterface):
             "jsonrpc": "2.0",
             "id": request_id,
             "method": method,
-            "params": params or []
+            "params": params or [],
         }
 
         # Try each endpoint with retries
         for endpoint_index in range(len(self.endpoints)):
             endpoint = self.endpoints[endpoint_index]
-            http_url = endpoint.replace('wss://', 'https://').replace('ws://', 'http://')
+            http_url = endpoint.replace("wss://", "https://").replace(
+                "ws://", "http://"
+            )
 
             for attempt in range(self.retry_attempts):
                 try:
@@ -159,24 +173,26 @@ class WestendAdapter(JAMInterface):
                     response = await self.http_client.post(
                         http_url,
                         json=payload,
-                        headers={'Content-Type': 'application/json'}
+                        headers={"Content-Type": "application/json"},
                     )
 
                     if response.status_code == 200:
                         result = response.json()
-                        if 'error' not in result:
-                            return result.get('result')
+                        if "error" not in result:
+                            return result.get("result")
                         else:
                             print(f"RPC error: {result['error']}")
                     else:
                         print(f"HTTP error {response.status_code}: {response.text}")
 
                 except Exception as e:
-                    print(f"HTTP request attempt {attempt + 1} failed for {http_url}: {e}")
+                    print(
+                        f"HTTP request attempt {attempt + 1} failed for {http_url}: {e}"
+                    )
 
                     if attempt < self.retry_attempts - 1:
                         # Exponential backoff
-                        delay = self.retry_backoff * (2 ** attempt)
+                        delay = self.retry_backoff * (2**attempt)
                         await asyncio.sleep(delay)
 
             # Try next endpoint if this one failed
@@ -210,10 +226,14 @@ class WestendAdapter(JAMInterface):
         """
         # Simple round-robin for now - could be enhanced with health checks
         endpoint = self.endpoints[self.current_endpoint_index]
-        self.current_endpoint_index = (self.current_endpoint_index + 1) % len(self.endpoints)
+        self.current_endpoint_index = (self.current_endpoint_index + 1) % len(
+            self.endpoints
+        )
         return endpoint
 
-    async def store_dna_hash(self, borg_id: str, dna_hash: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def store_dna_hash(
+        self, borg_id: str, dna_hash: str, metadata: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Store DNA hash on Kusama using system.remark extrinsic.
 
@@ -234,41 +254,39 @@ class WestendAdapter(JAMInterface):
             # Create and sign extrinsic
             extrinsic = self.substrate.create_signed_extrinsic(
                 call=self.substrate.compose_call(
-                    call_module='System',
-                    call_function='remark',
-                    call_params={'remark': remark_data.encode('utf-8')}
+                    call_module="System",
+                    call_function="remark",
+                    call_params={"remark": remark_data.encode("utf-8")},
                 ),
-                keypair=self.keypair
+                keypair=self.keypair,
             )
 
             # Submit and wait for inclusion
-            receipt = self.substrate.submit_extrinsic(extrinsic, wait_for_inclusion=True)
+            receipt = self.substrate.submit_extrinsic(
+                extrinsic, wait_for_inclusion=True
+            )
 
             if receipt.is_success:
                 # Calculate mock gas cost (simplified)
-                gas_cost = Decimal('0.001')  # Fixed cost for Phase 1
-    
+                gas_cost = Decimal("0.001")  # Fixed cost for Phase 1
+
                 return {
-                    'success': True,
-                    'block': receipt.block_hash,
-                    'transaction_hash': receipt.extrinsic_hash,
-                    'cost': gas_cost,
-                    'timestamp': time.time(),
-                    'westend_block_number': receipt.block_number
+                    "success": True,
+                    "block": receipt.block_hash,
+                    "transaction_hash": receipt.extrinsic_hash,
+                    "cost": gas_cost,
+                    "timestamp": time.time(),
+                    "westend_block_number": receipt.block_number,
                 }
             else:
                 return {
-                    'success': False,
-                    'error': f"Transaction failed: {receipt.error_message}",
-                    'cost': Decimal('0')
+                    "success": False,
+                    "error": f"Transaction failed: {receipt.error_message}",
+                    "cost": Decimal("0"),
                 }
 
         except Exception as e:
-            return {
-                'success': False,
-                'error': str(e),
-                'cost': Decimal('0')
-            }
+            return {"success": False, "error": str(e), "cost": Decimal("0")}
 
     async def retrieve_dna_hash(self, borg_id: str) -> Optional[str]:
         """
@@ -288,14 +306,18 @@ class WestendAdapter(JAMInterface):
             scan_range = min(self.max_scan_blocks, current_block)
             start_block = max(0, current_block - scan_range)
 
-            dna_hash = await self._scan_blocks_for_dna_hash(borg_id, start_block, current_block)
+            dna_hash = await self._scan_blocks_for_dna_hash(
+                borg_id, start_block, current_block
+            )
             return dna_hash
 
         except Exception as e:
             print(f"Error retrieving DNA hash for {borg_id}: {e}")
             return None
 
-    async def _scan_blocks_for_dna_hash(self, borg_id: str, start_block: int, end_block: int) -> Optional[str]:
+    async def _scan_blocks_for_dna_hash(
+        self, borg_id: str, start_block: int, end_block: int
+    ) -> Optional[str]:
         """
         Scan block range for DNA hash in system.remark extrinsics.
         """
@@ -306,7 +328,9 @@ class WestendAdapter(JAMInterface):
             # Scan this batch of blocks
             for block_number in range(batch_start, batch_end + 1):
                 try:
-                    dna_hash = await self._scan_single_block_for_dna_hash(borg_id, block_number)
+                    dna_hash = await self._scan_single_block_for_dna_hash(
+                        borg_id, block_number
+                    )
                     if dna_hash:
                         return dna_hash
 
@@ -319,7 +343,9 @@ class WestendAdapter(JAMInterface):
 
         return None
 
-    async def _scan_single_block_for_dna_hash(self, borg_id: str, block_number: int) -> Optional[str]:
+    async def _scan_single_block_for_dna_hash(
+        self, borg_id: str, block_number: int
+    ) -> Optional[str]:
         """
         Scan a single block for BORGLIFE system.remark extrinsics.
         """
@@ -327,11 +353,11 @@ class WestendAdapter(JAMInterface):
             # Get block data
             block = self.substrate.get_block(block_number=block_number)
 
-            if not block or 'extrinsics' not in block:
+            if not block or "extrinsics" not in block:
                 return None
 
             # Check each extrinsic in the block
-            for extrinsic in block['extrinsics']:
+            for extrinsic in block["extrinsics"]:
                 dna_hash = self._extract_dna_hash_from_extrinsic(extrinsic, borg_id)
                 if dna_hash:
                     return dna_hash
@@ -341,30 +367,36 @@ class WestendAdapter(JAMInterface):
 
         return None
 
-    def _extract_dna_hash_from_extrinsic(self, extrinsic: Dict[str, Any], borg_id: str) -> Optional[str]:
+    def _extract_dna_hash_from_extrinsic(
+        self, extrinsic: Dict[str, Any], borg_id: str
+    ) -> Optional[str]:
         """
         Extract DNA hash from a system.remark extrinsic if it matches our format.
         """
         try:
             # Check if this is a system.remark extrinsic
-            if (extrinsic.get('call', {}).get('call_module') == 'System' and
-                extrinsic.get('call', {}).get('call_function') == 'remark'):
+            if (
+                extrinsic.get("call", {}).get("call_module") == "System"
+                and extrinsic.get("call", {}).get("call_function") == "remark"
+            ):
 
                 # Get the remark data
-                remark_bytes = extrinsic['call']['call_args']['remark']
+                remark_bytes = extrinsic["call"]["call_args"]["remark"]
                 if isinstance(remark_bytes, str):
                     remark_data = remark_bytes
                 else:
-                    remark_data = bytes(remark_bytes).decode('utf-8', errors='ignore')
+                    remark_data = bytes(remark_bytes).decode("utf-8", errors="ignore")
 
                 # Check if it starts with our BORGLIFE prefix
-                if remark_data.startswith('BORGLIFE:'):
-                    parts = remark_data.split(':')
+                if remark_data.startswith("BORGLIFE:"):
+                    parts = remark_data.split(":")
                     if len(parts) >= 3 and parts[1] == borg_id:
                         # Extract DNA hash (parts[2])
                         dna_hash = parts[2]
                         # Validate it's a proper hash (64 characters, hex)
-                        if len(dna_hash) == 64 and all(c in '0123456789abcdefABCDEF' for c in dna_hash):
+                        if len(dna_hash) == 64 and all(
+                            c in "0123456789abcdefABCDEF" for c in dna_hash
+                        ):
                             return dna_hash
 
         except Exception as e:
@@ -394,13 +426,13 @@ class WestendAdapter(JAMInterface):
 
             if receipt:
                 tx_data = {
-                    'hash': tx_hash,
-                    'block_number': receipt.block_number,
-                    'block_hash': receipt.block_hash,
-                    'success': receipt.is_success,
-                    'timestamp': time.time(),  # Approximate
-                    'fee': getattr(receipt, 'fee', None),
-                    'borg_data': self._extract_borg_data_from_receipt(receipt)
+                    "hash": tx_hash,
+                    "block_number": receipt.block_number,
+                    "block_hash": receipt.block_hash,
+                    "success": receipt.is_success,
+                    "timestamp": time.time(),  # Approximate
+                    "fee": getattr(receipt, "fee", None),
+                    "borg_data": self._extract_borg_data_from_receipt(receipt),
                 }
 
                 # Cache the result
@@ -418,7 +450,7 @@ class WestendAdapter(JAMInterface):
         """
         try:
             # Get the extrinsic data
-            if hasattr(receipt, 'extrinsic'):
+            if hasattr(receipt, "extrinsic"):
                 extrinsic = receipt.extrinsic
                 borg_data = self._extract_dna_data_from_extrinsic(extrinsic.value)
                 return borg_data
@@ -427,28 +459,32 @@ class WestendAdapter(JAMInterface):
 
         return None
 
-    def _extract_dna_data_from_extrinsic(self, extrinsic_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _extract_dna_data_from_extrinsic(
+        self, extrinsic_data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """
         Extract DNA-related data from extrinsic.
         """
         try:
             # Check if this is a system.remark with BORGLIFE data
-            if (extrinsic_data.get('call', {}).get('call_module') == 'System' and
-                extrinsic_data.get('call', {}).get('call_function') == 'remark'):
+            if (
+                extrinsic_data.get("call", {}).get("call_module") == "System"
+                and extrinsic_data.get("call", {}).get("call_function") == "remark"
+            ):
 
-                remark_bytes = extrinsic_data['call']['call_args']['remark']
+                remark_bytes = extrinsic_data["call"]["call_args"]["remark"]
                 if isinstance(remark_bytes, str):
                     remark_data = remark_bytes
                 else:
-                    remark_data = bytes(remark_bytes).decode('utf-8', errors='ignore')
+                    remark_data = bytes(remark_bytes).decode("utf-8", errors="ignore")
 
-                if remark_data.startswith('BORGLIFE:'):
-                    parts = remark_data.split(':')
+                if remark_data.startswith("BORGLIFE:"):
+                    parts = remark_data.split(":")
                     if len(parts) >= 3:
                         return {
-                            'borg_id': parts[1],
-                            'dna_hash': parts[2],
-                            'metadata': parts[3] if len(parts) > 3 else None
+                            "borg_id": parts[1],
+                            "dna_hash": parts[2],
+                            "metadata": parts[3] if len(parts) > 3 else None,
                         }
 
         except Exception as e:
@@ -456,7 +492,9 @@ class WestendAdapter(JAMInterface):
 
         return None
 
-    async def scan_block_range_for_borgs(self, start_block: int, end_block: int) -> List[Dict[str, Any]]:
+    async def scan_block_range_for_borgs(
+        self, start_block: int, end_block: int
+    ) -> List[Dict[str, Any]]:
         """
         Scan a range of blocks for all BORGLIFE transactions.
         """
@@ -467,11 +505,15 @@ class WestendAdapter(JAMInterface):
             max_range = min(end_block - start_block + 1, self.max_scan_blocks)
             actual_end_block = start_block + max_range - 1
 
-            print(f"Scanning blocks {start_block} to {actual_end_block} for BORGLIFE transactions...")
+            print(
+                f"Scanning blocks {start_block} to {actual_end_block} for BORGLIFE transactions..."
+            )
 
             for block_number in range(start_block, actual_end_block + 1):
                 try:
-                    block_borgs = await self._scan_single_block_for_all_borgs(block_number)
+                    block_borgs = await self._scan_single_block_for_all_borgs(
+                        block_number
+                    )
                     borg_transactions.extend(block_borgs)
 
                     # Rate limiting delay
@@ -486,7 +528,9 @@ class WestendAdapter(JAMInterface):
 
         return borg_transactions
 
-    async def _scan_single_block_for_all_borgs(self, block_number: int) -> List[Dict[str, Any]]:
+    async def _scan_single_block_for_all_borgs(
+        self, block_number: int
+    ) -> List[Dict[str, Any]]:
         """
         Scan a single block for all BORGLIFE system.remark extrinsics.
         """
@@ -495,11 +539,13 @@ class WestendAdapter(JAMInterface):
         try:
             block = self.substrate.get_block(block_number=block_number)
 
-            if not block or 'extrinsics' not in block:
+            if not block or "extrinsics" not in block:
                 return borg_data
 
-            for extrinsic in block['extrinsics']:
-                borg_info = self._extract_borg_info_from_extrinsic(extrinsic, block_number)
+            for extrinsic in block["extrinsics"]:
+                borg_info = self._extract_borg_info_from_extrinsic(
+                    extrinsic, block_number
+                )
                 if borg_info:
                     borg_data.append(borg_info)
 
@@ -508,19 +554,21 @@ class WestendAdapter(JAMInterface):
 
         return borg_data
 
-    def _extract_borg_info_from_extrinsic(self, extrinsic: Dict[str, Any], block_number: int) -> Optional[Dict[str, Any]]:
+    def _extract_borg_info_from_extrinsic(
+        self, extrinsic: Dict[str, Any], block_number: int
+    ) -> Optional[Dict[str, Any]]:
         """
         Extract complete borg information from extrinsic.
         """
         dna_data = self._extract_dna_data_from_extrinsic(extrinsic)
         if dna_data:
             return {
-                'block_number': block_number,
-                'borg_id': dna_data['borg_id'],
-                'dna_hash': dna_data['dna_hash'],
-                'metadata': dna_data.get('metadata'),
-                'extrinsic_hash': extrinsic.get('hash'),
-                'timestamp': time.time()  # Approximate
+                "block_number": block_number,
+                "borg_id": dna_data["borg_id"],
+                "dna_hash": dna_data["dna_hash"],
+                "metadata": dna_data.get("metadata"),
+                "extrinsic_hash": extrinsic.get("hash"),
+                "timestamp": time.time(),  # Approximate
             }
         return None
 
@@ -528,19 +576,21 @@ class WestendAdapter(JAMInterface):
         """
         Get wealth balance from cache (Kusama doesn't have native wealth tracking).
         """
-        return self.wealth_cache.get(borg_id, Decimal('0'))
+        return self.wealth_cache.get(borg_id, Decimal("0"))
 
-    async def update_wealth(self, borg_id: str, amount: Decimal, operation: str, description: str) -> bool:
+    async def update_wealth(
+        self, borg_id: str, amount: Decimal, operation: str, description: str
+    ) -> bool:
         """
         Update wealth balance in local cache.
         """
         if borg_id not in self.wealth_cache:
-            self.wealth_cache[borg_id] = Decimal('0')
+            self.wealth_cache[borg_id] = Decimal("0")
 
         # Update balance
-        if operation in ['revenue', 'transfer']:
+        if operation in ["revenue", "transfer"]:
             self.wealth_cache[borg_id] += amount
-        elif operation == 'cost':
+        elif operation == "cost":
             self.wealth_cache[borg_id] -= amount
         else:
             raise ValueError(f"Unknown operation: {operation}")
@@ -550,11 +600,11 @@ class WestendAdapter(JAMInterface):
             self.transaction_cache[borg_id] = []
 
         transaction = {
-            'timestamp': time.time(),
-            'operation': operation,
-            'amount': float(amount),
-            'description': description,
-            'balance_after': float(self.wealth_cache[borg_id])
+            "timestamp": time.time(),
+            "operation": operation,
+            "amount": float(amount),
+            "description": description,
+            "balance_after": float(self.wealth_cache[borg_id]),
         }
 
         self.transaction_cache[borg_id].append(transaction)
@@ -573,51 +623,51 @@ class WestendAdapter(JAMInterface):
         Comprehensive health check for Kusama connectivity and account status.
         """
         base_info = {
-            'mode': self.mode.value,
-            'rpc_url': self.rpc_url,
-            'keypair_configured': self.keypair is not None,
-            'cached_wealth_records': len(self.wealth_cache),
-            'cached_transactions': len(self.tx_cache),
-            'usdb_asset_id': self._get_usdb_asset_id(),
-            'scan_config': {
-                'max_scan_blocks': self.max_scan_blocks,
-                'scan_batch_size': self.scan_batch_size,
-                'scan_delay': self.scan_delay
+            "mode": self.mode.value,
+            "rpc_url": self.rpc_url,
+            "keypair_configured": self.keypair is not None,
+            "cached_wealth_records": len(self.wealth_cache),
+            "cached_transactions": len(self.tx_cache),
+            "usdb_asset_id": self._get_usdb_asset_id(),
+            "scan_config": {
+                "max_scan_blocks": self.max_scan_blocks,
+                "scan_batch_size": self.scan_batch_size,
+                "scan_delay": self.scan_delay,
             },
-            'rate_limit_config': {
-                'requests_per_window': self.rate_limit_requests,
-                'window_seconds': self.rate_limit_window,
-                'current_requests': len(self.request_history)
+            "rate_limit_config": {
+                "requests_per_window": self.rate_limit_requests,
+                "window_seconds": self.rate_limit_window,
+                "current_requests": len(self.request_history),
             },
-            'endpoints': self.endpoints,
-            'current_endpoint_index': self.current_endpoint_index,
-            'ssl_config': {
-                'openssl_version': ssl.OPENSSL_VERSION,
-                'has_tls_1_3': hasattr(ssl, 'PROTOCOL_TLSv1_3'),
-                'max_tls_version': getattr(self.ssl_context, 'maximum_version', None),
-                'min_tls_version': getattr(self.ssl_context, 'minimum_version', None)
-            }
+            "endpoints": self.endpoints,
+            "current_endpoint_index": self.current_endpoint_index,
+            "ssl_config": {
+                "openssl_version": ssl.OPENSSL_VERSION,
+                "has_tls_1_3": hasattr(ssl, "PROTOCOL_TLSv1_3"),
+                "max_tls_version": getattr(self.ssl_context, "maximum_version", None),
+                "min_tls_version": getattr(self.ssl_context, "minimum_version", None),
+            },
         }
 
         # Initialize health check results
         results = {
-            'websocket_connected': False,
-            'rpc_responsive': False,
-            'chain_name': None,
-            'block_number': None,
-            'account_balance': None,
-            'network_congestion': None,
-            **base_info
+            "websocket_connected": False,
+            "rpc_responsive": False,
+            "chain_name": None,
+            "block_number": None,
+            "account_balance": None,
+            "network_congestion": None,
+            **base_info,
         }
 
         if not self.substrate:
-            results['status'] = 'offline'
-            results['error'] = 'No substrate connection'
+            results["status"] = "offline"
+            results["error"] = "No substrate connection"
             return results
 
         try:
             # Check WebSocket connection
-            results['websocket_connected'] = True
+            results["websocket_connected"] = True
 
             # Test RPC responsiveness by getting chain name
             # Note: substrateinterface uses different method names
@@ -627,14 +677,16 @@ class WestendAdapter(JAMInterface):
             except AttributeError:
                 try:
                     # Try querying system properties
-                    chain_name = self.substrate.query("System", "Properties").value['ss58Format']
+                    chain_name = self.substrate.query("System", "Properties").value[
+                        "ss58Format"
+                    ]
                     if not isinstance(chain_name, str):
                         chain_name = "Kusama"  # Default assumption
                 except:
                     chain_name = "Kusama"  # Default for Kusama testnet
 
-            results['rpc_responsive'] = True
-            results['chain_name'] = chain_name
+            results["rpc_responsive"] = True
+            results["chain_name"] = chain_name
 
             # Get current block number
             try:
@@ -646,57 +698,66 @@ class WestendAdapter(JAMInterface):
                 except:
                     block_number = None
 
-            results['block_number'] = block_number
+            results["block_number"] = block_number
 
             # Check account balance if keypair available
             if self.keypair:
                 try:
                     account_info = self.substrate.query(
-                        module='System',
-                        storage_function='Account',
-                        params=[self.keypair.ss58_address]
+                        module="System",
+                        storage_function="Account",
+                        params=[self.keypair.ss58_address],
                     )
-                    balance = account_info.value['data']['free']
+                    balance = account_info.value["data"]["free"]
                     # Convert from smallest unit to KSM (assuming 10^12 decimals)
-                    balance_ksm = float(balance) / (10 ** 12)
-                    results['account_balance'] = f"{balance_ksm:.6f} KSM"
+                    balance_ksm = float(balance) / (10**12)
+                    results["account_balance"] = f"{balance_ksm:.6f} KSM"
                 except Exception as e:
-                    results['account_balance'] = f"Error: {str(e)}"
+                    results["account_balance"] = f"Error: {str(e)}"
 
             # Assess network congestion (simplified - could be enhanced)
             try:
                 # Get recent block times to estimate congestion
                 current_block = self.substrate.get_block(block_number=block_number)
-                prev_block = self.substrate.get_block(block_number=block_number - 1) if block_number > 0 else None
+                prev_block = (
+                    self.substrate.get_block(block_number=block_number - 1)
+                    if block_number > 0
+                    else None
+                )
 
-                if current_block and prev_block and 'extrinsics' in current_block and 'extrinsics' in prev_block:
-                    current_tx_count = len(current_block['extrinsics'])
-                    prev_tx_count = len(prev_block['extrinsics'])
+                if (
+                    current_block
+                    and prev_block
+                    and "extrinsics" in current_block
+                    and "extrinsics" in prev_block
+                ):
+                    current_tx_count = len(current_block["extrinsics"])
+                    prev_tx_count = len(prev_block["extrinsics"])
                     avg_tx_count = (current_tx_count + prev_tx_count) / 2
 
                     # Simple congestion assessment
                     if avg_tx_count > 50:
-                        results['network_congestion'] = 'high'
+                        results["network_congestion"] = "high"
                     elif avg_tx_count > 20:
-                        results['network_congestion'] = 'medium'
+                        results["network_congestion"] = "medium"
                     else:
-                        results['network_congestion'] = 'low'
+                        results["network_congestion"] = "low"
                 else:
-                    results['network_congestion'] = 'unknown'
+                    results["network_congestion"] = "unknown"
             except Exception as e:
-                results['network_congestion'] = f"Error assessing: {str(e)}"
+                results["network_congestion"] = f"Error assessing: {str(e)}"
 
             # Overall status
-            if results['rpc_responsive'] and results['chain_name']:
-                results['status'] = 'healthy'
+            if results["rpc_responsive"] and results["chain_name"]:
+                results["status"] = "healthy"
             else:
-                results['status'] = 'degraded'
+                results["status"] = "degraded"
 
             return results
 
         except Exception as e:
-            results['status'] = 'unhealthy'
-            results['error'] = str(e)
+            results["status"] = "unhealthy"
+            results["error"] = str(e)
             return results
 
     def get_mode(self) -> JAMMode:
@@ -708,17 +769,21 @@ class WestendAdapter(JAMInterface):
         self.mode = mode
         return True
 
-    async def configure_testnet(self, rpc_url: str, keypair_data: Optional[Dict[str, Any]] = None) -> bool:
+    async def configure_testnet(
+        self, rpc_url: str, keypair_data: Optional[Dict[str, Any]] = None
+    ) -> bool:
         """Configure testnet parameters."""
         try:
             self.rpc_url = rpc_url
-            self.substrate = SubstrateInterface(url=rpc_url, ssl_context=self.ssl_context)
+            self.substrate = SubstrateInterface(
+                url=rpc_url, ssl_context=self.ssl_context
+            )
 
             if keypair_data:
-                if 'seed' in keypair_data:
-                    self.set_keypair_from_seed(keypair_data['seed'])
-                elif 'uri' in keypair_data:
-                    self.set_keypair_from_uri(keypair_data['uri'])
+                if "seed" in keypair_data:
+                    self.set_keypair_from_seed(keypair_data["seed"])
+                elif "uri" in keypair_data:
+                    self.set_keypair_from_uri(keypair_data["uri"])
 
             return True
         except Exception as e:
@@ -739,7 +804,9 @@ class WestendAdapter(JAMInterface):
 
     # Phase 2A: Dual-Currency Support Methods
 
-    async def transfer_wnd(self, from_address: str, to_address: str, amount: int) -> Dict[str, Any]:
+    async def transfer_wnd(
+        self, from_address: str, to_address: str, amount: int
+    ) -> Dict[str, Any]:
         """
         Transfer WND tokens between addresses using balances.transfer extrinsic.
 
@@ -752,60 +819,60 @@ class WestendAdapter(JAMInterface):
             Transfer result with success status and transaction details
         """
         if not self.substrate:
-            return {'success': False, 'error': 'No substrate connection'}
+            return {"success": False, "error": "No substrate connection"}
 
         if not self.keypair:
-            return {'success': False, 'error': 'No keypair configured'}
+            return {"success": False, "error": "No keypair configured"}
 
         try:
             # Compose balances.transfer extrinsic
             call = self.substrate.compose_call(
-                call_module='Balances',
-                call_function='transfer_keep_alive',
-                call_params={
-                    'dest': to_address,
-                    'value': amount
-                }
+                call_module="Balances",
+                call_function="transfer_keep_alive",
+                call_params={"dest": to_address, "value": amount},
             )
 
             # Create signed extrinsic
             extrinsic = self.substrate.create_signed_extrinsic(
-                call=call,
-                keypair=self.keypair
+                call=call, keypair=self.keypair
             )
 
             # Submit and wait for inclusion
-            receipt = self.substrate.submit_extrinsic(extrinsic, wait_for_inclusion=True)
+            receipt = self.substrate.submit_extrinsic(
+                extrinsic, wait_for_inclusion=True
+            )
 
             if receipt.is_success:
                 return {
-                    'success': True,
-                    'transaction_hash': receipt.extrinsic_hash,
-                    'block_hash': receipt.block_hash,
-                    'block_number': receipt.block_number,
-                    'from_address': from_address,
-                    'to_address': to_address,
-                    'amount': amount
+                    "success": True,
+                    "transaction_hash": receipt.extrinsic_hash,
+                    "block_hash": receipt.block_hash,
+                    "block_number": receipt.block_number,
+                    "from_address": from_address,
+                    "to_address": to_address,
+                    "amount": amount,
                 }
             else:
                 return {
-                    'success': False,
-                    'error': f'Transfer failed: {receipt.error_message}',
-                    'from_address': from_address,
-                    'to_address': to_address,
-                    'amount': amount
+                    "success": False,
+                    "error": f"Transfer failed: {receipt.error_message}",
+                    "from_address": from_address,
+                    "to_address": to_address,
+                    "amount": amount,
                 }
 
         except Exception as e:
             return {
-                'success': False,
-                'error': str(e),
-                'from_address': from_address,
-                'to_address': to_address,
-                'amount': amount
+                "success": False,
+                "error": str(e),
+                "from_address": from_address,
+                "to_address": to_address,
+                "amount": amount,
             }
 
-    async def transfer_usdb(self, from_address: str, to_address: str, amount: int, asset_id: int) -> Dict[str, Any]:
+    async def transfer_usdb(
+        self, from_address: str, to_address: str, amount: int, asset_id: int
+    ) -> Dict[str, Any]:
         """
         Transfer USDB assets between addresses using assets.transfer extrinsic.
 
@@ -819,59 +886,56 @@ class WestendAdapter(JAMInterface):
             Transfer result with success status and transaction details
         """
         if not self.substrate:
-            return {'success': False, 'error': 'No substrate connection'}
+            return {"success": False, "error": "No substrate connection"}
 
         if not self.keypair:
-            return {'success': False, 'error': 'No keypair configured'}
+            return {"success": False, "error": "No keypair configured"}
 
         try:
             # Compose assets.transfer extrinsic
             call = self.substrate.compose_call(
-                call_module='Assets',
-                call_function='transfer',
-                call_params={
-                    'id': asset_id,
-                    'target': to_address,
-                    'amount': amount
-                }
+                call_module="Assets",
+                call_function="transfer",
+                call_params={"id": asset_id, "target": to_address, "amount": amount},
             )
 
             # Create signed extrinsic
             extrinsic = self.substrate.create_signed_extrinsic(
-                call=call,
-                keypair=self.keypair
+                call=call, keypair=self.keypair
             )
 
             # Submit and wait for inclusion
-            receipt = self.substrate.submit_extrinsic(extrinsic, wait_for_inclusion=True)
+            receipt = self.substrate.submit_extrinsic(
+                extrinsic, wait_for_inclusion=True
+            )
 
             if receipt.is_success:
                 return {
-                    'success': True,
-                    'transaction_hash': receipt.extrinsic_hash,
-                    'block_hash': receipt.block_hash,
-                    'block_number': receipt.block_number,
-                    'from_address': from_address,
-                    'to_address': to_address,
-                    'amount': amount,
-                    'asset_id': asset_id
+                    "success": True,
+                    "transaction_hash": receipt.extrinsic_hash,
+                    "block_hash": receipt.block_hash,
+                    "block_number": receipt.block_number,
+                    "from_address": from_address,
+                    "to_address": to_address,
+                    "amount": amount,
+                    "asset_id": asset_id,
                 }
             else:
                 return {
-                    'success': False,
-                    'error': f'Transfer failed: {receipt.error_message}',
-                    'from_address': from_address,
-                    'to_address': to_address,
-                    'amount': amount
+                    "success": False,
+                    "error": f"Transfer failed: {receipt.error_message}",
+                    "from_address": from_address,
+                    "to_address": to_address,
+                    "amount": amount,
                 }
 
         except Exception as e:
             return {
-                'success': False,
-                'error': str(e),
-                'from_address': from_address,
-                'to_address': to_address,
-                'amount': amount
+                "success": False,
+                "error": str(e),
+                "from_address": from_address,
+                "to_address": to_address,
+                "amount": amount,
             }
 
     async def get_usdb_balance(self, address: str, asset_id: int) -> int:
@@ -891,13 +955,11 @@ class WestendAdapter(JAMInterface):
         try:
             # Query Assets.Account storage
             account_info = self.substrate.query(
-                module='Assets',
-                storage_function='Account',
-                params=[asset_id, address]
+                module="Assets", storage_function="Account", params=[asset_id, address]
             )
 
             if account_info.value:
-                return account_info.value.get('balance', 0)
+                return account_info.value.get("balance", 0)
             else:
                 return 0
 
@@ -921,22 +983,27 @@ class WestendAdapter(JAMInterface):
         try:
             # Query System.Account storage
             account_info = self.substrate.query(
-                module='System',
-                storage_function='Account',
-                params=[address]
+                module="System", storage_function="Account", params=[address]
             )
 
-            if account_info and hasattr(account_info, 'value') and account_info.value:
-                if isinstance(account_info.value, dict) and 'data' in account_info.value:
-                    data = account_info.value['data']
+            if account_info and hasattr(account_info, "value") and account_info.value:
+                if (
+                    isinstance(account_info.value, dict)
+                    and "data" in account_info.value
+                ):
+                    data = account_info.value["data"]
                     if isinstance(data, dict):
-                        return data.get('free', 0)
+                        return data.get("free", 0)
                     else:
                         # Handle case where data might be a different structure
-                        return getattr(data, 'free', 0)
+                        return getattr(data, "free", 0)
                 else:
                     # Handle different account_info structures
-                    return account_info.value.get('free', 0) if isinstance(account_info.value, dict) else 0
+                    return (
+                        account_info.value.get("free", 0)
+                        if isinstance(account_info.value, dict)
+                        else 0
+                    )
             else:
                 return 0
 
@@ -944,7 +1011,9 @@ class WestendAdapter(JAMInterface):
             print(f"Error querying WND balance for {address}: {e}")
             return 0
 
-    async def get_dual_balance(self, address: str, asset_id: Optional[int] = None) -> Dict[str, int]:
+    async def get_dual_balance(
+        self, address: str, asset_id: Optional[int] = None
+    ) -> Dict[str, int]:
         """
         Get both WND and USDB balances for an address.
 
@@ -962,27 +1031,34 @@ class WestendAdapter(JAMInterface):
         wnd_balance = await self.get_wnd_balance(address)
         usdb_balance = await self.get_usdb_balance(address, asset_id) if asset_id else 0
 
-        return {
-            'wnd': wnd_balance,
-            'usdb': usdb_balance
-        }
+        return {"wnd": wnd_balance, "usdb": usdb_balance}
 
     def _get_usdb_asset_id(self) -> Optional[int]:
         """Get USDB asset ID from configuration."""
         try:
             import os
-            config_path = os.path.join(os.path.dirname(__file__), '..', '.borglife_config')
+
+            config_path = os.path.join(
+                os.path.dirname(__file__), "..", ".borglife_config"
+            )
             if os.path.exists(config_path):
-                with open(config_path, 'r') as f:
+                with open(config_path, "r") as f:
                     for line in f:
-                        if line.startswith('USDB_ASSET_ID='):
-                            return int(line.split('=', 1)[1].strip())
+                        if line.startswith("USDB_ASSET_ID="):
+                            return int(line.split("=", 1)[1].strip())
         except Exception as e:
             print(f"Warning: Could not read USDB asset ID from config: {e}")
 
         return None
 
-    async def update_wealth_dual(self, borg_id: str, currency: str, amount: Decimal, operation: str, description: str) -> bool:
+    async def update_wealth_dual(
+        self,
+        borg_id: str,
+        currency: str,
+        amount: Decimal,
+        operation: str,
+        description: str,
+    ) -> bool:
         """
         Update wealth balance for dual-currency system.
 
@@ -996,16 +1072,16 @@ class WestendAdapter(JAMInterface):
         Returns:
             True if update successful
         """
-        if currency not in ['WND', 'USDB']:
+        if currency not in ["WND", "USDB"]:
             raise ValueError(f"Invalid currency: {currency}")
 
         if borg_id not in self.wealth_cache:
-            self.wealth_cache[borg_id] = {'WND': Decimal('0'), 'USDB': Decimal('0')}
+            self.wealth_cache[borg_id] = {"WND": Decimal("0"), "USDB": Decimal("0")}
 
         # Update balance
-        if operation in ['revenue', 'transfer']:
+        if operation in ["revenue", "transfer"]:
             self.wealth_cache[borg_id][currency] += amount
-        elif operation == 'cost':
+        elif operation == "cost":
             self.wealth_cache[borg_id][currency] -= amount
         else:
             raise ValueError(f"Unknown operation: {operation}")
@@ -1015,12 +1091,12 @@ class WestendAdapter(JAMInterface):
             self.transaction_cache[borg_id] = []
 
         transaction = {
-            'timestamp': time.time(),
-            'currency': currency,
-            'operation': operation,
-            'amount': float(amount),
-            'description': description,
-            'balance_after': float(self.wealth_cache[borg_id][currency])
+            "timestamp": time.time(),
+            "currency": currency,
+            "operation": operation,
+            "amount": float(amount),
+            "description": description,
+            "balance_after": float(self.wealth_cache[borg_id][currency]),
         }
 
         self.transaction_cache[borg_id].append(transaction)
@@ -1038,13 +1114,13 @@ class WestendAdapter(JAMInterface):
         Returns:
             Balance as Decimal
         """
-        if currency not in ['WND', 'USDB']:
+        if currency not in ["WND", "USDB"]:
             raise ValueError(f"Invalid currency: {currency}")
 
         if borg_id not in self.wealth_cache:
-            return Decimal('0')
+            return Decimal("0")
 
-        return self.wealth_cache[borg_id].get(currency, Decimal('0'))
+        return self.wealth_cache[borg_id].get(currency, Decimal("0"))
 
     async def get_wealth_summary(self, borg_id: str) -> Dict[str, Decimal]:
         """
@@ -1057,11 +1133,12 @@ class WestendAdapter(JAMInterface):
             Dict with WND and USDB balances
         """
         return {
-            'WND': await self.get_wealth_balance_dual(borg_id, 'WND'),
-            'USDB': await self.get_wealth_balance_dual(borg_id, 'USDB')
+            "WND": await self.get_wealth_balance_dual(borg_id, "WND"),
+            "USDB": await self.get_wealth_balance_dual(borg_id, "USDB"),
         }
 
 
 class KusamaAdapter(WestendAdapter):
     """Backward compatibility alias for legacy imports."""
+
     pass

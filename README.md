@@ -1,237 +1,93 @@
-# BorgLife Phase 1: DNA Storage Demo
+# BorgLife Proto Private
 
-A comprehensive demonstration of BorgLife's DNA-based data storage and execution system, featuring real blockchain integration with the Polkadot ecosystem.
+BorgLife is a prototype implementation of autonomous digital organisms ("borgs") that synthesize executable phenotypes from DNA configurations using Archon as the off-chain synthesis engine, integrated with Westend blockchain for asset management and JAM mock for on-chain operations.
+
+## 🎯 Current Status
+- ✅ Phase 1: DNA synthesis and phenotype execution
+- ✅ Phase 2A: USDB stablecoin created (ID [`code/.borglife_config`](code/.borglife_config:17):50000313), fund holding, inter-borg transfers
+- ✅ Security: Keyring-backed dispenser, signature verification, DNA anchoring
+- ✅ UI: Borg Designer and Sponsor UIs at localhost:8501
+- ✅ Testing: Unit, integration, E2E suites >90% coverage
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- **Python 3.9+**
-- **Testnet Account**: Funded Westend testnet account (get free tokens from [faucet.parity.io](https://faucet.parity.io/))
-- **Stable Internet**: Reliable connection for blockchain operations
+- Python 3.12
+- Docker Desktop
+- Funded Westend account in keyring (dispenser ready with 13+ WND)
 
 ### Installation
+```bash
+pip install -r [`code/requirements.txt`](code/requirements.txt)
+```
 
-1. **Clone Repository**
-   ```bash
-   git clone https://github.com/m888m/borglife_prototype.git
-   cd borglife_prototype
-   ```
+### Verify Setup
+```bash
+bash -c ". .venv/bin/activate && python3 [`code/scripts/check_keyring.py`](code/scripts/check_keyring.py)"
+```
 
-2. **Install Dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Create USDB Asset
+```bash
+bash -c ". .venv/bin/activate && python3 [`code/scripts/create_usdb_asset.py`](code/scripts/create_usdb_asset.py)"
+```
 
-3. **Setup Testnet Account**
-   ```bash
-   python code/jam_mock/setup_kusama_testnet.py
-   ```
-
-4. **Run Demo**
-   ```bash
-   python code/jam_mock/dna_storage_demo.py
-   ```
-
-## 📋 What It Does
-
-BorgLife Phase 1 demonstrates a complete DNA storage and execution workflow:
-
-1. **DNA Loading** - Parse and validate BorgLife DNA configuration
-2. **Proto-Borg Initialization** - Create executable phenotype from DNA
-3. **Task Execution** - Run tasks with wealth tracking and cost calculation
-4. **Phenotype Encoding** - Convert execution results back to DNA
-5. **Blockchain Storage** - Submit DNA hash to Westend testnet
-6. **Block Confirmation** - Monitor transaction finality
-7. **Integrity Verification** - Validate round-trip DNA integrity
+### Launch UIs
+```bash
+streamlit run [`code/borg_designer_ui.py`](code/borg_designer_ui.py)  # Designer
+streamlit run [`code/sponsor_ui.py`](code/sponsor_ui.py)  # Sponsor
+```
 
 ## 🏗️ Architecture
 
-### Core Components
+See [`code/FUNCTION_ARCHITECTURE_OVERVIEW.md`](code/FUNCTION_ARCHITECTURE_OVERVIEW.md)
 
-- **`dna_storage_demo.py`** - Main demo orchestration
-- **`proto_borg.py`** - DNA parsing and phenotype execution
-- **`kusama_adapter.py`** - Multi-endpoint blockchain connectivity
-- **`transaction_manager.py`** - Transaction construction and submission
-- **`demo_metrics.py`** - Comprehensive performance monitoring
+Key modules:
+- [`code/archon_adapter`](code/archon_adapter/) - Archon MCP/RAG integration
+- [`code/synthesis`](code/synthesis/) - DNA parsing/phenotype building
+- [`code/jam_mock`](code/jam_mock/) - Westend adapter, transfers
+- [`code/security`](code/security/) - Keyring, compliance
+- [`code/tests`](code/tests/) - Comprehensive suite
 
-### Security & Compliance
+## 📖 Usage
 
-- **`secure_key_storage.py`** - Encrypted keypair management
-- **`demo_input_validator.py`** - Input validation and sanitization
-- **`demo_audit_logger.py`** - Complete audit trail
-- **`ethical_compliance_monitor.py`** - Ethical operation validation
-- **`demo_cost_controller.py`** - Budget and spending controls
+### Blockchain Operations
+- USDB transfers: [`code/jam_mock/westend_adapter.py`](code/jam_mock/westend_adapter.py:742)`transfer_usdb`
+- WND transfers: [`code/security/secure_dispenser.py`](code/security/secure_dispenser.py:260)`transfer_wnd_to_borg`
 
-### User Experience
+### Demo Workflow
+1. Design phenotype in UI
+2. Test execution with organs
+3. Encode to DNA
+4. Fund with USDB/WND
+5. Store on-chain
 
-- **`user_friendly_error_handler.py`** - User-friendly error messages
-- **`demo_progress_reporter.py`** - Real-time progress tracking
-- **`production_metrics_collector.py`** - Production monitoring
-- **`demo_alert_manager.py`** - Automated alerting system
+## 🔧 Scripts
+See [`code/scripts/README.md`](code/scripts/README.md)
 
-## 📊 Performance Metrics
+Key:
+- [`create_usdb_asset.py`](code/scripts/create_usdb_asset.py) - Create/mint USDB
+- [`check_keyring.py`](code/scripts/check_keyring.py) - Validate keys/balances
+- [`usdb_faucet.py`](code/scripts/usdb_faucet.py) - Distribute USDB
 
-**Production-Ready Performance:**
-- **Success Rate**: 100% over multiple test runs
-- **Average Duration**: 5.41 seconds (10x better than 5-minute target)
-- **Cost Efficiency**: 0.001 WND per complete demo run
-- **Block Confirmation**: < 10 seconds
-- **DNA Integrity**: 100% verified round-trip
-
-## 🔗 Live Blockchain Transactions
-
-Recent successful transactions on Westend testnet:
-
-- [Transaction 1](https://westend.subscan.io/extrinsic/0xe40eb41b9790bbb6c88f0afe3fc8514ee3dbbdb1e3c765c9374f53ca91337da1) - `0xe40eb41b9790bbb6c8...`
-- [Transaction 2](https://westend.subscan.io/extrinsic/0x899558f3f1f346476f6740e870112bc186bc748e9853ea2dcbf3ea4b58eb6bc7) - `0x899558f3f1f346476f...`
-
-**Deterministic Address**: `5EqfYqji7fS9ahM66WeXt7FW929TgiHkD7c4zs4Ky8LNJYud`
-
-## 🛡️ Security Features
-
-- **Encrypted Key Storage**: AES-256 encrypted keypairs
-- **Input Validation**: Comprehensive security checks
-- **Audit Logging**: Complete operation traceability
-- **Ethical Compliance**: Universal Principles validation
-- **Cost Controls**: Budget limits and spending alerts
-
-## 📈 Monitoring & Alerting
-
-### Real-time Metrics
-- Demo execution times and success rates
-- Transaction costs and blockchain performance
-- System resource usage
-- Error rates and types
-
-### Automated Alerts
-- Low testnet balance warnings
-- Performance degradation notifications
-- High error rate alerts
-- Security incident detection
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**"Keypair not configured"**
-```bash
-python code/jam_mock/setup_kusama_testnet.py
-```
-
-**"Insufficient funds"**
-- Visit [faucet.parity.io](https://faucet.parity.io/) for free testnet tokens
-- Check balance on [westend.subscan.io](https://westend.subscan.io/)
-
-**"Network timeout"**
-- Check internet connection
-- Demo will automatically retry with backup endpoints
-- Try during off-peak hours
-
-**"DNA validation failed"**
-- Verify `borg_dna.yaml` syntax
-- Check for special characters or formatting issues
-- Ensure all required DNA fields are present
-
-### Getting Help
-
-- **Logs**: Check `code/jam_mock/logs/` directory
-- **Metrics**: View `code/jam_mock/metrics/demo_metrics.jsonl`
-- **Alerts**: Monitor `code/jam_mock/alerts/demo_alerts.jsonl`
+## 🛡️ Security
+- Keyring macOS/Linux backend
+- Dispenser [`code/jam_mock/.dispenser_keystore.enc`](code/jam_mock/.dispenser_keystore.enc)
+- Rate limiting, audit logs
 
 ## 🧪 Testing
-
-### Automated Testing
 ```bash
-# Run full test suite
-python -m pytest code/tests/ -v
-
-# Run specific demo tests
-python code/tests/test_dna_integrity.py
-python code/tests/test_economic_model.py
+pytest [`code/tests`](code/tests/) -v --cov
 ```
 
-### Beta Testing
-The demo has been validated with:
-- 100% success rate over 5+ consecutive runs
-- Multiple network conditions
-- Various DNA configurations
-- Error scenario testing
+## 🔗 Blockchain
+- Westend Asset Hub RPC: wss://westend-asset-hub-rpc.polkadot.io
+- USDB ID: 50000313
+- Dispenser: 5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD
 
-## 📚 API Reference
+## 📚 Docs
+- Architecture: [`code/FUNCTION_ARCHITECTURE_OVERVIEW.md`](code/FUNCTION_ARCHITECTURE_OVERVIEW.md)
+- Troubleshooting: [`code/TROUBLESHOOTING.md`](code/TROUBLESHOOTING.md)
+- PRPs: [`PRPs/`](PRPs/)
 
-### Core Classes
-
-#### `BorgLifeDNADemo`
-Main demo orchestrator with comprehensive error handling and monitoring.
-
-```python
-demo = BorgLifeDNADemo()
-await demo.run_complete_demo()
-```
-
-#### `SecureKeypairManager`
-Production-grade keypair management with encryption.
-
-```python
-key_manager = SecureKeypairManager()
-keypair = key_manager.load_demo_keypair()
-```
-
-#### `EthicalComplianceMonitor`
-Validates operations against Universal Principles.
-
-```python
-monitor = EthicalComplianceMonitor()
-result = await monitor.validate_task_ethics(task_description)
-```
-
-## 🤝 Contributing
-
-### Development Setup
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/your-feature`
-3. Make changes with comprehensive tests
-4. Run full test suite: `python -m pytest`
-5. Submit pull request
-
-### Code Standards
-- Type hints for all function parameters
-- Comprehensive error handling
-- Security-first approach
-- Ethical compliance validation
-- Performance monitoring
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
-
-## 🙏 Acknowledgments
-
-- **Polkadot Ecosystem** for robust blockchain infrastructure
-- **Substrate Interface** for Python blockchain integration
-- **OpenSSL** for cryptographic operations
-- **Universal Principles** guiding ethical development
-
-## 🎯 Roadmap
-
-### Phase 1 ✅ (Complete)
-- End-to-end DNA storage demonstration
-- Real blockchain integration
-- Production-grade security and monitoring
-- Comprehensive error handling
-
-### Phase 2 (Planned)
-- Full DNA retrieval from blockchain
-- Multi-chain support (Kusama, Polkadot)
-- Advanced phenotype execution
-- Production deployment
-
-### Phase 3 (Future)
-- Decentralized BorgLife network
-- Cross-chain DNA interoperability
-- Advanced AI phenotype evolution
-- Enterprise integration
-
----
-
-**BorgLife Phase 1 is production-ready and demonstrates the world's first DNA-based data storage on a live blockchain!** 🧬⛓️🚀
+## Contributing
+See CONTRIBUTING.md

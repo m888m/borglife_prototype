@@ -8,16 +8,18 @@ Validates that BorgLife components can successfully interact with Archon infrast
 import asyncio
 import json
 import os
+from typing import Any, Dict
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 import yaml
-from typing import Dict, Any
-from unittest.mock import AsyncMock, MagicMock
 
 # Test imports - these will be available in Docker environment
 try:
     from archon_adapter.adapter import ArchonAdapter
-    from jam_mock.interface import JAMInterface
     from demo_scenarios import DemoScenarios
+    from jam_mock.interface import JAMInterface
+
     IMPORTS_AVAILABLE = True
 except ImportError:
     # Mock for development environment
@@ -36,8 +38,15 @@ class TestServiceIntegration:
         if not IMPORTS_AVAILABLE:
             # Mock adapter for development
             adapter = AsyncMock()
-            adapter.health_check.return_value = {"status": "healthy", "services": ["mcp", "database"]}
-            adapter.get_mcp_tools.return_value = ["rag_query", "create_task", "search_code"]
+            adapter.health_check.return_value = {
+                "status": "healthy",
+                "services": ["mcp", "database"],
+            }
+            adapter.get_mcp_tools.return_value = [
+                "rag_query",
+                "create_task",
+                "search_code",
+            ]
             yield adapter
         else:
             # Real adapter for Docker environment
@@ -53,7 +62,10 @@ class TestServiceIntegration:
             # Mock interface for development
             interface = AsyncMock()
             interface.get_balance.return_value = 1.5
-            interface.transfer.return_value = {"tx_hash": "0x123", "status": "confirmed"}
+            interface.transfer.return_value = {
+                "tx_hash": "0x123",
+                "status": "confirmed",
+            }
             yield interface
         else:
             # Real interface for Docker environment
@@ -93,9 +105,7 @@ class TestServiceIntegration:
     async def test_jam_transfer_simulation(self, jam_interface):
         """Test JAM transfer functionality (simulation mode)."""
         transfer_result = await jam_interface.transfer(
-            to_address="test_address",
-            amount=0.1,
-            memo="test transfer"
+            to_address="test_address", amount=0.1, memo="test transfer"
         )
 
         assert "tx_hash" in transfer_result
@@ -108,7 +118,11 @@ class TestServiceIntegration:
         if not IMPORTS_AVAILABLE:
             # Mock test for development
             scenarios = AsyncMock()
-            scenarios.load_scenarios.return_value = ["scenario1", "scenario2", "scenario3"]
+            scenarios.load_scenarios.return_value = [
+                "scenario1",
+                "scenario2",
+                "scenario3",
+            ]
             scenarios.validate_scenarios.return_value = True
         else:
             # Real test for Docker environment
@@ -158,6 +172,7 @@ class TestServiceIntegration:
     @pytest.mark.asyncio
     async def test_concurrent_service_requests(self, archon_adapter):
         """Test handling of concurrent service requests."""
+
         async def make_request(request_id: int):
             return await archon_adapter.make_request(f"test_request_{request_id}")
 

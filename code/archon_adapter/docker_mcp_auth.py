@@ -1,5 +1,6 @@
-from typing import Dict, Optional
 import os
+from typing import Dict, Optional
+
 
 class DockerMCPAuthManager:
     """Manage authentication for Docker MCP organs"""
@@ -28,14 +29,16 @@ class DockerMCPAuthManager:
     def load_from_env(self):
         """Load credentials from environment variables"""
         # Gmail
-        if 'GMAIL_APP_PASSWORD' in os.environ:
-            self.add_credential('gmail', 'app_password', os.environ['GMAIL_APP_PASSWORD'])
+        if "GMAIL_APP_PASSWORD" in os.environ:
+            self.add_credential(
+                "gmail", "app_password", os.environ["GMAIL_APP_PASSWORD"]
+            )
 
         # Stripe
-        if 'STRIPE_API_KEY' in os.environ:
-            self.add_credential('stripe', 'api_key', os.environ['STRIPE_API_KEY'])
+        if "STRIPE_API_KEY" in os.environ:
+            self.add_credential("stripe", "api_key", os.environ["STRIPE_API_KEY"])
 
         # Bitcoin
-        if 'BITCOIN_RPC_USER' in os.environ and 'BITCOIN_RPC_PASS' in os.environ:
-            self.add_credential('bitcoin', 'rpc_user', os.environ['BITCOIN_RPC_USER'])
-            self.add_credential('bitcoin', 'rpc_pass', os.environ['BITCOIN_RPC_PASS'])
+        if "BITCOIN_RPC_USER" in os.environ and "BITCOIN_RPC_PASS" in os.environ:
+            self.add_credential("bitcoin", "rpc_user", os.environ["BITCOIN_RPC_USER"])
+            self.add_credential("bitcoin", "rpc_pass", os.environ["BITCOIN_RPC_PASS"])

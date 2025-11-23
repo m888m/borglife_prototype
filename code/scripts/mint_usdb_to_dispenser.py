@@ -7,8 +7,8 @@ Uses SecureDispenser for secure key management and Asset Hub operations.
 """
 
 import asyncio
-import sys
 import os
+import sys
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -37,7 +37,7 @@ async def main():
 
         mint_result = await dispenser.mint_usdb_tokens(mint_amount)
 
-        if mint_result['success']:
+        if mint_result["success"]:
             print("✅ USDB Minting Successful!")
             print(f"   Amount: {mint_amount:,.0f} USDB")
             print(f"   Transaction Hash: {mint_result['transaction_hash']}")
@@ -47,12 +47,16 @@ async def main():
 
             # Verify balance after minting
             print("\n🔍 Verifying dispenser balance...")
-            balance = await dispenser.get_usdb_balance(dispenser.unlocked_keypair.ss58_address)
-            balance_usdb = balance / (10 ** 12)
+            balance = await dispenser.get_usdb_balance(
+                dispenser.unlocked_keypair.ss58_address
+            )
+            balance_usdb = balance / (10**12)
 
-            print(f"   Dispenser USDB Balance: {balance_usdb:,.0f} USDB ({balance:,} planck)")
+            print(
+                f"   Dispenser USDB Balance: {balance_usdb:,.0f} USDB ({balance:,} planck)"
+            )
 
-            if balance >= int(mint_amount * (10 ** 12)):
+            if balance >= int(mint_amount * (10**12)):
                 print("✅ Balance verification successful!")
                 return True
             else:

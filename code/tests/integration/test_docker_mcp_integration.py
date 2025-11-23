@@ -1,8 +1,10 @@
-import pytest
 from typing import Dict
-from archon_adapter import DockerMCPDiscovery, DockerMCPCompatibilityMatrix
-from security import OrganRateLimiter
+
+import pytest
+from archon_adapter import DockerMCPCompatibilityMatrix, DockerMCPDiscovery
 from billing import DockerMCPBilling
+from security import OrganRateLimiter
+
 
 @pytest.mark.asyncio
 async def test_docker_mcp_discovery():
@@ -10,6 +12,7 @@ async def test_docker_mcp_discovery():
     discovery = DockerMCPDiscovery()
     organs = await discovery.discover_mcp_containers()
     assert len(organs) >= 3  # gmail, stripe, bitcoin minimum
+
 
 @pytest.mark.asyncio
 async def test_docker_mcp_health_monitoring():
@@ -19,41 +22,43 @@ async def test_docker_mcp_health_monitoring():
     dashboard = DockerMCPHealthDashboard(
         monitor=None,  # Would need actual monitor
         rate_limiter=None,
-        compatibility_matrix=None
+        compatibility_matrix=None,
     )
 
     # This would test health metrics collection
     # For now, just verify dashboard initializes
     assert dashboard is not None
 
+
 @pytest.mark.asyncio
 async def test_docker_mcp_circuit_breaker():
     """Test circuit breaker for failed Docker MCP organs"""
-    from archon_adapter import MCPClient, AllFallbacksFailedError
+    from archon_adapter import AllFallbacksFailedError, MCPClient
 
     client = MCPClient(
         archon_adapter=None,
         fallback_manager=None,
         rate_limiter=None,
-        billing_manager=None
+        billing_manager=None,
     )
 
     # Simulate failures
     for i in range(3):
         try:
-            await client.call_organ('nonexistent', 'test', {})
+            await client.call_organ("nonexistent", "test", {})
         except:
             pass
 
     # Circuit breaker should be open
     with pytest.raises(AllFallbacksFailedError):
-        await client.call_organ('nonexistent', 'test', {})
+        await client.call_organ("nonexistent", "test", {})
+
 
 @pytest.mark.asyncio
 async def test_phenotype_with_docker_mcp_organs():
     """Test phenotype building with Docker MCP organs"""
-    from synthesis import DNAParser, PhenotypeBuilder
     from archon_adapter import ArchonServiceAdapter
+    from synthesis import DNAParser, PhenotypeBuilder
 
     adapter = ArchonServiceAdapter()
     await adapter.initialize()
@@ -111,22 +116,20 @@ async def test_phenotype_with_docker_mcp_organs():
     phenotype = await builder.build(dna)
 
     # Verify Docker MCP organs are registered
-    assert 'stripe_payment' in phenotype.organs
-    assert 'email_notification' in phenotype.organs
+    assert "stripe_payment" in phenotype.organs
+    assert "email_notification" in phenotype.organs
 
     # Test organ invocation
-    result = await phenotype.organs['stripe_payment'](
-        amount=1000,
-        currency='usd'
-    )
+    result = await phenotype.organs["stripe_payment"](amount=1000, currency="usd")
     assert result is not None
+
 
 @pytest.mark.asyncio
 async def test_rating_integration_with_phenotype():
     """Test rating integration with phenotype execution"""
+    from archon_adapter import ArchonServiceAdapter
     from reputation import BorgRatingSystem
     from synthesis import DNAParser, PhenotypeBuilder
-    from archon_adapter import ArchonServiceAdapter
 
     # Setup components
     rating_system = BorgRatingSystem()
@@ -137,7 +140,7 @@ async def test_rating_integration_with_phenotype():
     builder = PhenotypeBuilder(adapter)
 
     # Load DNA with initial reputation
-    with open('borg_dna.yaml') as f:
+    with open("borg_dna.yaml") as f:
         dna = parser.from_yaml(f.read())
 
     # Build phenotype
@@ -153,28 +156,29 @@ async def test_rating_integration_with_phenotype():
         sponsor_id=sponsor_id,
         rating=5,
         feedback="Excellent performance on analysis task",
-        task_context="Market data analysis"
+        task_context="Market data analysis",
     )
     assert success
 
     # Verify rating is stored
     ratings = await rating_system.get_borg_ratings(borg_id)
     assert len(ratings) >= 1
-    assert any(r['rating'] == 5 for r in ratings)
+    assert any(r["rating"] == 5 for r in ratings)
 
     # Check reputation calculation
     reputation = await rating_system.calculate_reputation(borg_id)
-    assert reputation['total_ratings'] >= 1
-    assert 'average_rating' in reputation
+    assert reputation["total_ratings"] >= 1
+    assert "average_rating" in reputation
 
     # Update DNA with new reputation data
-    dna.reputation.average_rating = reputation['average_rating']
-    dna.reputation.total_ratings = reputation['total_ratings']
-    dna.reputation.rating_distribution = reputation['rating_distribution']
-    dna.reputation.last_rated = reputation['last_rated']
+    dna.reputation.average_rating = reputation["average_rating"]
+    dna.reputation.total_ratings = reputation["total_ratings"]
+    dna.reputation.rating_distribution = reputation["rating_distribution"]
+    dna.reputation.last_rated = reputation["last_rated"]
 
     # Verify DNA integrity is maintained
     assert dna.validate_integrity()
+
 
 @pytest.mark.asyncio
 async def test_docker_mcp_authentication():
@@ -184,12 +188,12 @@ async def test_docker_mcp_authentication():
     auth_manager = DockerMCPAuthManager()
 
     # Add credentials
-    auth_manager.add_credential('gmail', 'app_password', 'test_app_password')
-    auth_manager.add_credential('stripe', 'api_key', 'sk_test_123')
+    auth_manager.add_credential("gmail", "app_password", "test_app_password")
+    auth_manager.add_credential("stripe", "api_key", "sk_test_123")
 
     # Retrieve credentials
-    gmail_cred = auth_manager.get_credential('gmail')
-    assert gmail_cred == 'test_app_password'
+    gmail_cred = auth_manager.get_credential("gmail")
+    assert gmail_cred == "test_app_password"
 
-    stripe_cred = auth_manager.get_credential('stripe')
-    assert stripe_cred == 'sk_test_123'
+    stripe_cred = auth_manager.get_credential("stripe")
+    assert stripe_cred == "sk_test_123"

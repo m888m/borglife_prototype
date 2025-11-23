@@ -4,8 +4,8 @@ Test Dispenser Keyring Access
 Safely verify that dispenser private key can be accessed from macOS Keychain.
 """
 
-import sys
 import os
+import sys
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -49,10 +49,11 @@ def test_dispenser_keyring_access():
 
         # Verify address matches keystore metadata
         import json
-        with open(dispenser.keystore_path, 'r') as f:
+
+        with open(dispenser.keystore_path, "r") as f:
             keystore_data = json.load(f)
 
-        stored_address = keystore_data.get('ss58_address')
+        stored_address = keystore_data.get("ss58_address")
         if address != stored_address:
             print(f"❌ Address mismatch: {address} != {stored_address}")
             return False
@@ -61,6 +62,7 @@ def test_dispenser_keyring_access():
 
         # Test keypair functionality (signing capability)
         from substrateinterface import Keypair
+
         test_message = b"test_message_for_signing"
         signature = dispenser.unlocked_keypair.sign(test_message)
 

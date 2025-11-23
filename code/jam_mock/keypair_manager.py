@@ -5,19 +5,20 @@ Provides secure keypair creation, management, and transaction signing capabiliti
 for BorgLife Phase 1 DNA storage operations on Westend testnet.
 """
 
-import json
 import hashlib
+import json
 import secrets
-from typing import Dict, Any, Optional, Tuple, List
 from pathlib import Path
-from substrateinterface import Keypair
-from substrateinterface.utils.ss58 import ss58_encode
+from typing import Any, Dict, List, Optional, Tuple
 
 from security.keyring_service import KeyringService, KeyringServiceError
+from substrateinterface import Keypair
+from substrateinterface.utils.ss58 import ss58_encode
 
 
 class KeypairSecurityError(Exception):
     """Raised when keypair security operations fail"""
+
     pass
 
 
@@ -36,7 +37,9 @@ class KeypairManager:
         Args:
             storage_path: Directory to store keypair metadata (optional)
         """
-        self.storage_path = Path(storage_path) if storage_path else Path.home() / ".borglife" / "keys"
+        self.storage_path = (
+            Path(storage_path) if storage_path else Path.home() / ".borglife" / "keys"
+        )
         self.storage_path.mkdir(parents=True, exist_ok=True)
 
         # In-memory keypair cache (not persisted)
@@ -63,17 +66,17 @@ class KeypairManager:
         # Generate new keypair
         keypair = Keypair.create_from_seed(
             seed_hex=secrets.token_hex(32),  # 256-bit seed
-            ss58_format=42  # Westend format
+            ss58_format=42,  # Westend format
         )
 
         # Get public information
         public_info = {
-            'name': name,
-            'public_key': keypair.public_key.hex(),
-            'ss58_address': keypair.ss58_address,
-            'ss58_format': 42,  # Westend
-            'created_at': self._get_timestamp(),
-            'fingerprint': self._generate_fingerprint(keypair.public_key.hex())
+            "name": name,
+            "public_key": keypair.public_key.hex(),
+            "ss58_address": keypair.ss58_address,
+            "ss58_format": 42,  # Westend
+            "created_at": self._get_timestamp(),
+            "fingerprint": self._generate_fingerprint(keypair.public_key.hex()),
         }
 
         # Cache the keypair in memory
@@ -85,7 +88,9 @@ class KeypairManager:
 
         return public_info
 
-    def create_keypair_from_seed(self, name: str, seed_hex: str, save_to_disk: bool = True) -> Dict[str, Any]:
+    def create_keypair_from_seed(
+        self, name: str, seed_hex: str, save_to_disk: bool = True
+    ) -> Dict[str, Any]:
         """
         Create keypair from existing seed.
 
@@ -102,19 +107,18 @@ class KeypairManager:
 
         try:
             keypair = Keypair.create_from_seed(
-                seed_hex=seed_hex,
-                ss58_format=42  # Westend format
+                seed_hex=seed_hex, ss58_format=42  # Westend format
             )
         except Exception as e:
             raise KeypairSecurityError(f"Invalid seed: {e}")
 
         public_info = {
-            'name': name,
-            'public_key': keypair.public_key.hex(),
-            'ss58_address': keypair.ss58_address,
-            'ss58_format': 42,  # Westend
-            'created_at': self._get_timestamp(),
-            'fingerprint': self._generate_fingerprint(keypair.public_key.hex())
+            "name": name,
+            "public_key": keypair.public_key.hex(),
+            "ss58_address": keypair.ss58_address,
+            "ss58_format": 42,  # Westend
+            "created_at": self._get_timestamp(),
+            "fingerprint": self._generate_fingerprint(keypair.public_key.hex()),
         }
 
         self._keypair_cache[name] = keypair
@@ -124,7 +128,9 @@ class KeypairManager:
 
         return public_info
 
-    def create_keypair_from_uri(self, name: str, uri: str, save_to_disk: bool = True) -> Dict[str, Any]:
+    def create_keypair_from_uri(
+        self, name: str, uri: str, save_to_disk: bool = True
+    ) -> Dict[str, Any]:
         """
         Create keypair from Polkadot.js style URI (seed phrase or hex).
 
@@ -137,20 +143,17 @@ class KeypairManager:
             Dictionary with keypair information
         """
         try:
-            keypair = Keypair.create_from_uri(
-                uri=uri,
-                ss58_format=42  # Westend format
-            )
+            keypair = Keypair.create_from_uri(uri=uri, ss58_format=42)  # Westend format
         except Exception as e:
             raise KeypairSecurityError(f"Invalid URI: {e}")
 
         public_info = {
-            'name': name,
-            'public_key': keypair.public_key.hex(),
-            'ss58_address': keypair.ss58_address,
-            'ss58_format': 42,  # Westend
-            'created_at': self._get_timestamp(),
-            'fingerprint': self._generate_fingerprint(keypair.public_key.hex())
+            "name": name,
+            "public_key": keypair.public_key.hex(),
+            "ss58_address": keypair.ss58_address,
+            "ss58_format": 42,  # Westend
+            "created_at": self._get_timestamp(),
+            "fingerprint": self._generate_fingerprint(keypair.public_key.hex()),
         }
 
         self._keypair_cache[name] = keypair
@@ -193,12 +196,14 @@ class KeypairManager:
         metadata = self._load_metadata()
 
         for name, info in metadata.items():
-            keypairs.append({
-                'name': name,
-                'ss58_address': info['ss58_address'],
-                'fingerprint': info['fingerprint'],
-                'created_at': info['created_at']
-            })
+            keypairs.append(
+                {
+                    "name": name,
+                    "ss58_address": info["ss58_address"],
+                    "fingerprint": info["fingerprint"],
+                    "created_at": info["created_at"],
+                }
+            )
 
         return keypairs
 
@@ -254,7 +259,9 @@ class KeypairManager:
         signature = keypair.sign(message)
         return signature.hex()
 
-    def verify_signature(self, public_key_hex: str, message: bytes, signature_hex: str) -> bool:
+    def verify_signature(
+        self, public_key_hex: str, message: bytes, signature_hex: str
+    ) -> bool:
         """
         Verify a signature against a public key.
 
@@ -272,6 +279,7 @@ class KeypairManager:
 
             # Use substrateinterface verification
             from substrateinterface.utils.hasher import blake2b
+
             message_hash = blake2b(message)
 
             # This is a simplified verification - in production you'd use proper crypto
@@ -306,7 +314,9 @@ class KeypairManager:
         """
         return self._load_metadata()
 
-    def export_keypair(self, name: str, include_private: bool = False) -> Dict[str, Any]:
+    def export_keypair(
+        self, name: str, include_private: bool = False
+    ) -> Dict[str, Any]:
         """
         Export keypair information (optionally including private key).
 
@@ -325,15 +335,21 @@ class KeypairManager:
 
         export_data = metadata[name].copy()
         keypair = self.load_keypair(name)
-        seed_hex = keypair.seed_hex if isinstance(keypair.seed_hex, str) else keypair.seed_hex.hex()
-        export_data['seed_hex'] = seed_hex
+        seed_hex = (
+            keypair.seed_hex
+            if isinstance(keypair.seed_hex, str)
+            else keypair.seed_hex.hex()
+        )
+        export_data["seed_hex"] = seed_hex
 
         if include_private:
-            export_data['private_key'] = keypair.private_key.hex()
+            export_data["private_key"] = keypair.private_key.hex()
 
         return export_data
 
-    def import_keypair(self, name: str, import_data: Dict[str, Any], save_to_disk: bool = True) -> Dict[str, Any]:
+    def import_keypair(
+        self, name: str, import_data: Dict[str, Any], save_to_disk: bool = True
+    ) -> Dict[str, Any]:
         """
         Import keypair from exported data.
 
@@ -345,31 +361,35 @@ class KeypairManager:
         Returns:
             Public keypair information
         """
-        if 'seed_hex' not in import_data:
+        if "seed_hex" not in import_data:
             raise KeypairSecurityError("Import data missing seed_hex")
 
-        return self.create_keypair_from_seed(name, import_data['seed_hex'], save_to_disk)
+        return self.create_keypair_from_seed(
+            name, import_data["seed_hex"], save_to_disk
+        )
 
     def _store_keypair(self, name: str, keypair: Keypair, public_info: Dict[str, Any]):
         """Persist keypair via KeyringService and update metadata."""
         service_name = self._service_name(name)
         metadata = {
-            'name': name,
-            'ss58_address': keypair.ss58_address,
-            'ss58_format': keypair.ss58_format,
-            'fingerprint': public_info.get('fingerprint'),
-            'stored_at': self._get_timestamp(),
+            "name": name,
+            "ss58_address": keypair.ss58_address,
+            "ss58_format": keypair.ss58_format,
+            "fingerprint": public_info.get("fingerprint"),
+            "stored_at": self._get_timestamp(),
         }
         try:
             self._keyring.store_keypair(service_name, keypair, metadata=metadata)
         except KeyringServiceError as exc:
-            raise KeypairSecurityError(f"Failed to store keypair '{name}': {exc}") from exc
+            raise KeypairSecurityError(
+                f"Failed to store keypair '{name}': {exc}"
+            ) from exc
 
         local_metadata = self._load_metadata()
         local_metadata[name] = {
-            'ss58_address': keypair.ss58_address,
-            'fingerprint': public_info.get('fingerprint'),
-            'created_at': metadata['stored_at']
+            "ss58_address": keypair.ss58_address,
+            "fingerprint": public_info.get("fingerprint"),
+            "created_at": metadata["stored_at"],
         }
         self._save_metadata(local_metadata)
 
@@ -379,7 +399,9 @@ class KeypairManager:
         try:
             keypair = self._keyring.load_keypair(service_name)
         except KeyringServiceError as exc:
-            raise KeypairSecurityError(f"Failed to load keypair '{name}': {exc}") from exc
+            raise KeypairSecurityError(
+                f"Failed to load keypair '{name}': {exc}"
+            ) from exc
 
         if not keypair:
             raise KeypairSecurityError(f"Keypair '{name}' not found")
@@ -395,7 +417,7 @@ class KeypairManager:
         """Load keypair metadata."""
         if self._metadata_file.exists():
             try:
-                with open(self._metadata_file, 'r') as f:
+                with open(self._metadata_file, "r") as f:
                     return json.load(f)
             except Exception:
                 pass
@@ -403,7 +425,7 @@ class KeypairManager:
 
     def _save_metadata(self, metadata: Dict[str, Dict[str, Any]]):
         """Save keypair metadata."""
-        with open(self._metadata_file, 'w') as f:
+        with open(self._metadata_file, "w") as f:
             json.dump(metadata, f, indent=2)
 
     def _generate_fingerprint(self, public_key_hex: str) -> str:
@@ -414,4 +436,5 @@ class KeypairManager:
     def _get_timestamp(self) -> str:
         """Get current timestamp in ISO format."""
         from datetime import datetime
+
         return datetime.utcnow().isoformat()

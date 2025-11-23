@@ -10,31 +10,37 @@ Creates the required Supabase tables for dual-currency support:
 Run this script to set up the database schema for Phase 2A.
 """
 
+import json
 import os
 import sys
-from typing import Dict, Any
-import json
-from supabase import create_client, Client
+from typing import Any, Dict
+
 from dotenv import load_dotenv
+from supabase import Client, create_client
 
 # Load environment variables from .env.borglife file
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env.borglife'))
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env.borglife"))
 
 # Add the code directory to the path so we can import modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # from jam_mock.secure_key_storage import SecureKeyStorage  # Not needed for database setup
+
 
 class Phase2ADatabaseSetup:
     """Setup Phase 2A database schema for fund holding and transfers."""
 
     def __init__(self):
-        self.supabase_url = os.getenv('SUPABASE_URL')
+        self.supabase_url = os.getenv("SUPABASE_URL")
         # Try service role key first, then fall back to secret key
-        self.supabase_key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_SECRET_KEY')
+        self.supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv(
+            "SUPABASE_SECRET_KEY"
+        )
 
         if not self.supabase_url or not self.supabase_key:
-            raise ValueError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY) environment variables required")
+            raise ValueError(
+                "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY) environment variables required"
+            )
 
         self.supabase: Client = create_client(self.supabase_url, self.supabase_key)
 
@@ -58,7 +64,7 @@ class Phase2ADatabaseSetup:
         );
         """
         try:
-            self.supabase.rpc('exec_sql', {'sql': sql})
+            self.supabase.rpc("exec_sql", {"sql": sql})
             print("✅ Created borg_addresses table")
             return True
         except Exception as e:
@@ -77,7 +83,7 @@ class Phase2ADatabaseSetup:
         );
         """
         try:
-            self.supabase.rpc('exec_sql', {'sql': sql})
+            self.supabase.rpc("exec_sql", {"sql": sql})
             print("✅ Created borg_balances table")
             return True
         except Exception as e:
@@ -101,7 +107,7 @@ class Phase2ADatabaseSetup:
         );
         """
         try:
-            self.supabase.rpc('exec_sql', {'sql': sql})
+            self.supabase.rpc("exec_sql", {"sql": sql})
             print("✅ Created transfer_transactions table")
             return True
         except Exception as e:
@@ -113,13 +119,13 @@ class Phase2ADatabaseSetup:
         indexes = [
             "CREATE INDEX IF NOT EXISTS idx_balances_borg_currency ON borg_balances(borg_id, currency);",
             "CREATE INDEX IF NOT EXISTS idx_transfers_status ON transfer_transactions(status);",
-            "CREATE INDEX IF NOT EXISTS idx_transfers_created ON transfer_transactions(created_at DESC);"
+            "CREATE INDEX IF NOT EXISTS idx_transfers_created ON transfer_transactions(created_at DESC);",
         ]
 
         success = True
         for sql in indexes:
             try:
-                self.supabase.rpc('exec_sql', {'sql': sql})
+                self.supabase.rpc("exec_sql", {"sql": sql})
                 print("✅ Created index")
             except Exception as e:
                 print(f"❌ Failed to create index: {e}")
@@ -131,12 +137,16 @@ class Phase2ADatabaseSetup:
         """Verify that all required tables exist by attempting to query them."""
         try:
             # Check tables exist by trying to query them
-            tables_to_check = ['borg_addresses', 'borg_balances', 'transfer_transactions']
+            tables_to_check = [
+                "borg_addresses",
+                "borg_balances",
+                "transfer_transactions",
+            ]
 
             for table in tables_to_check:
                 try:
                     # Try to select from the table (will fail if table doesn't exist)
-                    result = self.supabase.table(table).select('*').limit(1).execute()
+                    result = self.supabase.table(table).select("*").limit(1).execute()
                     print(f"✅ Table {table} exists and is accessible")
                 except Exception as e:
                     if "Could not find the table" in str(e):
@@ -161,9 +171,12 @@ class Phase2ADatabaseSetup:
         steps = [
             ("Creating borg_addresses table", self.create_borg_addresses_table),
             ("Creating borg_balances table", self.create_borg_balances_table),
-            ("Creating transfer_transactions table", self.create_transfer_transactions_table),
+            (
+                "Creating transfer_transactions table",
+                self.create_transfer_transactions_table,
+            ),
             ("Creating performance indexes", self.create_indexes),
-            ("Verifying schema", self.verify_schema)
+            ("Verifying schema", self.verify_schema),
         ]
 
         success = True
@@ -185,6 +198,7 @@ class Phase2ADatabaseSetup:
 
         return success
 
+
 def main():
     """Main entry point for the setup script."""
     try:
@@ -194,6 +208,7 @@ def main():
     except Exception as e:
         print(f"❌ Setup failed with error: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

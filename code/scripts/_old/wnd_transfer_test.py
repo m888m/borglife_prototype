@@ -5,16 +5,16 @@ Tests live WND transfer from dispenser to borg tester address.
 """
 
 import asyncio
-import sys
-import os
 import json
+import os
+import sys
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from security.secure_dispenser import SecureDispenser
 from jam_mock.borg_address_manager import BorgAddressManager
 from jam_mock.kusama_adapter import WestendAdapter
+from security.secure_dispenser import SecureDispenser
 
 
 async def main():
@@ -28,12 +28,12 @@ async def main():
         print(f"❌ Borg tester results file not found: {results_file}")
         return False
 
-    with open(results_file, 'r') as f:
+    with open(results_file, "r") as f:
         borg_data = json.load(f)
 
-    borg_id = borg_data['borg_id']
-    borg_address = borg_data['address']
-    service_name = borg_data['service_name']
+    borg_id = borg_data["borg_id"]
+    borg_address = borg_data["address"]
+    service_name = borg_data["service_name"]
 
     print(f"Borg ID: {borg_id}")
     print(f"Borg Address: {borg_address}")
@@ -43,6 +43,7 @@ async def main():
     # Verify borg keypair access
     print("🔑 Verifying borg keypair access...")
     import keyring
+
     private_key = keyring.get_password(service_name, "private_key")
     public_key = keyring.get_password(service_name, "public_key")
     stored_address = keyring.get_password(service_name, "address")
@@ -75,17 +76,20 @@ async def main():
     # Check dispenser balance
     print("💰 Checking dispenser balance...")
     from jam_mock.kusama_adapter import WestendAdapter
+
     westend_adapter = WestendAdapter("wss://westend-rpc.polkadot.io")
 
     try:
         dispenser_balance = await westend_adapter.get_wnd_balance(dispenser_address)
-        dispenser_balance_wnd = dispenser_balance / (10 ** 12)
-        print(f"✅ Dispenser balance: {dispenser_balance_wnd:.6f} WND ({dispenser_balance} planck)")
+        dispenser_balance_wnd = dispenser_balance / (10**12)
+        print(
+            f"✅ Dispenser balance: {dispenser_balance_wnd:.6f} WND ({dispenser_balance} planck)"
+        )
     except Exception as e:
         print(f"❌ Failed to check dispenser balance: {e}")
         return False
 
-    if dispenser_balance < 1 * (10 ** 12):  # Less than 1 WND
+    if dispenser_balance < 1 * (10**12):  # Less than 1 WND
         print("❌ Insufficient dispenser balance (< 1 WND)")
         return False
     print()
@@ -94,8 +98,10 @@ async def main():
     print("🔍 Checking borg initial balance...")
     try:
         borg_balance = await westend_adapter.get_wnd_balance(borg_address)
-        borg_balance_wnd = borg_balance / (10 ** 12)
-        print(f"✅ Borg initial balance: {borg_balance_wnd:.6f} WND ({borg_balance} planck)")
+        borg_balance_wnd = borg_balance / (10**12)
+        print(
+            f"✅ Borg initial balance: {borg_balance_wnd:.6f} WND ({borg_balance} planck)"
+        )
     except Exception as e:
         print(f"❌ Failed to check borg balance: {e}")
         return False
@@ -111,22 +117,23 @@ async def main():
 
         # Create balances.transfer extrinsic
         call = westend_adapter.substrate.compose_call(
-            call_module='Balances',
-            call_function='transfer_keep_alive',
+            call_module="Balances",
+            call_function="transfer_keep_alive",
             call_params={
-                'dest': borg_address,
-                'value': int(transfer_amount * (10 ** 12))  # Convert to planck
-            }
+                "dest": borg_address,
+                "value": int(transfer_amount * (10**12)),  # Convert to planck
+            },
         )
 
         # Create signed extrinsic
         extrinsic = westend_adapter.substrate.create_signed_extrinsic(
-            call=call,
-            keypair=dispenser.unlocked_keypair
+            call=call, keypair=dispenser.unlocked_keypair
         )
 
         # Submit and wait for inclusion
-        receipt = westend_adapter.substrate.submit_extrinsic(extrinsic, wait_for_inclusion=True)
+        receipt = westend_adapter.substrate.submit_extrinsic(
+            extrinsic, wait_for_inclusion=True
+        )
 
         if receipt.is_success:
             print("✅ Transfer successful!")
@@ -134,9 +141,9 @@ async def main():
             print(f"   Block: {receipt.block_number}")
             print(f"   Amount: {transfer_amount} WND")
             transfer_result = {
-                'success': True,
-                'transaction_hash': receipt.extrinsic_hash,
-                'block_number': receipt.block_number
+                "success": True,
+                "transaction_hash": receipt.extrinsic_hash,
+                "block_number": receipt.block_number,
             }
         else:
             print(f"❌ Transfer failed: {receipt.error_message}")
@@ -153,11 +160,13 @@ async def main():
     # Check final balances
     print("🔍 Checking final balances...")
     try:
-        final_dispenser_balance = await westend_adapter.get_wnd_balance(dispenser_address)
-        final_dispenser_balance_wnd = final_dispenser_balance / (10 ** 12)
+        final_dispenser_balance = await westend_adapter.get_wnd_balance(
+            dispenser_address
+        )
+        final_dispenser_balance_wnd = final_dispenser_balance / (10**12)
 
         final_borg_balance = await westend_adapter.get_wnd_balance(borg_address)
-        final_borg_balance_wnd = final_borg_balance / (10 ** 12)
+        final_borg_balance_wnd = final_borg_balance / (10**12)
 
         print(f"✅ Final dispenser balance: {final_dispenser_balance_wnd:.6f} WND")
         print(f"✅ Final borg balance: {final_borg_balance_wnd:.6f} WND")
@@ -167,9 +176,11 @@ async def main():
         dispenser_decrease = dispenser_balance - final_dispenser_balance
         borg_increase = final_borg_balance - borg_balance
 
-        expected_transfer = int(transfer_amount * (10 ** 12))
+        expected_transfer = int(transfer_amount * (10**12))
 
-        dispenser_ok = abs(dispenser_decrease - expected_transfer) <= 1000000  # Allow small fee difference
+        dispenser_ok = (
+            abs(dispenser_decrease - expected_transfer) <= 1000000
+        )  # Allow small fee difference
         borg_ok = abs(borg_increase - expected_transfer) <= 1000000
 
         if dispenser_ok and borg_ok:

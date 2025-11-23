@@ -5,11 +5,11 @@ Implements borg-based rate limiting to prevent abuse and ensure fair resource al
 Tracks usage per borg per organ with configurable limits and reset periods.
 """
 
-from typing import Dict, Any, Optional, Tuple, List
-from datetime import datetime, timedelta
-from decimal import Decimal
 import asyncio
 import logging
+from datetime import datetime, timedelta
+from decimal import Decimal
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -24,20 +24,22 @@ class OrganRateLimiter:
 
     # Default rate limits per organ (requests per hour)
     DEFAULT_RATE_LIMITS = {
-        'gmail': 100,        # Email operations - moderate limit
-        'stripe': 50,        # Payment processing - conservative limit
-        'bitcoin': 200,      # Blockchain queries - higher limit
-        'mongodb': 500,      # Database operations - high limit
-        'duckduckgo': 300,   # Web search - moderate-high limit
-        'grafana': 1000,     # Metrics queries - very high limit
-        'wikipedia': 500,    # Knowledge queries - high limit
-        'arxiv': 200,        # Academic search - moderate limit
+        "gmail": 100,  # Email operations - moderate limit
+        "stripe": 50,  # Payment processing - conservative limit
+        "bitcoin": 200,  # Blockchain queries - higher limit
+        "mongodb": 500,  # Database operations - high limit
+        "duckduckgo": 300,  # Web search - moderate-high limit
+        "grafana": 1000,  # Metrics queries - very high limit
+        "wikipedia": 500,  # Knowledge queries - high limit
+        "arxiv": 200,  # Academic search - moderate limit
     }
 
     # Reset period in seconds (1 hour = 3600 seconds)
     RESET_PERIOD_SECONDS = 3600
 
-    def __init__(self, supabase_client=None, custom_limits: Optional[Dict[str, int]] = None):
+    def __init__(
+        self, supabase_client=None, custom_limits: Optional[Dict[str, int]] = None
+    ):
         """
         Initialize rate limiter.
 
@@ -57,10 +59,7 @@ class OrganRateLimiter:
         self._lock = asyncio.Lock()
 
     async def check_limit(
-        self,
-        borg_id: str,
-        organ_name: str,
-        wealth: Optional[float] = None
+        self, borg_id: str, organ_name: str, wealth: Optional[float] = None
     ) -> Tuple[bool, int, int]:
         """
         Check if borg can make a request to the specified organ.
@@ -84,14 +83,16 @@ class OrganRateLimiter:
             limit = self._get_effective_limit(organ_name, wealth)
 
             # Check if under limit
-            current_usage = usage_data['request_count']
+            current_usage = usage_data["request_count"]
             allowed = current_usage < limit
 
             if allowed:
                 # Record the request (will be incremented)
                 await self._record_request(borg_id, organ_name)
 
-            logger.debug(f"Rate limit check for {borg_id}:{organ_name} - {current_usage}/{limit}, allowed: {allowed}")
+            logger.debug(
+                f"Rate limit check for {borg_id}:{organ_name} - {current_usage}/{limit}, allowed: {allowed}"
+            )
             return allowed, current_usage, limit
 
     async def get_reset_time(self, borg_id: str, organ_name: str) -> datetime:
@@ -106,7 +107,7 @@ class OrganRateLimiter:
             Reset time as datetime object
         """
         usage_data = await self._get_usage_data(borg_id, organ_name)
-        return usage_data['window_start'] + timedelta(seconds=self.RESET_PERIOD_SECONDS)
+        return usage_data["window_start"] + timedelta(seconds=self.RESET_PERIOD_SECONDS)
 
     async def _record_request(self, borg_id: str, organ_name: str) -> None:
         """
@@ -120,19 +121,21 @@ class OrganRateLimiter:
             usage_data = await self._get_usage_data(borg_id, organ_name)
 
             # Increment request count
-            usage_data['request_count'] += 1
-            usage_data['last_request'] = datetime.utcnow()
+            usage_data["request_count"] += 1
+            usage_data["last_request"] = datetime.utcnow()
 
             # Persist to Supabase if available
             if self.supabase:
                 try:
-                    await self.supabase.table('borg_rate_limits').upsert({
-                        'borg_id': borg_id,
-                        'organ_name': organ_name,
-                        'request_count': usage_data['request_count'],
-                        'window_start': usage_data['window_start'].isoformat(),
-                        'last_request': usage_data['last_request'].isoformat()
-                    })
+                    await self.supabase.table("borg_rate_limits").upsert(
+                        {
+                            "borg_id": borg_id,
+                            "organ_name": organ_name,
+                            "request_count": usage_data["request_count"],
+                            "window_start": usage_data["window_start"].isoformat(),
+                            "last_request": usage_data["last_request"].isoformat(),
+                        }
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to persist rate limit data: {e}")
 
@@ -158,15 +161,17 @@ class OrganRateLimiter:
             if usage_data is None:
                 # Create new usage data
                 usage_data = {
-                    'request_count': 0,
-                    'window_start': datetime.utcnow(),
-                    'last_request': None
+                    "request_count": 0,
+                    "window_start": datetime.utcnow(),
+                    "last_request": None,
                 }
             self.usage_cache[borg_id][organ_name] = usage_data
 
         return self.usage_cache[borg_id][organ_name]
 
-    async def _load_usage_data(self, borg_id: str, organ_name: str) -> Optional[Dict[str, Any]]:
+    async def _load_usage_data(
+        self, borg_id: str, organ_name: str
+    ) -> Optional[Dict[str, Any]]:
         """
         Load usage data from Supabase.
 
@@ -181,13 +186,23 @@ class OrganRateLimiter:
             return None
 
         try:
-            result = await self.supabase.table('borg_rate_limits').select('*').eq('borg_id', borg_id).eq('organ_name', organ_name).single()
+            result = (
+                await self.supabase.table("borg_rate_limits")
+                .select("*")
+                .eq("borg_id", borg_id)
+                .eq("organ_name", organ_name)
+                .single()
+            )
 
             if result:
                 return {
-                    'request_count': result['request_count'],
-                    'window_start': datetime.fromisoformat(result['window_start']),
-                    'last_request': datetime.fromisoformat(result['last_request']) if result.get('last_request') else None
+                    "request_count": result["request_count"],
+                    "window_start": datetime.fromisoformat(result["window_start"]),
+                    "last_request": (
+                        datetime.fromisoformat(result["last_request"])
+                        if result.get("last_request")
+                        else None
+                    ),
                 }
         except Exception as e:
             logger.debug(f"Failed to load rate limit data from Supabase: {e}")
@@ -202,12 +217,14 @@ class OrganRateLimiter:
             usage_data: Usage data dictionary to check/modify
         """
         now = datetime.utcnow()
-        window_end = usage_data['window_start'] + timedelta(seconds=self.RESET_PERIOD_SECONDS)
+        window_end = usage_data["window_start"] + timedelta(
+            seconds=self.RESET_PERIOD_SECONDS
+        )
 
         if now >= window_end:
             # Reset the window
-            usage_data['request_count'] = 0
-            usage_data['window_start'] = now
+            usage_data["request_count"] = 0
+            usage_data["window_start"] = now
             logger.debug("Reset rate limit window")
 
     def _get_effective_limit(self, organ_name: str, wealth: Optional[float]) -> int:
@@ -245,19 +262,22 @@ class OrganRateLimiter:
         if borg_id in self.usage_cache:
             for organ_name, usage_data in self.usage_cache[borg_id].items():
                 limit = self.rate_limits.get(organ_name, 100)
-                usage_percent = (usage_data['request_count'] / limit) * 100 if limit > 0 else 0
+                usage_percent = (
+                    (usage_data["request_count"] / limit) * 100 if limit > 0 else 0
+                )
 
                 stats[organ_name] = {
-                    'request_count': usage_data['request_count'],
-                    'limit': limit,
-                    'usage_percent': round(usage_percent, 1),
-                    'reset_time': usage_data['window_start'] + timedelta(seconds=self.RESET_PERIOD_SECONDS)
+                    "request_count": usage_data["request_count"],
+                    "limit": limit,
+                    "usage_percent": round(usage_percent, 1),
+                    "reset_time": usage_data["window_start"]
+                    + timedelta(seconds=self.RESET_PERIOD_SECONDS),
                 }
-                total_requests += usage_data['request_count']
+                total_requests += usage_data["request_count"]
 
         return {
-            'borg_id': borg_id,
-            'total_requests': total_requests,
-            'organ_stats': stats,
-            'timestamp': datetime.utcnow().isoformat()
+            "borg_id": borg_id,
+            "total_requests": total_requests,
+            "organ_stats": stats,
+            "timestamp": datetime.utcnow().isoformat(),
         }

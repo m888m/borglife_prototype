@@ -48,7 +48,9 @@ class KeyringService:
                 stored_keys.append("metadata")
 
             return True
-        except Exception as exc:  # pragma: no cover - keyring failures not deterministic
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - keyring failures not deterministic
             self._rollback(service_name, stored_keys)
             raise KeyringServiceError(
                 f"Failed to store keypair for {service_name}: {exc}"

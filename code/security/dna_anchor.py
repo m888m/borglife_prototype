@@ -3,11 +3,11 @@ DNA Anchoring Module for BorgLife Security
 Provides immutable on-chain proof of borg creation and DNA integrity.
 """
 
+import hashlib
 import os
 import time
-import hashlib
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, Optional
 
 from jam_mock.demo_audit_logger import DemoAuditLogger
 
@@ -52,7 +52,7 @@ class DNAAanchor:
         self.audit_logger.log_event(
             "dna_anchoring_started",
             f"Starting DNA hash anchoring for borg {borg_id}",
-            {"borg_id": borg_id, "dna_hash_prefix": dna_hash[:16]}
+            {"borg_id": borg_id, "dna_hash_prefix": dna_hash[:16]},
         )
 
         # For demo purposes, simulate blockchain anchoring
@@ -62,11 +62,7 @@ class DNAAanchor:
         self.audit_logger.log_event(
             "dna_anchoring_completed",
             f"DNA hash anchoring completed for borg {borg_id}",
-            {
-                "borg_id": borg_id,
-                "dna_hash_prefix": dna_hash[:16],
-                "tx_hash": tx_hash
-            }
+            {"borg_id": borg_id, "dna_hash_prefix": dna_hash[:16], "tx_hash": tx_hash},
         )
 
         return tx_hash
@@ -88,10 +84,7 @@ class DNAAanchor:
         self.audit_logger.log_event(
             "dna_anchoring_verification",
             f"DNA hash anchoring verification: {'found' if is_anchored else 'not found'}",
-            {
-                "dna_hash_prefix": dna_hash[:16],
-                "verified": is_anchored
-            }
+            {"dna_hash_prefix": dna_hash[:16], "verified": is_anchored},
         )
 
         return is_anchored
@@ -114,6 +107,7 @@ class DNAAanchor:
 
         # Generate deterministic "transaction hash" for demo
         import hashlib
+
         tx_data = f"{borg_id}:{dna_hash}:{datetime.utcnow().isoformat()}"
         tx_hash = hashlib.sha256(tx_data.encode()).hexdigest()[:64]
 
@@ -172,5 +166,5 @@ class DNAAanchor:
             "tx_hash": f"0x{hashlib.sha256(borg_id.encode()).hexdigest()[:64]}",
             "block_number": 1234567,
             "confirmed_at": datetime.utcnow().isoformat(),
-            "status": "confirmed"
+            "status": "confirmed",
         }

@@ -1,13 +1,17 @@
-from typing import Any, Optional, Dict
-import json
 import hashlib
+import json
 from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
+
 import redis.asyncio as redis
+
 
 class CacheManager:
     """Manage cached results for fallback scenarios and performance optimization"""
 
-    def __init__(self, redis_url: str = "redis://localhost:6379", default_ttl: int = 3600):
+    def __init__(
+        self, redis_url: str = "redis://localhost:6379", default_ttl: int = 3600
+    ):
         """
         Initialize cache manager
 
@@ -17,18 +21,10 @@ class CacheManager:
         """
         self.redis = redis.from_url(redis_url)
         self.default_ttl = default_ttl
-        self.cache_stats = {
-            'hits': 0,
-            'misses': 0,
-            'sets': 0,
-            'errors': 0
-        }
+        self.cache_stats = {"hits": 0, "misses": 0, "sets": 0, "errors": 0}
 
     def _generate_cache_key(
-        self,
-        organ_name: str,
-        tool: str,
-        params: Dict[str, Any]
+        self, organ_name: str, tool: str, params: Dict[str, Any]
     ) -> str:
         """
         Generate deterministic cache key
@@ -43,8 +39,9 @@ class CacheManager:
         """
         # Extract key parameters (ignore timestamps, random values)
         key_params = {
-            k: v for k, v in params.items()
-            if k not in ['timestamp', 'nonce', 'request_id']
+            k: v
+            for k, v in params.items()
+            if k not in ["timestamp", "nonce", "request_id"]
         }
 
         # Create deterministic hash
@@ -59,7 +56,7 @@ class CacheManager:
         tool: str,
         params: Dict[str, Any],
         result: Any,
-        ttl: Optional[int] = None
+        ttl: Optional[int] = None,
     ) -> bool:
         """
         Cache operation result
@@ -80,29 +77,26 @@ class CacheManager:
         try:
             # Serialize result with metadata
             cache_data = {
-                'result': result,
-                'cached_at': datetime.utcnow().isoformat(),
-                'organ': organ_name,
-                'tool': tool,
-                'ttl': ttl
+                "result": result,
+                "cached_at": datetime.utcnow().isoformat(),
+                "organ": organ_name,
+                "tool": tool,
+                "ttl": ttl,
             }
 
             serialized = json.dumps(cache_data)
             await self.redis.setex(cache_key, ttl, serialized)
 
-            self.cache_stats['sets'] += 1
+            self.cache_stats["sets"] += 1
             return True
 
         except Exception as e:
-            self.cache_stats['errors'] += 1
+            self.cache_stats["errors"] += 1
             print(f"Cache set error: {e}")
             return False
 
     async def get_cached_result(
-        self,
-        organ_name: str,
-        tool: str,
-        params: Dict[str, Any]
+        self, organ_name: str, tool: str, params: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
         """
         Retrieve cached result
@@ -122,30 +116,28 @@ class CacheManager:
 
             if cached:
                 cache_data = json.loads(cached)
-                cached_at = datetime.fromisoformat(cache_data['cached_at'])
+                cached_at = datetime.fromisoformat(cache_data["cached_at"])
                 age_seconds = (datetime.utcnow() - cached_at).total_seconds()
 
-                self.cache_stats['hits'] += 1
+                self.cache_stats["hits"] += 1
 
                 return {
-                    'result': cache_data['result'],
-                    'cached_at': cache_data['cached_at'],
-                    'age_seconds': int(age_seconds),
-                    'is_stale': age_seconds > cache_data['ttl'] * 0.8  # 80% of TTL
+                    "result": cache_data["result"],
+                    "cached_at": cache_data["cached_at"],
+                    "age_seconds": int(age_seconds),
+                    "is_stale": age_seconds > cache_data["ttl"] * 0.8,  # 80% of TTL
                 }
             else:
-                self.cache_stats['misses'] += 1
+                self.cache_stats["misses"] += 1
                 return None
 
         except Exception as e:
-            self.cache_stats['errors'] += 1
+            self.cache_stats["errors"] += 1
             print(f"Cache get error: {e}")
             return None
 
     async def invalidate_cache(
-        self,
-        organ_name: str,
-        tool: Optional[str] = None
+        self, organ_name: str, tool: Optional[str] = None
     ) -> int:
         """
         Invalidate cached results

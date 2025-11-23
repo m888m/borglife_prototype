@@ -5,14 +5,14 @@ Collects user satisfaction ratings to provide feedback signals for borg evaluati
 and Phase 2 evolution.
 """
 
-from .rating_system import BorgRatingSystem, BorgRating, BorgReputation
 from .feedback_collector import FeedbackCollector
+from .rating_system import BorgRating, BorgRatingSystem, BorgReputation
 from .reputation_analytics import ReputationAnalytics
 
 __all__ = [
-    'BorgRatingSystem',
-    'BorgRating',
-    'BorgReputation',
-    'FeedbackCollector',
-    'ReputationAnalytics'
+    "BorgRatingSystem",
+    "BorgRating",
+    "BorgReputation",
+    "FeedbackCollector",
+    "ReputationAnalytics",
 ]

@@ -1,25 +1,26 @@
 from datetime import datetime, timedelta
 from typing import Dict, List
 
+
 class TimelineTracker:
     """Track project timeline and identify slippage risks"""
 
     MILESTONES = {
-        'M1_foundation': {
-            'target_week': 3,
-            'dependencies': ['archon_running', 'docker_mcp_healthy'],
-            'buffer_days': 2
+        "M1_foundation": {
+            "target_week": 3,
+            "dependencies": ["archon_running", "docker_mcp_healthy"],
+            "buffer_days": 2,
         },
-        'M2_bootstrap': {
-            'target_week': 5,
-            'dependencies': ['M1_foundation', 'ui_functional'],
-            'buffer_days': 3
+        "M2_bootstrap": {
+            "target_week": 5,
+            "dependencies": ["M1_foundation", "ui_functional"],
+            "buffer_days": 3,
         },
-        'M3_integration': {
-            'target_week': 8,
-            'dependencies': ['M2_bootstrap', 'adapter_complete'],
-            'buffer_days': 2
-        }
+        "M3_integration": {
+            "target_week": 8,
+            "dependencies": ["M2_bootstrap", "adapter_complete"],
+            "buffer_days": 2,
+        },
     }
 
     def check_milestone_status(self, milestone: str) -> Dict[str, Any]:

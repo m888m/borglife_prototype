@@ -1,13 +1,11 @@
-from typing import Dict, Any
+from typing import Any, Dict
+
 
 class ComplianceMonitor:
     """Monitor compliance with Universal Principles (Ψ(E))"""
 
     async def evaluate_ethical_compliance(
-        self,
-        borg_id: str,
-        task_description: str,
-        execution_log: Dict[str, Any]
+        self, borg_id: str, task_description: str, execution_log: Dict[str, Any]
     ) -> float:
         """
         Evaluate ethical compliance score Ψ(E)
@@ -21,11 +19,7 @@ class ComplianceMonitor:
         # Return compliance score
         pass
 
-    async def flag_suspicious_activity(
-        self,
-        borg_id: str,
-        reason: str
-    ):
+    async def flag_suspicious_activity(self, borg_id: str, reason: str):
         """Flag borg for manual review"""
         # Log to Supabase
         # Alert administrators

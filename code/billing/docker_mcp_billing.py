@@ -1,19 +1,20 @@
-from typing import Dict, Any, Optional
-from datetime import datetime
 import asyncio
+from datetime import datetime
 from decimal import Decimal
+from typing import Any, Dict, Optional
+
 
 class DockerMCPBilling:
     """Track and bill for Docker MCP organ usage"""
 
     # Cost per API call (in DOT, calibrated for Kusama testnet)
     ORGAN_COSTS = {
-        'gmail': Decimal('0.0005'),      # Email operations
-        'stripe': Decimal('0.001'),      # Payment processing
-        'bitcoin': Decimal('0.0008'),    # Blockchain queries
-        'mongodb': Decimal('0.0003'),    # Database operations
-        'duckduckgo': Decimal('0.0002'), # Web search
-        'grafana': Decimal('0.0004'),    # Metrics queries
+        "gmail": Decimal("0.0005"),  # Email operations
+        "stripe": Decimal("0.001"),  # Payment processing
+        "bitcoin": Decimal("0.0008"),  # Blockchain queries
+        "mongodb": Decimal("0.0003"),  # Database operations
+        "duckduckgo": Decimal("0.0002"),  # Web search
+        "grafana": Decimal("0.0004"),  # Metrics queries
     }
 
     def __init__(self, supabase_client):
@@ -26,7 +27,7 @@ class DockerMCPBilling:
         organ_name: str,
         operation: str,
         response_size: int = 0,
-        execution_time: float = 0.0
+        execution_time: float = 0.0,
     ) -> Decimal:
         """
         Track organ usage and calculate cost
@@ -42,34 +43,34 @@ class DockerMCPBilling:
             Cost in DOT for this operation
         """
         # Base cost per operation
-        base_cost = self.ORGAN_COSTS.get(organ_name, Decimal('0.001'))
+        base_cost = self.ORGAN_COSTS.get(organ_name, Decimal("0.001"))
 
         # Size multiplier (larger responses cost more)
-        size_multiplier = Decimal('1.0')
+        size_multiplier = Decimal("1.0")
         if response_size > 1000:  # >1KB
-            size_multiplier = Decimal('1.2')
+            size_multiplier = Decimal("1.2")
         elif response_size > 10000:  # >10KB
-            size_multiplier = Decimal('1.5')
+            size_multiplier = Decimal("1.5")
 
         # Time multiplier (slower operations cost more)
-        time_multiplier = Decimal('1.0')
+        time_multiplier = Decimal("1.0")
         if execution_time > 2.0:  # >2 seconds
-            time_multiplier = Decimal('1.1')
+            time_multiplier = Decimal("1.1")
         elif execution_time > 5.0:  # >5 seconds
-            time_multiplier = Decimal('1.3')
+            time_multiplier = Decimal("1.3")
 
         # Calculate final cost
         total_cost = base_cost * size_multiplier * time_multiplier
 
         # Store usage record
         usage_record = {
-            'borg_id': borg_id,
-            'organ_name': organ_name,
-            'operation': operation,
-            'cost': str(total_cost),
-            'response_size': response_size,
-            'execution_time': execution_time,
-            'timestamp': datetime.utcnow().isoformat()
+            "borg_id": borg_id,
+            "organ_name": organ_name,
+            "operation": operation,
+            "cost": str(total_cost),
+            "response_size": response_size,
+            "execution_time": execution_time,
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
         # Insert into Supabase (async)
@@ -85,10 +86,7 @@ class DockerMCPBilling:
         return total_cost
 
     async def deduct_from_borg_wealth(
-        self,
-        borg_id: str,
-        cost: Decimal,
-        operation: str
+        self, borg_id: str, cost: Decimal, operation: str
     ) -> bool:
         """
         Deduct cost from borg's wealth tracking
@@ -97,12 +95,17 @@ class DockerMCPBilling:
             True if deduction successful, False if insufficient funds
         """
         # Get current wealth
-        wealth_record = await self.supabase.table('borg_wealth').select('*').eq('borg_id', borg_id).single()
+        wealth_record = (
+            await self.supabase.table("borg_wealth")
+            .select("*")
+            .eq("borg_id", borg_id)
+            .single()
+        )
 
         if not wealth_record:
             return False
 
-        current_wealth = Decimal(str(wealth_record['total_wealth']))
+        current_wealth = Decimal(str(wealth_record["total_wealth"]))
 
         if current_wealth < cost:
             # Insufficient funds - operation should be rejected
@@ -112,27 +115,29 @@ class DockerMCPBilling:
         new_wealth = current_wealth - cost
 
         # Update wealth record
-        await self.supabase.table('borg_wealth').update({
-            'total_wealth': str(new_wealth),
-            'last_updated': datetime.utcnow().isoformat()
-        }).eq('borg_id', borg_id)
+        await self.supabase.table("borg_wealth").update(
+            {
+                "total_wealth": str(new_wealth),
+                "last_updated": datetime.utcnow().isoformat(),
+            }
+        ).eq("borg_id", borg_id)
 
         # Log transaction
-        await self.supabase.table('borg_transactions').insert({
-            'borg_id': borg_id,
-            'transaction_type': 'cost',
-            'amount': str(cost),
-            'currency': 'DOT',
-            'description': f"Docker MCP organ usage: {operation}",
-            'timestamp': datetime.utcnow().isoformat()
-        })
+        await self.supabase.table("borg_transactions").insert(
+            {
+                "borg_id": borg_id,
+                "transaction_type": "cost",
+                "amount": str(cost),
+                "currency": "DOT",
+                "description": f"Docker MCP organ usage: {operation}",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        )
 
         return True
 
     async def get_borg_usage_summary(
-        self,
-        borg_id: str,
-        days: int = 7
+        self, borg_id: str, days: int = 7
     ) -> Dict[str, Any]:
         """
         Get usage summary for borg
@@ -147,28 +152,33 @@ class DockerMCPBilling:
         # Query Supabase for usage data
         cutoff_date = datetime.utcnow() - timedelta(days=days)
 
-        usage_records = await self.supabase.table('organ_usage').select('*').eq('borg_id', borg_id).gte('timestamp', cutoff_date.isoformat())
+        usage_records = (
+            await self.supabase.table("organ_usage")
+            .select("*")
+            .eq("borg_id", borg_id)
+            .gte("timestamp", cutoff_date.isoformat())
+        )
 
-        total_cost = Decimal('0')
+        total_cost = Decimal("0")
         organ_breakdown = {}
 
         for record in usage_records:
-            cost = Decimal(record['cost'])
-            organ = record['organ_name']
+            cost = Decimal(record["cost"])
+            organ = record["organ_name"]
 
             total_cost += cost
-            organ_breakdown[organ] = organ_breakdown.get(organ, Decimal('0')) + cost
+            organ_breakdown[organ] = organ_breakdown.get(organ, Decimal("0")) + cost
 
         return {
-            'total_cost': total_cost,
-            'organ_breakdown': organ_breakdown,
-            'usage_count': len(usage_records)
+            "total_cost": total_cost,
+            "organ_breakdown": organ_breakdown,
+            "usage_count": len(usage_records),
         }
 
     async def _store_usage_record(self, record: Dict[str, Any]):
         """Store usage record in Supabase"""
         try:
-            await self.supabase.table('organ_usage').insert(record)
+            await self.supabase.table("organ_usage").insert(record)
         except Exception as e:
             # Log error but don't fail operation
             print(f"Failed to store usage record: {e}")

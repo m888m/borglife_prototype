@@ -1,45 +1,119 @@
 from typing import Any, Dict, List, Optional, Tuple
-from packaging import version
+
 import semver
+from packaging import version
+
 
 class DockerMCPCompatibilityMatrix:
     """Manage Docker MCP organ version compatibility"""
 
     # Compatibility matrix: organ -> version -> borglife requirements
     COMPATIBILITY_MATRIX = {
-        'gmail': {
-            '1.0.0': {'min_borglife': '1.0.0', 'max_borglife': '1.2.0', 'deprecated': False},
-            '1.1.0': {'min_borglife': '1.0.0', 'max_borglife': '1.3.0', 'deprecated': False},
-            '1.2.0': {'min_borglife': '1.1.0', 'max_borglife': '1.4.0', 'deprecated': False},
-            '1.3.0': {'min_borglife': '1.2.0', 'max_borglife': '1.5.0', 'deprecated': False},
+        "gmail": {
+            "1.0.0": {
+                "min_borglife": "1.0.0",
+                "max_borglife": "1.2.0",
+                "deprecated": False,
+            },
+            "1.1.0": {
+                "min_borglife": "1.0.0",
+                "max_borglife": "1.3.0",
+                "deprecated": False,
+            },
+            "1.2.0": {
+                "min_borglife": "1.1.0",
+                "max_borglife": "1.4.0",
+                "deprecated": False,
+            },
+            "1.3.0": {
+                "min_borglife": "1.2.0",
+                "max_borglife": "1.5.0",
+                "deprecated": False,
+            },
         },
-        'stripe': {
-            '2.0.0': {'min_borglife': '1.0.0', 'max_borglife': '1.1.0', 'deprecated': True},
-            '2.1.0': {'min_borglife': '1.0.0', 'max_borglife': '1.2.0', 'deprecated': False},
-            '2.2.0': {'min_borglife': '1.1.0', 'max_borglife': '1.3.0', 'deprecated': False},
-            '2.3.0': {'min_borglife': '1.2.0', 'max_borglife': '1.4.0', 'deprecated': False},
+        "stripe": {
+            "2.0.0": {
+                "min_borglife": "1.0.0",
+                "max_borglife": "1.1.0",
+                "deprecated": True,
+            },
+            "2.1.0": {
+                "min_borglife": "1.0.0",
+                "max_borglife": "1.2.0",
+                "deprecated": False,
+            },
+            "2.2.0": {
+                "min_borglife": "1.1.0",
+                "max_borglife": "1.3.0",
+                "deprecated": False,
+            },
+            "2.3.0": {
+                "min_borglife": "1.2.0",
+                "max_borglife": "1.4.0",
+                "deprecated": False,
+            },
         },
-        'bitcoin': {
-            '1.0.0': {'min_borglife': '1.0.0', 'max_borglife': '1.3.0', 'deprecated': False},
-            '1.1.0': {'min_borglife': '1.1.0', 'max_borglife': '1.4.0', 'deprecated': False},
+        "bitcoin": {
+            "1.0.0": {
+                "min_borglife": "1.0.0",
+                "max_borglife": "1.3.0",
+                "deprecated": False,
+            },
+            "1.1.0": {
+                "min_borglife": "1.1.0",
+                "max_borglife": "1.4.0",
+                "deprecated": False,
+            },
         },
-        'mongodb': {
-            '1.0.0': {'min_borglife': '1.0.0', 'max_borglife': '1.2.0', 'deprecated': False},
-            '1.1.0': {'min_borglife': '1.1.0', 'max_borglife': '1.3.0', 'deprecated': False},
+        "mongodb": {
+            "1.0.0": {
+                "min_borglife": "1.0.0",
+                "max_borglife": "1.2.0",
+                "deprecated": False,
+            },
+            "1.1.0": {
+                "min_borglife": "1.1.0",
+                "max_borglife": "1.3.0",
+                "deprecated": False,
+            },
         },
-        'duckduckgo': {
-            '1.0.0': {'min_borglife': '1.0.0', 'max_borglife': '1.4.0', 'deprecated': False},
+        "duckduckgo": {
+            "1.0.0": {
+                "min_borglife": "1.0.0",
+                "max_borglife": "1.4.0",
+                "deprecated": False,
+            },
         },
-        'grafana': {
-            '1.0.0': {'min_borglife': '1.0.0', 'max_borglife': '1.2.0', 'deprecated': False},
-            '1.1.0': {'min_borglife': '1.1.0', 'max_borglife': '1.3.0', 'deprecated': False},
+        "grafana": {
+            "1.0.0": {
+                "min_borglife": "1.0.0",
+                "max_borglife": "1.2.0",
+                "deprecated": False,
+            },
+            "1.1.0": {
+                "min_borglife": "1.1.0",
+                "max_borglife": "1.3.0",
+                "deprecated": False,
+            },
         },
-        'wikipedia': {
-            '1.0.0': {'min_borglife': '1.0.0', 'max_borglife': '1.4.0', 'deprecated': False},
+        "wikipedia": {
+            "1.0.0": {
+                "min_borglife": "1.0.0",
+                "max_borglife": "1.4.0",
+                "deprecated": False,
+            },
         },
-        'arxiv': {
-            '1.0.0': {'min_borglife': '1.0.0', 'max_borglife': '1.3.0', 'deprecated': False},
-            '1.1.0': {'min_borglife': '1.1.0', 'max_borglife': '1.4.0', 'deprecated': False},
+        "arxiv": {
+            "1.0.0": {
+                "min_borglife": "1.0.0",
+                "max_borglife": "1.3.0",
+                "deprecated": False,
+            },
+            "1.1.0": {
+                "min_borglife": "1.1.0",
+                "max_borglife": "1.4.0",
+                "deprecated": False,
+            },
         },
     }
 
@@ -48,10 +122,7 @@ class DockerMCPCompatibilityMatrix:
 
     @classmethod
     def validate_compatibility(
-        cls,
-        organ_name: str,
-        organ_version: str,
-        borglife_version: str = None
+        cls, organ_name: str, organ_version: str, borglife_version: str = None
     ) -> Tuple[bool, str, Dict[str, Any]]:
         """
         Validate if organ version is compatible with Borglife version
@@ -70,24 +141,40 @@ class DockerMCPCompatibilityMatrix:
 
         # Check if organ version exists
         if organ_version not in organ_matrix:
-            return False, f"Organ '{organ_name}' version '{organ_version}' not supported", {}
+            return (
+                False,
+                f"Organ '{organ_name}' version '{organ_version}' not supported",
+                {},
+            )
 
         compatibility = organ_matrix[organ_version]
 
         # Check if deprecated
-        if compatibility.get('deprecated', False):
-            return False, f"Organ '{organ_name}' version '{organ_version}' is deprecated", compatibility
+        if compatibility.get("deprecated", False):
+            return (
+                False,
+                f"Organ '{organ_name}' version '{organ_version}' is deprecated",
+                compatibility,
+            )
 
         # Check version compatibility
-        min_borglife = compatibility['min_borglife']
-        max_borglife = compatibility['max_borglife']
+        min_borglife = compatibility["min_borglife"]
+        max_borglife = compatibility["max_borglife"]
 
         try:
-            if not (semver.compare(min_borglife, borglife_version) <= 0 <= semver.compare(max_borglife, borglife_version)):
-                return False, (
-                    f"Organ '{organ_name}' v{organ_version} requires Borglife "
-                    f"v{min_borglife} to v{max_borglife}, but running v{borglife_version}"
-                ), compatibility
+            if not (
+                semver.compare(min_borglife, borglife_version)
+                <= 0
+                <= semver.compare(max_borglife, borglife_version)
+            ):
+                return (
+                    False,
+                    (
+                        f"Organ '{organ_name}' v{organ_version} requires Borglife "
+                        f"v{min_borglife} to v{max_borglife}, but running v{borglife_version}"
+                    ),
+                    compatibility,
+                )
         except ValueError as e:
             return False, f"Version comparison error: {e}", compatibility
 
@@ -95,9 +182,7 @@ class DockerMCPCompatibilityMatrix:
 
     @classmethod
     def get_compatible_versions(
-        cls,
-        organ_name: str,
-        borglife_version: str = None
+        cls, organ_name: str, borglife_version: str = None
     ) -> List[str]:
         """
         Get all organ versions compatible with current Borglife version
@@ -120,7 +205,9 @@ class DockerMCPCompatibilityMatrix:
                 compatible_versions.append(version_str)
 
         # Sort by version (newest first)
-        compatible_versions.sort(key=lambda v: semver.VersionInfo.parse(v), reverse=True)
+        compatible_versions.sort(
+            key=lambda v: semver.VersionInfo.parse(v), reverse=True
+        )
         return compatible_versions
 
     @classmethod
@@ -140,9 +227,7 @@ class DockerMCPCompatibilityMatrix:
 
     @classmethod
     def check_update_available(
-        cls,
-        organ_name: str,
-        current_version: str
+        cls, organ_name: str, current_version: str
     ) -> Tuple[bool, Optional[str], str]:
         """
         Check if update is available for organ
@@ -156,17 +241,27 @@ class DockerMCPCompatibilityMatrix:
 
         try:
             if semver.compare(recommended, current_version) > 0:
-                return True, recommended, f"Update available: {current_version} → {recommended}"
+                return (
+                    True,
+                    recommended,
+                    f"Update available: {current_version} → {recommended}",
+                )
             else:
-                return False, None, f"Already on latest compatible version: {current_version}"
+                return (
+                    False,
+                    None,
+                    f"Already on latest compatible version: {current_version}",
+                )
         except ValueError:
-            return False, None, f"Version comparison failed for {current_version} vs {recommended}"
+            return (
+                False,
+                None,
+                f"Version comparison failed for {current_version} vs {recommended}",
+            )
 
     @classmethod
     def get_compatibility_report(
-        cls,
-        organ_versions: Dict[str, str],
-        borglife_version: str = None
+        cls, organ_versions: Dict[str, str], borglife_version: str = None
     ) -> Dict[str, Any]:
         """
         Generate comprehensive compatibility report
@@ -197,31 +292,35 @@ class DockerMCPCompatibilityMatrix:
             )
 
             organ_reports[organ_name] = {
-                'current_version': current_version,
-                'compatible': is_compatible,
-                'reason': reason,
-                'compatibility': compatibility,
-                'update_available': update_available,
-                'recommended_version': new_version,
-                'update_reason': update_reason
+                "current_version": current_version,
+                "compatible": is_compatible,
+                "reason": reason,
+                "compatibility": compatibility,
+                "update_available": update_available,
+                "recommended_version": new_version,
+                "update_reason": update_reason,
             }
 
             if not is_compatible:
                 overall_compatible = False
 
         # Generate summary
-        compatible_count = sum(1 for r in organ_reports.values() if r['compatible'])
+        compatible_count = sum(1 for r in organ_reports.values() if r["compatible"])
         total_count = len(organ_reports)
 
         if overall_compatible:
-            summary = f"All {total_count} organs compatible with Borglife v{borglife_version}"
+            summary = (
+                f"All {total_count} organs compatible with Borglife v{borglife_version}"
+            )
         else:
-            incompatible = [name for name, r in organ_reports.items() if not r['compatible']]
+            incompatible = [
+                name for name, r in organ_reports.items() if not r["compatible"]
+            ]
             summary = f"{len(incompatible)}/{total_count} organs incompatible: {', '.join(incompatible)}"
 
         return {
-            'overall_compatible': overall_compatible,
-            'organ_reports': organ_reports,
-            'summary': summary,
-            'borglife_version': borglife_version
+            "overall_compatible": overall_compatible,
+            "organ_reports": organ_reports,
+            "summary": summary,
+            "borglife_version": borglife_version,
         }

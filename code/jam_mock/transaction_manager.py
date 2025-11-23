@@ -6,21 +6,24 @@ for BorgLife DNA storage operations on Westend testnet.
 """
 
 import asyncio
-import time
 import hashlib
 import json
-from typing import Dict, Any, Optional, List, Tuple, Union
-from decimal import Decimal
+import time
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
-from dataclasses import dataclass, asdict
+from decimal import Decimal
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from substrateinterface import SubstrateInterface, Keypair
-from .advanced_keypair_features import AdvancedKeypairManager, TransactionSigner
+from substrateinterface import Keypair, SubstrateInterface
+
+from .advanced_keypair_features import (AdvancedKeypairManager,
+                                        TransactionSigner)
 
 
 class TransactionStatus(Enum):
     """Transaction status enumeration."""
+
     PENDING = "pending"
     SUBMITTED = "submitted"
     CONFIRMED = "confirmed"
@@ -31,16 +34,18 @@ class TransactionStatus(Enum):
 
 class TransactionType(Enum):
     """Transaction type enumeration."""
+
     DNA_STORAGE = "dna_storage"
     WEALTH_UPDATE = "wealth_update"
     BATCH_OPERATION = "batch_operation"
-    TRANSFER = "transfer"           # WND transfers
+    TRANSFER = "transfer"  # WND transfers
     ASSET_TRANSFER = "asset_transfer"  # USDB transfers
 
 
 @dataclass
 class TransactionRecord:
     """Transaction record for tracking and auditing."""
+
     tx_id: str
     borg_id: str
     transaction_type: TransactionType
@@ -66,22 +71,22 @@ class TransactionRecord:
         """Convert to dictionary for serialization."""
         data = asdict(self)
         # Convert enums to strings
-        data['transaction_type'] = self.transaction_type.value
-        data['status'] = self.status.value
+        data["transaction_type"] = self.transaction_type.value
+        data["status"] = self.status.value
         # Convert datetime to ISO string
-        for field in ['created_at', 'submitted_at', 'confirmed_at']:
+        for field in ["created_at", "submitted_at", "confirmed_at"]:
             if data[field]:
                 data[field] = data[field].isoformat()
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'TransactionRecord':
+    def from_dict(cls, data: Dict[str, Any]) -> "TransactionRecord":
         """Create from dictionary."""
         # Convert strings back to enums
-        data['transaction_type'] = TransactionType(data['transaction_type'])
-        data['status'] = TransactionStatus(data['status'])
+        data["transaction_type"] = TransactionType(data["transaction_type"])
+        data["status"] = TransactionStatus(data["status"])
         # Convert ISO strings back to datetime
-        for field in ['created_at', 'submitted_at', 'confirmed_at']:
+        for field in ["created_at", "submitted_at", "confirmed_at"]:
             if data[field]:
                 data[field] = datetime.fromisoformat(data[field])
         return cls(**data)
@@ -89,6 +94,7 @@ class TransactionRecord:
 
 class TransactionValidationError(Exception):
     """Raised when transaction validation fails."""
+
     pass
 
 
@@ -105,7 +111,7 @@ class TransactionManager:
         westend_adapter,
         keypair_manager: AdvancedKeypairManager,
         confirmation_timeout_seconds: int = 300,  # 5 minutes
-        max_retry_attempts: int = 3
+        max_retry_attempts: int = 3,
     ):
         self.westend_adapter = westend_adapter
         self.keypair_manager = keypair_manager
@@ -145,10 +151,7 @@ class TransactionManager:
         print("✅ Transaction monitoring stopped")
 
     def validate_transaction_comprehensive(
-        self,
-        borg_id: str,
-        transaction_data: Dict[str, Any],
-        keypair_name: str
+        self, borg_id: str, transaction_data: Dict[str, Any], keypair_name: str
     ) -> Dict[str, Any]:
         """
         Comprehensive transaction validation.
@@ -162,74 +165,84 @@ class TransactionManager:
             Validation results with detailed checks
         """
         validation_results = {
-            'valid': True,
-            'checks': {},
-            'warnings': [],
-            'errors': [],
-            'recommendations': []
+            "valid": True,
+            "checks": {},
+            "warnings": [],
+            "errors": [],
+            "recommendations": [],
         }
 
         # Basic validation using keypair manager
-        basic_validation = self.keypair_manager.validate_transaction(keypair_name, transaction_data)
-        validation_results['checks']['basic'] = basic_validation
+        basic_validation = self.keypair_manager.validate_transaction(
+            keypair_name, transaction_data
+        )
+        validation_results["checks"]["basic"] = basic_validation
 
-        if not basic_validation['valid']:
-            validation_results['valid'] = False
-            validation_results['errors'].extend(basic_validation['errors'])
+        if not basic_validation["valid"]:
+            validation_results["valid"] = False
+            validation_results["errors"].extend(basic_validation["errors"])
 
         # Borg ID validation
         if not self._validate_borg_id(borg_id):
-            validation_results['errors'].append(f"Invalid borg ID format: {borg_id}")
-            validation_results['valid'] = False
+            validation_results["errors"].append(f"Invalid borg ID format: {borg_id}")
+            validation_results["valid"] = False
 
         # Transaction type validation
-        tx_type = transaction_data.get('type', 'dna_storage')
+        tx_type = transaction_data.get("type", "dna_storage")
         if tx_type not in [t.value for t in TransactionType]:
-            validation_results['errors'].append(f"Invalid transaction type: {tx_type}")
-            validation_results['valid'] = False
+            validation_results["errors"].append(f"Invalid transaction type: {tx_type}")
+            validation_results["valid"] = False
 
         # DNA hash validation (for DNA storage)
-        if tx_type == 'dna_storage':
-            dna_hash = transaction_data.get('dna_hash')
+        if tx_type == "dna_storage":
+            dna_hash = transaction_data.get("dna_hash")
             if not dna_hash or not self._is_valid_hash(dna_hash):
-                validation_results['errors'].append("Invalid or missing DNA hash")
-                validation_results['valid'] = False
+                validation_results["errors"].append("Invalid or missing DNA hash")
+                validation_results["valid"] = False
 
         # Fee estimation and validation
-        fee_info = self.keypair_manager.estimate_transaction_fee(keypair_name, transaction_data)
-        validation_results['checks']['fee'] = fee_info
+        fee_info = self.keypair_manager.estimate_transaction_fee(
+            keypair_name, transaction_data
+        )
+        validation_results["checks"]["fee"] = fee_info
 
-        if 'error' in fee_info:
-            validation_results['warnings'].append(f"Fee estimation failed: {fee_info['error']}")
+        if "error" in fee_info:
+            validation_results["warnings"].append(
+                f"Fee estimation failed: {fee_info['error']}"
+            )
         else:
-            estimated_fee = fee_info.get('estimated_fee', Decimal('0'))
+            estimated_fee = fee_info.get("estimated_fee", Decimal("0"))
             max_fee = self.keypair_manager.max_transaction_fee
 
             if estimated_fee > max_fee:
-                validation_results['errors'].append(
+                validation_results["errors"].append(
                     f"Estimated fee {estimated_fee} WND exceeds maximum {max_fee} WND"
                 )
-                validation_results['valid'] = False
-            elif estimated_fee > max_fee * Decimal('0.8'):
-                validation_results['warnings'].append(
+                validation_results["valid"] = False
+            elif estimated_fee > max_fee * Decimal("0.8"):
+                validation_results["warnings"].append(
                     f"High fee: {estimated_fee} WND (close to maximum {max_fee} WND)"
                 )
 
         # Network health check
         try:
             health = asyncio.run(self.westend_adapter.health_check())
-            validation_results['checks']['network'] = health
+            validation_results["checks"]["network"] = health
 
-            if health.get('status') != 'healthy':
-                validation_results['warnings'].append("Network health check failed")
+            if health.get("status") != "healthy":
+                validation_results["warnings"].append("Network health check failed")
         except Exception as e:
-            validation_results['warnings'].append(f"Network check error: {e}")
+            validation_results["warnings"].append(f"Network check error: {e}")
 
         # Add recommendations
-        if validation_results['valid']:
-            validation_results['recommendations'].append("Transaction ready for submission")
+        if validation_results["valid"]:
+            validation_results["recommendations"].append(
+                "Transaction ready for submission"
+            )
         else:
-            validation_results['recommendations'].append("Fix validation errors before submission")
+            validation_results["recommendations"].append(
+                "Fix validation errors before submission"
+            )
 
         return validation_results
 
@@ -238,7 +251,7 @@ class TransactionManager:
         borg_id: str,
         transaction_data: Dict[str, Any],
         keypair_name: str,
-        wait_for_confirmation: bool = True
+        wait_for_confirmation: bool = True,
     ) -> Dict[str, Any]:
         """
         Submit a transaction with comprehensive validation and monitoring.
@@ -256,24 +269,28 @@ class TransactionManager:
         tx_id = self._generate_transaction_id(borg_id, transaction_data)
 
         # Comprehensive validation
-        validation = self.validate_transaction_comprehensive(borg_id, transaction_data, keypair_name)
+        validation = self.validate_transaction_comprehensive(
+            borg_id, transaction_data, keypair_name
+        )
 
-        if not validation['valid']:
+        if not validation["valid"]:
             return {
-                'success': False,
-                'tx_id': tx_id,
-                'error': 'Validation failed',
-                'validation_errors': validation['errors'],
-                'validation_warnings': validation['warnings']
+                "success": False,
+                "tx_id": tx_id,
+                "error": "Validation failed",
+                "validation_errors": validation["errors"],
+                "validation_warnings": validation["warnings"],
             }
 
         # Create transaction record
         tx_record = TransactionRecord(
             tx_id=tx_id,
             borg_id=borg_id,
-            transaction_type=TransactionType(transaction_data.get('type', 'dna_storage')),
+            transaction_type=TransactionType(
+                transaction_data.get("type", "dna_storage")
+            ),
             status=TransactionStatus.PENDING,
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
         )
 
         # Add to pending transactions
@@ -288,30 +305,30 @@ class TransactionManager:
                 keypair_name, transaction_data, self.westend_adapter
             )
 
-            if result.get('success'):
+            if result.get("success"):
                 tx_record.status = TransactionStatus.CONFIRMED
                 tx_record.confirmed_at = datetime.utcnow()
-                tx_record.transaction_hash = result.get('transaction_hash')
-                tx_record.block_hash = result.get('block')
-                tx_record.block_number = result.get('westend_block_number')
-                tx_record.fee_paid = result.get('cost', Decimal('0'))
+                tx_record.transaction_hash = result.get("transaction_hash")
+                tx_record.block_hash = result.get("block")
+                tx_record.block_number = result.get("westend_block_number")
+                tx_record.fee_paid = result.get("cost", Decimal("0"))
 
                 # Move to completed
                 self.completed_transactions[tx_id] = tx_record
                 del self.pending_transactions[tx_id]
 
                 return {
-                    'success': True,
-                    'tx_id': tx_id,
-                    'transaction_hash': tx_record.transaction_hash,
-                    'block_number': tx_record.block_number,
-                    'fee_paid': tx_record.fee_paid,
-                    'validation_warnings': validation['warnings']
+                    "success": True,
+                    "tx_id": tx_id,
+                    "transaction_hash": tx_record.transaction_hash,
+                    "block_number": tx_record.block_number,
+                    "fee_paid": tx_record.fee_paid,
+                    "validation_warnings": validation["warnings"],
                 }
             else:
                 # Handle submission failure
                 tx_record.status = TransactionStatus.FAILED
-                tx_record.error_message = result.get('error', 'Unknown error')
+                tx_record.error_message = result.get("error", "Unknown error")
                 tx_record.retry_count += 1
 
                 # Check if we should retry
@@ -324,11 +341,11 @@ class TransactionManager:
                     del self.pending_transactions[tx_id]
 
                 return {
-                    'success': False,
-                    'tx_id': tx_id,
-                    'error': tx_record.error_message,
-                    'retry_count': tx_record.retry_count,
-                    'max_retries': tx_record.max_retries
+                    "success": False,
+                    "tx_id": tx_id,
+                    "error": tx_record.error_message,
+                    "retry_count": tx_record.retry_count,
+                    "max_retries": tx_record.max_retries,
                 }
 
         except Exception as e:
@@ -338,11 +355,7 @@ class TransactionManager:
             self.failed_transactions[tx_id] = tx_record
             del self.pending_transactions[tx_id]
 
-            return {
-                'success': False,
-                'tx_id': tx_id,
-                'error': str(e)
-            }
+            return {"success": False, "tx_id": tx_id, "error": str(e)}
 
     async def get_transaction_status(self, tx_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -355,7 +368,11 @@ class TransactionManager:
             Transaction status information
         """
         # Check all transaction stores
-        for store in [self.pending_transactions, self.completed_transactions, self.failed_transactions]:
+        for store in [
+            self.pending_transactions,
+            self.completed_transactions,
+            self.failed_transactions,
+        ]:
             if tx_id in store:
                 record = store[tx_id]
                 status_info = record.to_dict()
@@ -364,7 +381,9 @@ class TransactionManager:
                 if record.status == TransactionStatus.CONFIRMED:
                     if record.confirmed_at and record.submitted_at:
                         confirmation_time = record.confirmed_at - record.submitted_at
-                        status_info['confirmation_time_seconds'] = confirmation_time.total_seconds()
+                        status_info["confirmation_time_seconds"] = (
+                            confirmation_time.total_seconds()
+                        )
 
                 return status_info
 
@@ -407,7 +426,7 @@ class TransactionManager:
         record = self.failed_transactions[tx_id]
 
         if record.retry_count >= record.max_retries:
-            return {'error': 'Max retries exceeded'}
+            return {"error": "Max retries exceeded"}
 
         # Move back to pending for retry
         record.retry_count += 1
@@ -417,44 +436,60 @@ class TransactionManager:
         self.pending_transactions[tx_id] = record
         del self.failed_transactions[tx_id]
 
-        return {'status': 'retry_queued', 'retry_count': record.retry_count}
+        return {"status": "retry_queued", "retry_count": record.retry_count}
 
     def get_transaction_statistics(self) -> Dict[str, Any]:
         """Get comprehensive transaction statistics."""
         now = datetime.utcnow()
 
         # Calculate statistics
-        total_submitted = len(self.completed_transactions) + len(self.failed_transactions) + len(self.pending_transactions)
+        total_submitted = (
+            len(self.completed_transactions)
+            + len(self.failed_transactions)
+            + len(self.pending_transactions)
+        )
         successful = len(self.completed_transactions)
         failed = len(self.failed_transactions)
         pending = len(self.pending_transactions)
 
         # Success rate
-        success_rate = (successful / total_submitted * 100) if total_submitted > 0 else 0
+        success_rate = (
+            (successful / total_submitted * 100) if total_submitted > 0 else 0
+        )
 
         # Average confirmation time
         confirmation_times = []
         for record in self.completed_transactions.values():
             if record.confirmed_at and record.submitted_at:
-                confirmation_times.append((record.confirmed_at - record.submitted_at).total_seconds())
+                confirmation_times.append(
+                    (record.confirmed_at - record.submitted_at).total_seconds()
+                )
 
-        avg_confirmation_time = sum(confirmation_times) / len(confirmation_times) if confirmation_times else 0
+        avg_confirmation_time = (
+            sum(confirmation_times) / len(confirmation_times)
+            if confirmation_times
+            else 0
+        )
 
         # Fee statistics
-        fees = [record.fee_paid for record in self.completed_transactions.values() if record.fee_paid]
-        avg_fee = sum(fees) / len(fees) if fees else Decimal('0')
-        total_fees = sum(fees) if fees else Decimal('0')
+        fees = [
+            record.fee_paid
+            for record in self.completed_transactions.values()
+            if record.fee_paid
+        ]
+        avg_fee = sum(fees) / len(fees) if fees else Decimal("0")
+        total_fees = sum(fees) if fees else Decimal("0")
 
         return {
-            'total_transactions': total_submitted,
-            'successful': successful,
-            'failed': failed,
-            'pending': pending,
-            'success_rate_percent': round(success_rate, 2),
-            'avg_confirmation_time_seconds': round(avg_confirmation_time, 2),
-            'avg_fee_ksm': float(avg_fee),
-            'total_fees_ksm': float(total_fees),
-            'timestamp': now.isoformat()
+            "total_transactions": total_submitted,
+            "successful": successful,
+            "failed": failed,
+            "pending": pending,
+            "success_rate_percent": round(success_rate, 2),
+            "avg_confirmation_time_seconds": round(avg_confirmation_time, 2),
+            "avg_fee_ksm": float(avg_fee),
+            "total_fees_ksm": float(total_fees),
+            "timestamp": now.isoformat(),
         }
 
     async def _monitor_transactions(self):
@@ -476,12 +511,17 @@ class TransactionManager:
                             continue
 
                     # For submitted transactions, check confirmation status
-                    if record.status == TransactionStatus.SUBMITTED and record.transaction_hash:
+                    if (
+                        record.status == TransactionStatus.SUBMITTED
+                        and record.transaction_hash
+                    ):
                         # In a real implementation, we would query the blockchain
                         # For now, simulate confirmation after some time
                         if record.submitted_at:
                             elapsed = datetime.utcnow() - record.submitted_at
-                            if elapsed.total_seconds() > 10:  # Simulate 10 second confirmation
+                            if (
+                                elapsed.total_seconds() > 10
+                            ):  # Simulate 10 second confirmation
                                 record.status = TransactionStatus.CONFIRMED
                                 record.confirmed_at = datetime.utcnow()
                                 record.block_number = 1000000  # Mock block number
@@ -501,15 +541,23 @@ class TransactionManager:
             # Wait before next check
             await asyncio.sleep(5)  # Check every 5 seconds
 
-    def _generate_transaction_id(self, borg_id: str, transaction_data: Dict[str, Any]) -> str:
+    def _generate_transaction_id(
+        self, borg_id: str, transaction_data: Dict[str, Any]
+    ) -> str:
         """Generate unique transaction ID."""
         # Create deterministic hash from borg_id and transaction data
-        data_str = f"{borg_id}:{json.dumps(transaction_data, sort_keys=True)}:{time.time()}"
+        data_str = (
+            f"{borg_id}:{json.dumps(transaction_data, sort_keys=True)}:{time.time()}"
+        )
         return hashlib.sha256(data_str.encode()).hexdigest()[:16]
 
     def _validate_borg_id(self, borg_id: str) -> bool:
         """Validate borg ID format."""
-        return bool(borg_id and len(borg_id) <= 50 and borg_id.replace('-', '').replace('_', '').isalnum())
+        return bool(
+            borg_id
+            and len(borg_id) <= 50
+            and borg_id.replace("-", "").replace("_", "").isalnum()
+        )
 
     def _is_valid_hash(self, hash_str: str) -> bool:
         """Validate hash format."""

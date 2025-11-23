@@ -4,10 +4,11 @@ Provides continuous monitoring and tampering detection for borg DNA integrity.
 """
 
 import hashlib
-from typing import Dict, Any, Optional
 from datetime import datetime
+from typing import Any, Dict, Optional
 
 from jam_mock.demo_audit_logger import DemoAuditLogger
+
 from .dna_anchor import DNAAanchor
 
 
@@ -19,7 +20,11 @@ class DNAIntegrityVerifier:
     DNA manipulation attacks and ensure evolutionary integrity.
     """
 
-    def __init__(self, dna_anchor: Optional[DNAAanchor] = None, audit_logger: Optional[DemoAuditLogger] = None):
+    def __init__(
+        self,
+        dna_anchor: Optional[DNAAanchor] = None,
+        audit_logger: Optional[DemoAuditLogger] = None,
+    ):
         """
         Initialize DNA Integrity Verifier.
 
@@ -42,12 +47,12 @@ class DNAIntegrityVerifier:
             Verification result with integrity status and details
         """
         result = {
-            'borg_id': borg_id,
-            'integrity_verified': False,
-            'tampering_detected': False,
-            'verification_details': {},
-            'recommendations': [],
-            'verified_at': datetime.utcnow().isoformat()
+            "borg_id": borg_id,
+            "integrity_verified": False,
+            "tampering_detected": False,
+            "verification_details": {},
+            "recommendations": [],
+            "verified_at": datetime.utcnow().isoformat(),
         }
 
         try:
@@ -55,47 +60,50 @@ class DNAIntegrityVerifier:
             is_anchored = self.dna_anchor.verify_anchoring(local_dna_hash)
 
             if not is_anchored:
-                result['tampering_detected'] = True
-                result['verification_details']['anchoring_status'] = 'not_found'
-                result['recommendations'].append('DNA hash not found on-chain - possible tampering or anchoring failure')
+                result["tampering_detected"] = True
+                result["verification_details"]["anchoring_status"] = "not_found"
+                result["recommendations"].append(
+                    "DNA hash not found on-chain - possible tampering or anchoring failure"
+                )
             else:
-                result['integrity_verified'] = True
-                result['verification_details']['anchoring_status'] = 'confirmed'
+                result["integrity_verified"] = True
+                result["verification_details"]["anchoring_status"] = "confirmed"
 
             # Log verification result
-            severity = 'critical' if result['tampering_detected'] else 'info'
+            severity = "critical" if result["tampering_detected"] else "info"
             self.audit_logger.log_security_event(
-                'dna_integrity_check',
-                'system',
+                "dna_integrity_check",
+                "system",
                 {
-                    'borg_id': borg_id,
-                    'integrity_verified': result['integrity_verified'],
-                    'tampering_detected': result['tampering_detected'],
-                    'local_dna_hash': local_dna_hash[:16] + '...',
-                    'anchoring_verified': is_anchored
+                    "borg_id": borg_id,
+                    "integrity_verified": result["integrity_verified"],
+                    "tampering_detected": result["tampering_detected"],
+                    "local_dna_hash": local_dna_hash[:16] + "...",
+                    "anchoring_verified": is_anchored,
                 },
-                severity
+                severity,
             )
 
         except Exception as e:
-            result['verification_details']['error'] = str(e)
-            result['recommendations'].append(f'Integrity verification failed: {str(e)}')
+            result["verification_details"]["error"] = str(e)
+            result["recommendations"].append(f"Integrity verification failed: {str(e)}")
 
             self.audit_logger.log_security_event(
-                'dna_integrity_check_failed',
-                'system',
+                "dna_integrity_check_failed",
+                "system",
                 {
-                    'borg_id': borg_id,
-                    'error': str(e),
-                    'local_dna_hash': local_dna_hash[:16] + '...'
+                    "borg_id": borg_id,
+                    "error": str(e),
+                    "local_dna_hash": local_dna_hash[:16] + "...",
                 },
-                'high'
+                "high",
             )
 
         return result
 
-    def detect_dna_tampering(self, borg_id: str, original_dna: Dict[str, Any],
-                           modified_dna: Dict[str, Any]) -> Dict[str, Any]:
+    def detect_dna_tampering(
+        self, borg_id: str, original_dna: Dict[str, Any], modified_dna: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Detect tampering by comparing original and modified DNA structures.
 
@@ -108,12 +116,12 @@ class DNAIntegrityVerifier:
             Tampering analysis with detected changes
         """
         result = {
-            'borg_id': borg_id,
-            'tampering_detected': False,
-            'changes_detected': [],
-            'severity': 'low',
-            'analysis': {},
-            'analyzed_at': datetime.utcnow().isoformat()
+            "borg_id": borg_id,
+            "tampering_detected": False,
+            "changes_detected": [],
+            "severity": "low",
+            "analysis": {},
+            "analyzed_at": datetime.utcnow().isoformat(),
         }
 
         try:
@@ -121,49 +129,51 @@ class DNAIntegrityVerifier:
             changes = self._compare_dna_structures(original_dna, modified_dna)
 
             if changes:
-                result['tampering_detected'] = True
-                result['changes_detected'] = changes
+                result["tampering_detected"] = True
+                result["changes_detected"] = changes
 
                 # Assess severity
                 if len(changes) > 5:
-                    result['severity'] = 'high'
+                    result["severity"] = "high"
                 elif len(changes) > 2:
-                    result['severity'] = 'medium'
+                    result["severity"] = "medium"
                 else:
-                    result['severity'] = 'low'
+                    result["severity"] = "low"
 
-                result['analysis'] = {
-                    'total_changes': len(changes),
-                    'change_types': list(set(change['type'] for change in changes)),
-                    'severity_assessment': result['severity']
+                result["analysis"] = {
+                    "total_changes": len(changes),
+                    "change_types": list(set(change["type"] for change in changes)),
+                    "severity_assessment": result["severity"],
                 }
 
             # Log tampering detection
-            if result['tampering_detected']:
+            if result["tampering_detected"]:
                 self.audit_logger.log_security_event(
-                    'dna_tampering_detected',
-                    'system',
+                    "dna_tampering_detected",
+                    "system",
                     {
-                        'borg_id': borg_id,
-                        'changes_count': len(changes),
-                        'severity': result['severity'],
-                        'change_types': result['analysis']['change_types']
+                        "borg_id": borg_id,
+                        "changes_count": len(changes),
+                        "severity": result["severity"],
+                        "change_types": result["analysis"]["change_types"],
                     },
-                    result['severity']
+                    result["severity"],
                 )
 
         except Exception as e:
-            result['analysis']['error'] = str(e)
+            result["analysis"]["error"] = str(e)
             self.audit_logger.log_security_event(
-                'dna_tampering_analysis_failed',
-                'system',
-                {'borg_id': borg_id, 'error': str(e)},
-                'medium'
+                "dna_tampering_analysis_failed",
+                "system",
+                {"borg_id": borg_id, "error": str(e)},
+                "medium",
             )
 
         return result
 
-    def _compare_dna_structures(self, original: Dict[str, Any], modified: Dict[str, Any]) -> list:
+    def _compare_dna_structures(
+        self, original: Dict[str, Any], modified: Dict[str, Any]
+    ) -> list:
         """
         Compare DNA structures and identify changes.
 
@@ -182,29 +192,31 @@ class DNAIntegrityVerifier:
 
         # Added keys
         for key in modified_keys - original_keys:
-            changes.append({
-                'type': 'addition',
-                'field': key,
-                'new_value': str(modified[key])[:100]
-            })
+            changes.append(
+                {
+                    "type": "addition",
+                    "field": key,
+                    "new_value": str(modified[key])[:100],
+                }
+            )
 
         # Removed keys
         for key in original_keys - modified_keys:
-            changes.append({
-                'type': 'removal',
-                'field': key,
-                'old_value': str(original[key])[:100]
-            })
+            changes.append(
+                {"type": "removal", "field": key, "old_value": str(original[key])[:100]}
+            )
 
         # Modified values
         for key in original_keys & modified_keys:
             if original[key] != modified[key]:
-                changes.append({
-                    'type': 'modification',
-                    'field': key,
-                    'old_value': str(original[key])[:100],
-                    'new_value': str(modified[key])[:100]
-                })
+                changes.append(
+                    {
+                        "type": "modification",
+                        "field": key,
+                        "old_value": str(original[key])[:100],
+                        "new_value": str(modified[key])[:100],
+                    }
+                )
 
         return changes
 
@@ -219,34 +231,32 @@ class DNAIntegrityVerifier:
             Integrity report with summary statistics
         """
         report = {
-            'total_borgs': len(borg_ids),
-            'integrity_checks': [],
-            'summary': {
-                'verified': 0,
-                'tampered': 0,
-                'errors': 0
-            },
-            'critical_findings': [],
-            'generated_at': datetime.utcnow().isoformat()
+            "total_borgs": len(borg_ids),
+            "integrity_checks": [],
+            "summary": {"verified": 0, "tampered": 0, "errors": 0},
+            "critical_findings": [],
+            "generated_at": datetime.utcnow().isoformat(),
         }
 
         for borg_id in borg_ids:
             # In a real implementation, we'd get the current DNA hash from database
             # For demo, we'll simulate integrity checks
             check_result = {
-                'borg_id': borg_id,
-                'status': 'verified',  # Assume verified for demo
-                'last_check': datetime.utcnow().isoformat()
+                "borg_id": borg_id,
+                "status": "verified",  # Assume verified for demo
+                "last_check": datetime.utcnow().isoformat(),
             }
 
-            report['integrity_checks'].append(check_result)
+            report["integrity_checks"].append(check_result)
 
-            if check_result['status'] == 'verified':
-                report['summary']['verified'] += 1
-            elif check_result['status'] == 'tampered':
-                report['summary']['tampered'] += 1
-                report['critical_findings'].append(f"Borg {borg_id}: DNA tampering detected")
+            if check_result["status"] == "verified":
+                report["summary"]["verified"] += 1
+            elif check_result["status"] == "tampered":
+                report["summary"]["tampered"] += 1
+                report["critical_findings"].append(
+                    f"Borg {borg_id}: DNA tampering detected"
+                )
             else:
-                report['summary']['errors'] += 1
+                report["summary"]["errors"] += 1
 
         return report

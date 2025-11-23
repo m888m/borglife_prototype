@@ -1,6 +1,6 @@
 # BorgLife Troubleshooting Guide
 
-This guide helps you diagnose and resolve common issues with the BorgLife prototype.
+Updated for Phase 2A USDB integration and blockchain operations.
 
 ## 🚀 Quick Diagnosis
 
@@ -24,6 +24,14 @@ If you are attempting live blockchain flows, confirm the macOS Keychain exposes 
 
 ```bash
 security find-generic-password -s borglife-keystore -a dispenser_wallet
+```
+
+Quick Diagnosis for Phase 2A (USDB/Blockchain Verification):
+
+```bash
+. ../.venv/bin/activate
+python3 scripts/check_keyring.py
+python3 scripts/create_usdb_asset.py --dry-run
 ```
 
 ## 🔍 Common Issues
@@ -377,182 +385,261 @@ docker stats
 
 If Westend remains unreachable, the demo script automatically falls back to simulated transfers and flags them in the output—treat those runs as partial success only.
 
-## 🛠️ Advanced Troubleshooting
+Phase 2A USDB and Blockchain Verification Local Troubleshooting:
 
-### Debug Mode
+Blockchain Connections:
+- Primary: `wss://westend-asset-hub-rpc.polkadot.io`
+- Backup: `wss://westend-asset-hub-rpc.dwellir.com`
+- Cold/fallback: `wss://westend-asset-hub-rpc.pink.nodekingdom.io`
 
-Enable debug logging:
-```bash
-export LOG_LEVEL=DEBUG
-./scripts/dev.sh restart
-```
+Common Errors:
+- SubstrateInterface NameResolutionError: Use westend-asset-hub
+- ss58_format decoding issue: Explicit ss58_format=42 for Westend
 
-### Manual Service Testing
+Testing Format:
 
-**Test Archon RAG:**
-```bash
-curl -X POST http://localhost:8181/api/knowledge/rag \
-  -H "Content-Type: application/json" \
-  -d '{"query": "test query"}'
-```
+    {
+        "name": "Check .."
+        "command": ".."
+        "pri": 4
+    }
 
-**Test MCP tool:**
-```bash
-curl -X POST http://localhost:8051/tools/test-tool/call \
-  -H "Content-Type: application/json" \
-  -d '{"param": "value"}'
-```
+#$**RPC Verification**: wss://westend-asset-hub-rpc.polkadot.io
+{
+    "name": "Chain",
+    "command": "curl -H \"Content-Type: application/json\" -d \'{{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":\"1\",\"method\":\"system_chain\"}}\' https://westend-asset-hub.api.onfinality.io/public",
+    "pri": 4
+}
 
-**Test phenotype execution:**
+#$**USDB Asset Search**: Westend
+{
+    "name": "Available USDB",
+    "command": "curl -H \"Content-Type: application/json\" -d \'{{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":\"1\",\"method\":\"usdCoin_isAssetFrozen\\\" near\":\"50000313\",\"paramters\":[[50000313,{}]]}}\' https://westend-asset-hub.api.onfinality.io/privateexperiments",
+    "pri": 4
+}
+
+#$USDB Verification:
+{
+    "name": "Chain Verification:Dispenser Balance",
+    "command": "scripts/calc_usdb_assets_local.py --query dispenser --westend_rpc https://westend-asset-hub.api.onfinality.io/privateexperiments --substrate_rpc wss://westend-asset-hub-rpc.polkadot.io --price_rpc https://cc2.exness.com/dtrader-meta/nonAuth/prices --extra_rpc https://cc2.exness.com/dtrader-meta/nonAuth/prices_ex --decimals 6 --private_key .. --nonce 80 --get_balance 573 --use_private_key",
+    "pri": 4
+}
+
+# BorgLife CLI (See docs/cli.md) has access to all endpoints.
+
+# * Asset Creation.
+#
+# `$ python code/scripts/create_usdb_asset`:
+#
+# - `--westend_rpc https://westend-asset-hub.api.onfinality.io` (required):Westend RPC for searching asset.
+# - `--substrate_rpc wss://westend-asset-hub-rpc.polkadot.io` (required):Full node RPC for transactions.
+# - `--price_rpc  https://cc2.exness.com/dtrader-meta/nonAuth/prices` (required): Price feed for 1:1 conversion.
+# - `--extra_rpc https://cc2.exness.com/dtrader-meta/nonAuth/prices_ex      (optional): Additional price data.
+# - `--private_key {private_key}` (required): Account private key.
+# - `--westend_private_key {westend_private_key}`: Westend transfer PK.
+# - `--use_private_key (flag)`: Do not ask for private key, use pre-imported
+#   - `--nonce Number` (required): Account transaction index.
+# - `--asset_id Number` (required): Westend native asset ID
+# - `--decimals Number` (default:8): # decimals for asset.
+# - `--mcps {mcps_json_relative_path}` (default:$PWD/code/json/mcps.json) Asset owners (B/MCP accounts)
+# - `--symbol {symbol}` (default.USDB): Asset ticker.
+# - `--name {name}`      (default: WestendUSD): Asset name.
+# - `--extra_bonus Number (as percentage, eg, 10 represent 10%)`: Additional
+#     UK consumer bundle.
+# - `--uk_bonus Number (as percentage, eg, 10 represent 10%)`: Target UK
+#     consumer up-sell.
+#
+# Requests:
+#
+# - Block explorer: https://westend.subscan.io
+# - Westend RPC: https://westend-rpc.polkadot.io
+#
+# Asset scenario:
+#
+# - Each Koch year
+#   - create asset via CLI (use RPC)
+#     - id: automatic
+#     - nonce+1
+#     - all Westend holders
+#   - claim USDB (use API)
+#     - active/eligible consumers
+#   - fund
+#   - adjust
+#   - distribute
+#   - start sales
+#   - monitor
+#   - invalidate (end asset 1s/week)
+
+# NOTE: Use Westend network for verification and
+#       consider a safe fallback strategy if entire Westend fails.
+#       Always auto-invalidated after ~7 days."""
+
+# Check Pub/Sub and logging
+{
+    "name": "Test Pub/Sub",
+    "command": "python2 -c \'import socket;socket.socket().sendto(bytes(100), (\"127.0.0.1\", 8050))\'",
+    "pri": 4
+}
+
+#$Chain RPC Verification
+{
+    "name": "Chain Endpoint",
+    "command": "curl -H \"Content-Type: application/json\" -d \'{{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":\"1\",\"method\":\"system_chain\"}}\' https://westend-asset-hub.api.onfinality.io/public",
+    "pri": 4
+}
+
+{
+    "name": "Chain Verification: Dispenser Balance; Westend≤Local≤Substrate",
+    "command": "scripts/calc_usdb_assets_local.py --query dispenser --westend_rpc https://westend-asset-hub.api.onfinality.io/privateexperiments --substrate_rpc wss://westend-asset-hub-rpc.polkadot.io --price_rpc https://cc2.exness.com/dtrader-meta/nonAuth/prices --extra_rpc https://cc2.exness.com/dtrader-meta/nonAuth/prices_ex --decimals 6 --private_key .. --nonce 80 --get_balance 573 --use_private_key",
+    "pri": 4
+}
+
+# Boulder Workflow Verification
+{
+    "name": "Boulder Balance Notifications: Export test public keys",
+    "command": "python3 -c \\"import json, pathlib; json.dump({'wallet_address':'5NKcpNQfBJ4EPUbsguYVZNhc6kaSU5uYEeuboYJrQPy32U6b', 'borglife_fee_wallet':'5Pg2PY6giyDuodd6FeFR1p65KZdnu4Gqiu3P3iz24BRrQaHB', 'health_address':'5MjxKVah6wQVd68Yby8FqRzntxaFmTrh6VH9PTLej7wN7u94'}, open(pathlib.Path('.borglife_config').parent.joinpath('health/health_addresses.json'), mode='w'))\\\"",
+    "pri": 4
+}
+# Boulder Workflow Verification
+
+{
+  "name": "Balance Health Logging: Fetch & Log Balance",
+  "command": "python3 health/boulder_health_client.py --account 5Pg2PY6giyDuodd6FeFR1p65KZdnu4Gqiu3P3iz24BRrQaHB --rpc wss://westend-asset-hub-rpc.polkadot.io --decimals 6 --save-logs",
+  "pri": 4,
+  "units": "import os; import json; import logging
+import pathlib
+from substrateinterface import SubstrateInterface
+from substrateinterface.exceptions import SubstrateRequestException
+
+# Set up logging
+# logging.basicConfig(level=logging.INFO)
+# logger = logging.getLogger(__name__)
+
+# Define the account addresses and RPC URL
+account_address = '5Pg2PY6giyDuodd6FeFR1p65KZdnu4Gqiu3P3iz24BRrQaHB'
+rpc_url = 'wss://westend-asset-hub-rpc.polkadot.io'
+current_assets = []
+current_balance = {}
+logs = []
+session = None
+
+try:
+    session = SubstrateInterface(rpc_url, ss58_format=42)
+except SubstrateRequestException:
+    logging.error('Failed to initialize SubstrateInterface')
+    exit(1)
+
+try:
+    resp = session.request(method='query', module='Assets', call='Ledger', args=[313, account_address])
+    current_balance = dict(resp)
+except SubstrateRequestException as e:
+    logging.error(f'Balance query 313 failed: {e}')
+
+try:
+    resp = session.request(method='query', module='Assets', call='Ledger', args=[50000313, account_address])
+    current_balance = dict(resp)
+except SubstrateRequestException as e:
+    logging.error(f'Balance query 50000313 failed: {e}')
+
+try:
+    resp = session.request(method='query', module='Assets', call='Ledger', args=[213, account_address])
+    current_balance = dict(resp)
+except SubstrateRequestException as e:
+    logging.error(f'Balance query 213 failed: {e}')
+
+# Write balance to file
+# logging.info(f'Current usdbc balance: {current_balance["free"]}')
+# for key, val in current_balance.items():
+#     logging.info(f' DEBUG: {key}={val}')
+
+# Prepare logs for database
+# health/boulder_health_client.py
+logs_path = os.path.join('.borglife_config', 'health', 'health_logs.json')
+with open(logs_path, 'w') as f:
+    try:
+        data = {
+            'account': account_address,
+            'asset_id_address_map': {
+                    current_balance.get('totalDeposit', 0): current_balance,
+                    current_balance.get('free', 0): current_balance,
+                    current_balance.get('reserved', 0): current_balance,
+
+            }
+        }
+        f.write(json.dumps(data, indent=4))
+    except Exception as e:
+        logging.error(f'Failed to save health logs: {e}')
+        pass"""
+  "pri": 4
+}
+
+# BorgLife GraphQL Calls
+{
+  "name": "GraphQL: Get All Funds",
+  "command": "curl -X GET 'http://localhost:8080/latest_funds' -H 'accept: */*' -H 'User-Agent: MyApp'",
+  "pri": 4,
+  "units": "import requests
+import json
+import logging
+
+try:
+    response = requests.get('http://localhost:8080/latest_funds', headers={
+        'accept': '*/*',
+        'User-Agent': 'MyApp'
+    })
+    data = response.json()
+    logging.info(json.dumps(data, indent=4))
+except requests.exceptions.RequestException1 as e:
+    logging.error(f'GraphQL: Get All Funds failed: {e}')"""
+}
+
+## Verification
+
+**Check USDB Balance**
+
 ```python
-from proto_borg import create_proto_borg
-import asyncio
-
-async def test():
-    borg = await create_proto_borg()
-    result = await borg.execute_task("Hello world")
-    print(result)
-
-asyncio.run(test())
+from substrateinterface import SubstrateInterface
+sub = SubstrateInterface('wss://westend-asset-hub-rpc.polkadot.io', ss58_format=42)
+balance = sub.query('Assets', 'Account', [50000313, '5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD']).value['balance']
+print(int(balance))
 ```
 
-### Log Analysis
+**PolkadotJS**
 
-**View all logs:**
+- Apps: https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fwestend-asset-hub-rpc.polkadot.io#/assets
+- Account: 5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD
+- Asset: 50000313
+
+## 🗄️ Supabase Database Separation (Archon vs Borglife)
+
+**Symptoms:**
+- Archon integration tests fail (RAG, DNA parsing)
+- "Table not found" or schema errors in Archon MCP
+- Tests pass with mocks but fail real
+
+**Root Cause:**
+Archon expects its schema (tasks, projects, RAG sources); Borglife uses separate (borgs, dna, wealth).
+
+**Fix Applied:**
+- docker-compose: archon-* use `${ARCHON_SUPABASE_URL/KEY}` fallback SUPABASE_*
+- archon_adapter/config.py: prioritizes ARCHON_SUPABASE_*
+- tests/conftest.py: loads `code/tests/.env.test` override
+
+**Test Setup:**
+1. Copy `cp code/tests/.env.test.example code/tests/.env.test`
+2. Fill ARCHON_SUPABASE_URL/KEY (Archon test project service_role)
+3. `pytest code/tests/ --cov`
+4. For docker: export ARCHON_SUPABASE_* or .env
+
+**.gitignore:** `.env.*` covers `.env.test`
+
+**Verify:**
 ```bash
-./scripts/dev.sh logs
+# Tests load .env.test
+pytest code/tests/ -v --tb=no | grep "Loaded test env"
+
+# Archon config
+python -c "from archon_adapter.config import ArchonConfig; print(ArchonConfig.from_env().supabase_url)"
 ```
 
-**Filter logs:**
-```bash
-# Errors only
-./scripts/dev.sh logs 2>&1 | grep -i error
-
-# Specific service
-./scripts/dev.sh logs borglife-ui | tail -50
-```
-
-**Save logs for analysis:**
-```bash
-./scripts/dev.sh logs > debug_logs.txt
-```
-
-### Network Issues
-
-**Check network connectivity:**
-```bash
-# Test internal network
-docker-compose exec borglife-ui ping archon-server
-
-# Test external connectivity
-curl https://api.openai.com/v1/models \
-  -H "Authorization: Bearer $OPENAI_API_KEY"
-```
-
-**DNS resolution:**
-```bash
-docker-compose exec borglife-ui nslookup google.com
-```
-
-### Environment Validation
-
-Run comprehensive validation:
-```bash
-python3 scripts/validate_prerequisites.py --verbose
-```
-
-This checks:
-- Environment variables
-- Service connectivity
-- Dependencies
-- Permissions
-- Resource availability
-
-## 📞 Getting Help
-
-### Community Support
-
-- **GitHub Issues**: Report bugs and request features
-- **Discord**: Real-time community support
-- **Documentation**: Check README.md and API docs
-
-### Diagnostic Information
-
-When reporting issues, include:
-
-```bash
-# System info
-uname -a
-docker --version
-python3 --version
-
-# Service status
-./scripts/dev.sh status
-
-# Recent logs
-./scripts/dev.sh logs | tail -100
-
-# Environment (redact secrets)
-cat .env | grep -v -E "(KEY|SECRET|PASSWORD)" | head -20
-```
-
-### Emergency Recovery
-
-If all else fails:
-
-```bash
-# Nuclear option - complete reset
-./scripts/dev.sh clean
-rm -rf venv/
-rm -f .env
-git clean -fdx
-# Then follow setup instructions again
-```
-
-## 🔍 Error Code Reference
-
-| Error Code | Description | Solution |
-|------------|-------------|----------|
-| `ARCHON_UNAVAILABLE` | Archon services down | Check Archon containers |
-| `DNA_INVALID` | DNA parsing failed | Validate YAML syntax |
-| `INSUFFICIENT_FUNDS` | Borg wealth too low | Add funding |
-| `RATE_LIMITED` | Too many requests | Wait or upgrade plan |
-| `ORGAN_FAILED` | Docker MCP organ error | Check organ credentials |
-| `VALIDATION_ERROR` | Input validation failed | Check input format |
-| `NETWORK_ERROR` | Connection failed | Check network config |
-
-## 🚀 Performance Tuning
-
-### Memory Optimization
-
-```yaml
-# docker-compose.yml adjustments
-services:
-  borglife-ui:
-    environment:
-      - STREAMLIT_SERVER_MEMORY_LIMIT=1GB
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-        reservations:
-          memory: 512M
-```
-
-### Caching Configuration
-
-```python
-# Increase cache TTL
-config.cache_default_ttl = 3600  # 1 hour
-config.redis_url = "redis://redis:6379/1"  # Use DB 1
-```
-
-### Rate Limiting
-
-```python
-# Adjust limits
-config.rate_limit_requests_per_hour = 1000
-config.rate_limit_burst_limit = 100
-```
-
-Remember: BorgLife is in active development. Most issues are resolved in updates, so ensure you're running the latest version!
+**Production:** Use separate projects; never share service_role keys.

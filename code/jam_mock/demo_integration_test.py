@@ -4,18 +4,18 @@ Comprehensive testing with 50+ demo runs and stakeholder validation scenarios.
 """
 
 import asyncio
-import time
 import json
-from typing import Dict, Any, List
-from pathlib import Path
 import statistics
+import time
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List
 
+from jam_mock.demo_alert_manager import DemoAlertManager
+from jam_mock.demo_progress_reporter import BorgLifeDemoProgress
 from jam_mock.dna_storage_demo import BorgLifeDNADemo
 from jam_mock.production_metrics_collector import ProductionMetricsCollector
-from jam_mock.demo_alert_manager import DemoAlertManager
 from jam_mock.user_friendly_error_handler import UserFriendlyErrorHandler
-from jam_mock.demo_progress_reporter import BorgLifeDemoProgress
 
 
 class DemoIntegrationTester:
@@ -31,11 +31,11 @@ class DemoIntegrationTester:
 
         # Test scenarios
         self.test_scenarios = [
-            'normal_operation',
-            'network_degradation',
-            'dna_variation',
-            'error_recovery',
-            'performance_baseline'
+            "normal_operation",
+            "network_degradation",
+            "dna_variation",
+            "error_recovery",
+            "performance_baseline",
         ]
 
     async def run_comprehensive_tests(self) -> Dict[str, Any]:
@@ -78,25 +78,31 @@ class DemoIntegrationTester:
                 # Run demo with scenario configuration
                 result = await self._run_single_demo_test(demo_config, scenario)
 
-                self.results.append({
-                    'scenario': scenario,
-                    'run_number': i + 1,
-                    'result': result,
-                    'timestamp': datetime.utcnow().isoformat()
-                })
+                self.results.append(
+                    {
+                        "scenario": scenario,
+                        "run_number": i + 1,
+                        "result": result,
+                        "timestamp": datetime.utcnow().isoformat(),
+                    }
+                )
 
                 # Progress indicator
-                success_indicator = "✅" if result['success'] else "❌"
-                print(f"  {success_indicator} {scenario} Run {i+1}/{runs_per_scenario}: {result['duration']:.1f}s")
+                success_indicator = "✅" if result["success"] else "❌"
+                print(
+                    f"  {success_indicator} {scenario} Run {i+1}/{runs_per_scenario}: {result['duration']:.1f}s"
+                )
 
             except Exception as e:
                 print(f"  ❌ {scenario} Run {i+1} failed: {e}")
-                self.results.append({
-                    'scenario': scenario,
-                    'run_number': i + 1,
-                    'result': {'success': False, 'error': str(e), 'duration': 0},
-                    'timestamp': datetime.utcnow().isoformat()
-                })
+                self.results.append(
+                    {
+                        "scenario": scenario,
+                        "run_number": i + 1,
+                        "result": {"success": False, "error": str(e), "duration": 0},
+                        "timestamp": datetime.utcnow().isoformat(),
+                    }
+                )
 
     async def _run_bulk_performance_tests(self):
         """Run bulk performance tests for stability validation"""
@@ -107,48 +113,42 @@ class DemoIntegrationTester:
         bulk_results = []
         for i in range(bulk_runs):
             try:
-                result = await self._run_single_demo_test({}, 'bulk_performance')
+                result = await self._run_single_demo_test({}, "bulk_performance")
                 bulk_results.append(result)
 
                 if (i + 1) % 5 == 0:
-                    success_count = sum(1 for r in bulk_results[-5:] if r['success'])
+                    success_count = sum(1 for r in bulk_results[-5:] if r["success"])
                     print(f"  📊 Bulk runs {i-3}-{i+1}: {success_count}/5 successful")
 
             except Exception as e:
                 print(f"  ❌ Bulk run {i+1} failed: {e}")
-                bulk_results.append({'success': False, 'error': str(e), 'duration': 0})
+                bulk_results.append({"success": False, "error": str(e), "duration": 0})
 
         # Add bulk results to main results
         for i, result in enumerate(bulk_results):
-            self.results.append({
-                'scenario': 'bulk_performance',
-                'run_number': i + 1,
-                'result': result,
-                'timestamp': datetime.utcnow().isoformat()
-            })
+            self.results.append(
+                {
+                    "scenario": "bulk_performance",
+                    "run_number": i + 1,
+                    "result": result,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            )
 
     def _get_scenario_config(self, scenario: str) -> Dict[str, Any]:
         """Get configuration for specific test scenario"""
         configs = {
-            'normal_operation': {},
-            'network_degradation': {
-                'simulate_network_delay': True,
-                'delay_ms': 500
-            },
-            'dna_variation': {
-                'dna_file': 'code/tests/fixtures/test_dna_samples.yaml'
-            },
-            'error_recovery': {
-                'inject_random_errors': True,
-                'error_probability': 0.1
-            },
-            'performance_baseline': {
-                'minimal_logging': True
-            }
+            "normal_operation": {},
+            "network_degradation": {"simulate_network_delay": True, "delay_ms": 500},
+            "dna_variation": {"dna_file": "code/tests/fixtures/test_dna_samples.yaml"},
+            "error_recovery": {"inject_random_errors": True, "error_probability": 0.1},
+            "performance_baseline": {"minimal_logging": True},
         }
         return configs.get(scenario, {})
 
-    async def _run_single_demo_test(self, config: Dict[str, Any], scenario: str) -> Dict[str, Any]:
+    async def _run_single_demo_test(
+        self, config: Dict[str, Any], scenario: str
+    ) -> Dict[str, Any]:
         """Run a single demo test with given configuration"""
         start_time = time.time()
 
@@ -157,7 +157,7 @@ class DemoIntegrationTester:
             demo = BorgLifeDNADemo()
 
             # Apply scenario configuration
-            if config.get('simulate_network_delay'):
+            if config.get("simulate_network_delay"):
                 # This would require demo modification to support delays
                 pass
 
@@ -167,32 +167,34 @@ class DemoIntegrationTester:
             duration = time.time() - start_time
 
             # Collect metrics
-            if hasattr(demo, 'metrics') and demo.metrics:
+            if hasattr(demo, "metrics") and demo.metrics:
                 await self.metrics_collector.record_demo_run(
                     success=success,
                     duration=duration,
-                    cost=demo.metrics.get('total_cost', 0),
-                    steps_data=demo.metrics.get('step_times', {})
+                    cost=demo.metrics.get("total_cost", 0),
+                    steps_data=demo.metrics.get("step_times", {}),
                 )
 
             result = {
-                'success': success,
-                'duration': duration,
-                'scenario': scenario,
-                'config': config,
-                'metrics': getattr(demo, 'metrics', {}),
-                'errors': getattr(demo, 'errors', [])
+                "success": success,
+                "duration": duration,
+                "scenario": scenario,
+                "config": config,
+                "metrics": getattr(demo, "metrics", {}),
+                "errors": getattr(demo, "errors", []),
             }
 
         except Exception as e:
             duration = time.time() - start_time
-            error_msg = self.error_handler.get_user_message('task_execution_timeout', str(e))
+            error_msg = self.error_handler.get_user_message(
+                "task_execution_timeout", str(e)
+            )
             result = {
-                'success': False,
-                'duration': duration,
-                'scenario': scenario,
-                'error': str(e),
-                'user_error': error_msg['user_message']
+                "success": False,
+                "duration": duration,
+                "scenario": scenario,
+                "error": str(e),
+                "user_error": error_msg["user_message"],
             }
 
         return result
@@ -200,76 +202,100 @@ class DemoIntegrationTester:
     def _generate_test_report(self, total_test_time: float) -> Dict[str, Any]:
         """Generate comprehensive test report"""
         # Calculate overall statistics
-        successful_runs = sum(1 for r in self.results if r['result']['success'])
+        successful_runs = sum(1 for r in self.results if r["result"]["success"])
         total_runs = len(self.results)
         success_rate = (successful_runs / total_runs * 100) if total_runs > 0 else 0
 
         # Calculate performance statistics
-        durations = [r['result']['duration'] for r in self.results if r['result']['success']]
+        durations = [
+            r["result"]["duration"] for r in self.results if r["result"]["success"]
+        ]
         avg_duration = statistics.mean(durations) if durations else 0
         min_duration = min(durations) if durations else 0
         max_duration = max(durations) if durations else 0
-        p95_duration = statistics.quantiles(durations, n=20)[18] if len(durations) >= 20 else max_duration
+        p95_duration = (
+            statistics.quantiles(durations, n=20)[18]
+            if len(durations) >= 20
+            else max_duration
+        )
 
         # Scenario breakdown
         scenario_stats = {}
-        for scenario in self.test_scenarios + ['bulk_performance']:
-            scenario_results = [r for r in self.results if r['scenario'] == scenario]
+        for scenario in self.test_scenarios + ["bulk_performance"]:
+            scenario_results = [r for r in self.results if r["scenario"] == scenario]
             if scenario_results:
-                scenario_success = sum(1 for r in scenario_results if r['result']['success'])
+                scenario_success = sum(
+                    1 for r in scenario_results if r["result"]["success"]
+                )
                 scenario_stats[scenario] = {
-                    'runs': len(scenario_results),
-                    'successful': scenario_success,
-                    'success_rate': scenario_success / len(scenario_results) * 100,
-                    'avg_duration': statistics.mean([r['result']['duration'] for r in scenario_results if r['result']['success']]) if scenario_results else 0
+                    "runs": len(scenario_results),
+                    "successful": scenario_success,
+                    "success_rate": scenario_success / len(scenario_results) * 100,
+                    "avg_duration": (
+                        statistics.mean(
+                            [
+                                r["result"]["duration"]
+                                for r in scenario_results
+                                if r["result"]["success"]
+                            ]
+                        )
+                        if scenario_results
+                        else 0
+                    ),
                 }
 
         # Error analysis
-        errors = [r for r in self.results if not r['result']['success']]
+        errors = [r for r in self.results if not r["result"]["success"]]
         error_types = {}
         for error in errors:
-            error_type = error['result'].get('error', 'unknown')
+            error_type = error["result"].get("error", "unknown")
             error_types[error_type] = error_types.get(error_type, 0) + 1
 
         # Stakeholder validation metrics
         stakeholder_metrics = {
-            'non_technical_user_testable': self._validate_non_technical_usability(),
-            'error_messages_helpful': self._validate_error_messages(),
-            'performance_acceptable': avg_duration < 30,  # Under 30 seconds
-            'cost_efficient': True,  # Assume validated by cost controller
-            'documentation_complete': self._validate_documentation_completeness()
+            "non_technical_user_testable": self._validate_non_technical_usability(),
+            "error_messages_helpful": self._validate_error_messages(),
+            "performance_acceptable": avg_duration < 30,  # Under 30 seconds
+            "cost_efficient": True,  # Assume validated by cost controller
+            "documentation_complete": self._validate_documentation_completeness(),
         }
 
         report = {
-            'test_summary': {
-                'total_runs': total_runs,
-                'successful_runs': successful_runs,
-                'overall_success_rate': success_rate,
-                'total_test_time': total_test_time,
-                'average_time_per_run': total_test_time / total_runs if total_runs > 0 else 0
+            "test_summary": {
+                "total_runs": total_runs,
+                "successful_runs": successful_runs,
+                "overall_success_rate": success_rate,
+                "total_test_time": total_test_time,
+                "average_time_per_run": (
+                    total_test_time / total_runs if total_runs > 0 else 0
+                ),
             },
-            'performance_metrics': {
-                'average_duration': avg_duration,
-                'min_duration': min_duration,
-                'max_duration': max_duration,
-                'p95_duration': p95_duration,
-                'target_duration': 30.0,  # 30 seconds target
-                'within_target': avg_duration <= 30.0
+            "performance_metrics": {
+                "average_duration": avg_duration,
+                "min_duration": min_duration,
+                "max_duration": max_duration,
+                "p95_duration": p95_duration,
+                "target_duration": 30.0,  # 30 seconds target
+                "within_target": avg_duration <= 30.0,
             },
-            'scenario_breakdown': scenario_stats,
-            'error_analysis': {
-                'total_errors': len(errors),
-                'error_types': error_types,
-                'most_common_error': max(error_types.items(), key=lambda x: x[1]) if error_types else None
+            "scenario_breakdown": scenario_stats,
+            "error_analysis": {
+                "total_errors": len(errors),
+                "error_types": error_types,
+                "most_common_error": (
+                    max(error_types.items(), key=lambda x: x[1])
+                    if error_types
+                    else None
+                ),
             },
-            'stakeholder_validation': stakeholder_metrics,
-            'production_readiness_score': self._calculate_readiness_score(
+            "stakeholder_validation": stakeholder_metrics,
+            "production_readiness_score": self._calculate_readiness_score(
                 success_rate, avg_duration, stakeholder_metrics
             ),
-            'recommendations': self._generate_test_recommendations(
+            "recommendations": self._generate_test_recommendations(
                 success_rate, avg_duration, errors
             ),
-            'generated_at': datetime.utcnow().isoformat()
+            "generated_at": datetime.utcnow().isoformat(),
         }
 
         return report
@@ -277,25 +303,29 @@ class DemoIntegrationTester:
     def _validate_non_technical_usability(self) -> bool:
         """Validate that demo can be used by non-technical stakeholders"""
         # Check if error messages are user-friendly
-        error_samples = [r for r in self.results if not r['result']['success']]
+        error_samples = [r for r in self.results if not r["result"]["success"]]
         if error_samples:
-            sample_error = error_samples[0]['result'].get('user_error', '')
+            sample_error = error_samples[0]["result"].get("user_error", "")
             # Check if error message avoids technical jargon
-            technical_terms = ['exception', 'traceback', 'substrate', 'websocket']
-            has_technical_terms = any(term in sample_error.lower() for term in technical_terms)
+            technical_terms = ["exception", "traceback", "substrate", "websocket"]
+            has_technical_terms = any(
+                term in sample_error.lower() for term in technical_terms
+            )
             return not has_technical_terms
         return True
 
     def _validate_error_messages(self) -> bool:
         """Validate that error messages are helpful"""
-        error_samples = [r for r in self.results if not r['result']['success']]
+        error_samples = [r for r in self.results if not r["result"]["success"]]
         helpful_messages = 0
 
         for error in error_samples[:5]:  # Check first 5 errors
-            user_error = error['result'].get('user_error', '')
+            user_error = error["result"].get("user_error", "")
             # Check if message includes actionable advice
-            has_action = any(word in user_error.lower() for word in
-                           ['visit', 'check', 'run', 'try', 'contact'])
+            has_action = any(
+                word in user_error.lower()
+                for word in ["visit", "check", "run", "try", "contact"]
+            )
             if has_action:
                 helpful_messages += 1
 
@@ -304,23 +334,31 @@ class DemoIntegrationTester:
     def _validate_documentation_completeness(self) -> bool:
         """Validate that documentation is complete"""
         # Check if README exists and has key sections
-        readme_path = Path('README.md')
+        readme_path = Path("README.md")
         if not readme_path.exists():
             return False
 
-        with open(readme_path, 'r') as f:
+        with open(readme_path, "r") as f:
             content = f.read().lower()
 
         required_sections = [
-            'quick start', 'troubleshooting', 'performance',
-            'security', 'monitoring', 'contributing'
+            "quick start",
+            "troubleshooting",
+            "performance",
+            "security",
+            "monitoring",
+            "contributing",
         ]
 
         present_sections = sum(1 for section in required_sections if section in content)
         return present_sections >= len(required_sections) * 0.8  # 80% coverage
 
-    def _calculate_readiness_score(self, success_rate: float, avg_duration: float,
-                                 stakeholder_metrics: Dict[str, bool]) -> float:
+    def _calculate_readiness_score(
+        self,
+        success_rate: float,
+        avg_duration: float,
+        stakeholder_metrics: Dict[str, bool],
+    ) -> float:
         """Calculate production readiness score (0-100)"""
         score = 0
 
@@ -336,29 +374,38 @@ class DemoIntegrationTester:
             score += 10
 
         # Stakeholder validation (30% weight)
-        stakeholder_score = sum(stakeholder_metrics.values()) / len(stakeholder_metrics) * 30
+        stakeholder_score = (
+            sum(stakeholder_metrics.values()) / len(stakeholder_metrics) * 30
+        )
         score += stakeholder_score
 
         return min(100, score)
 
-    def _generate_test_recommendations(self, success_rate: float, avg_duration: float,
-                                     errors: List[Dict]) -> List[str]:
+    def _generate_test_recommendations(
+        self, success_rate: float, avg_duration: float, errors: List[Dict]
+    ) -> List[str]:
         """Generate test recommendations based on results"""
         recommendations = []
 
         if success_rate < 95:
-            recommendations.append("Improve success rate through better error handling and recovery")
+            recommendations.append(
+                "Improve success rate through better error handling and recovery"
+            )
 
         if avg_duration > 30:
             recommendations.append("Optimize performance to meet 30-second target")
 
         if errors:
-            error_types = [e['result'].get('error', 'unknown') for e in errors[:5]]
-            if 'network' in str(error_types).lower():
-                recommendations.append("Enhance network resilience and failover mechanisms")
+            error_types = [e["result"].get("error", "unknown") for e in errors[:5]]
+            if "network" in str(error_types).lower():
+                recommendations.append(
+                    "Enhance network resilience and failover mechanisms"
+                )
 
         if len(errors) > len(self.results) * 0.1:  # More than 10% errors
-            recommendations.append("Implement more robust error recovery and retry logic")
+            recommendations.append(
+                "Implement more robust error recovery and retry logic"
+            )
 
         return recommendations
 
@@ -370,7 +417,7 @@ class DemoIntegrationTester:
 
         Path(filename).parent.mkdir(parents=True, exist_ok=True)
 
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             json.dump(report, f, indent=2, default=str)
 
         print(f"📄 Test report saved to: {filename}")
@@ -391,16 +438,16 @@ async def run_beta_tests():
     tester.save_test_report(report)
 
     # Print summary
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("📊 BETA TESTING RESULTS")
-    print("="*60)
+    print("=" * 60)
     print(f"Success Rate: {report['overall_success_rate']:.1f}%")
     print(f"Average Duration: {report['performance_metrics']['average_duration']:.1f}s")
     print(f"Production Readiness Score: {report['production_readiness_score']:.1f}/100")
 
-    if report['production_readiness_score'] >= 90:
+    if report["production_readiness_score"] >= 90:
         print("🎉 BETA TESTING PASSED - Production Ready!")
-    elif report['production_readiness_score'] >= 75:
+    elif report["production_readiness_score"] >= 75:
         print("⚠️ BETA TESTING CONDITIONAL - Minor issues to address")
     else:
         print("❌ BETA TESTING FAILED - Significant issues to resolve")

@@ -1,6 +1,64 @@
 # BorgLife Scripts
 
-This directory contains scripts for BorgLife Phase 1 operations, testing, and deployment.
+Utility scripts for development, testing, deployment, and blockchain operations.
+
+## Quick Usage
+
+```bash
+# Activate venv
+. ../.venv/bin/activate
+
+# Check keyring & balances
+python3 check_keyring.py
+
+# Create USDB asset
+python3 create_usdb_asset.py
+
+# Distribute USDB
+python3 usdb_distribution.py
+
+# Faucet mode
+python3 usdb_faucet.py
+```
+
+## Path Configuration
+
+Scripts use dynamic path resolution:
+
+```bash
+source path_config.sh
+echo $BORGLIFE_ROOT $ARCHON_ROOT
+```
+
+## Scripts
+
+### Blockchain & Assets
+- [`create_usdb_asset.py`](create_usdb_asset.py) - Create USDB asset, set metadata, mint initial supply to dispenser
+- [`mint_usdb_to_dispenser.py`](mint_usdb_to_dispenser.py) - Mint additional USDB to dispenser
+- [`usdb_faucet.py`](usdb_faucet.py) - Faucet mode for testing
+- [`usdb_distribution.py`](usdb_distribution.py) - Distribute USDB to borgs
+
+### Key Management
+- [`check_keyring.py`](check_keyring.py) - Validate keyring entries, balances, signing
+- [`emergency_recovery.sh`](emergency_recovery.sh) - Emergency key recovery
+
+### Testing & Dev
+- [`dev.sh`](dev.sh) - Dev environment management
+- [`run_e2e_tests.sh`](run_e2e_tests.sh) - E2E tests
+- [`setup_docker_mcp.sh`](setup_docker_mcp.sh) - Docker MCP setup
+- [`setup_phase2a_database.py`](setup_phase2a_database.py) - DB schema
+
+### Transfers
+- [`dispenser_wnd_transfer_test.py`](dispenser_wnd_transfer_test.py) - WND transfers
+- [`borg_to_borg_transfer_test.py`](borg_to_borg_transfer_test.py) - Inter-borg
+
+## USDB Workflow
+
+1. Create: `python3 create_usdb_asset.py`
+2. Verify: Balance in check_keyring.py
+3. Distribute: `python3 usdb_distribution.py`
+
+See PRPs for details.
 
 ## Path Configuration System
 

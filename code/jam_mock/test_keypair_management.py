@@ -7,8 +7,8 @@ for BorgLife Phase 1 DNA storage operations.
 """
 
 import asyncio
-import sys
 import os
+import sys
 import tempfile
 from pathlib import Path
 
@@ -36,14 +36,14 @@ async def test_keypair_creation():
         # Test 2: Load keypair from disk
         print("2. Loading keypair from disk...")
         loaded_keypair = manager.load_keypair("test_borg")
-        assert loaded_keypair.ss58_address == keypair_info['ss58_address']
+        assert loaded_keypair.ss58_address == keypair_info["ss58_address"]
         print("   ✅ Keypair loaded successfully")
 
         # Test 3: List keypairs
         print("3. Listing keypairs...")
         keypairs = manager.list_keypairs()
         assert len(keypairs) == 1
-        assert keypairs[0]['name'] == 'test_borg'
+        assert keypairs[0]["name"] == "test_borg"
         print(f"   ✅ Found {len(keypairs)} keypair(s)")
 
         # Test 4: Sign and verify message
@@ -54,9 +54,7 @@ async def test_keypair_creation():
 
         # Verify signature (simplified test)
         is_valid = manager.verify_signature(
-            keypair_info['public_key'],
-            message,
-            signature
+            keypair_info["public_key"], message, signature
         )
         print(f"   ✅ Signature verification: {'PASS' if is_valid else 'FAIL'}")
 
@@ -86,7 +84,7 @@ async def test_keypair_import_export():
         print(f"   ✅ Imported to: {imported_info['ss58_address']}")
 
         # Verify addresses match
-        assert original_info['ss58_address'] == imported_info['ss58_address']
+        assert original_info["ss58_address"] == imported_info["ss58_address"]
         print("   ✅ Import verification passed")
 
         return True
@@ -108,7 +106,7 @@ async def test_keypair_from_seed():
 
         # Create another with same seed
         keypair_info2 = manager.create_keypair_from_seed("seed_test2", test_seed)
-        assert keypair_info['ss58_address'] == keypair_info2['ss58_address']
+        assert keypair_info["ss58_address"] == keypair_info2["ss58_address"]
         print("   ✅ Deterministic creation verified")
 
         return True
@@ -177,7 +175,7 @@ async def test_get_test_keypair():
 
         # Get again (should return same)
         test_info2 = manager.get_test_keypair()
-        assert test_info['ss58_address'] == test_info2['ss58_address']
+        assert test_info["ss58_address"] == test_info2["ss58_address"]
         print("   ✅ Test keypair is consistent")
 
         return True

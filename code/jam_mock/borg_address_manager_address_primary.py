@@ -6,16 +6,17 @@ This version maintains all functionality while using substrate_address as the pr
 for better alignment with blockchain-native operations.
 """
 
-import os
 import hashlib
 import json
-from typing import Dict, Any, Optional, List, Tuple
+import os
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
+from security.dna_anchor import DNAAanchor
 from substrateinterface import Keypair
 
-from .secure_key_storage import SecureKeyStore
 from .demo_audit_logger import DemoAuditLogger
-from security.dna_anchor import DNAAanchor
+from .secure_key_storage import SecureKeyStore
 
 
 class BorgAddressManagerAddressPrimary:
@@ -26,7 +27,12 @@ class BorgAddressManagerAddressPrimary:
     Provides deterministic address generation and secure keypair storage.
     """
 
-    def __init__(self, supabase_client=None, audit_logger: Optional[DemoAuditLogger] = None, keystore: Optional[SecureKeyStore] = None):
+    def __init__(
+        self,
+        supabase_client=None,
+        audit_logger: Optional[DemoAuditLogger] = None,
+        keystore: Optional[SecureKeyStore] = None,
+    ):
         """
         Initialize Address-Primary BorgAddressManager.
 
@@ -46,6 +52,7 @@ class BorgAddressManagerAddressPrimary:
             # Use unique keystore path to avoid conflicts
             import tempfile
             import uuid
+
             temp_dir = tempfile.gettempdir()
             unique_id = str(uuid.uuid4())[:8]
             keystore_path = f"{temp_dir}/borglife_keystore_{unique_id}.enc"
@@ -58,13 +65,13 @@ class BorgAddressManagerAddressPrimary:
             self.audit_logger.log_event(
                 "keystore_auto_unlocked",
                 "Keystore automatically unlocked using macOS Keychain",
-                {"demo_mode": True, "storage": "macos_keychain"}
+                {"demo_mode": True, "storage": "macos_keychain"},
             )
         except Exception as e:
             self.audit_logger.log_event(
                 "keystore_unlock_failed",
                 f"Failed to auto-unlock keystore: {str(e)}",
-                {"error": str(e)}
+                {"error": str(e)},
             )
 
         self.dna_anchor = DNAAanchor(audit_logger)
@@ -99,12 +106,18 @@ class BorgAddressManagerAddressPrimary:
         self.audit_logger.log_event(
             "keypair_generated",
             f"Deterministic keypair generated for DNA hash {dna_hash[:16]}...",
-            {"dna_hash_prefix": dna_hash[:16], "address": keypair.ss58_address}
+            {"dna_hash_prefix": dna_hash[:16], "address": keypair.ss58_address},
         )
 
         return keypair
 
-    def register_borg_address(self, borg_id: str, dna_hash: str, creator_signature: Optional[str] = None, creator_public_key: Optional[str] = None) -> Dict[str, Any]:
+    def register_borg_address(
+        self,
+        borg_id: str,
+        dna_hash: str,
+        creator_signature: Optional[str] = None,
+        creator_public_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Register a borg's address using address as primary key.
 
@@ -131,11 +144,11 @@ class BorgAddressManagerAddressPrimary:
 
             # Store minimal metadata in keystore
             keystore_data = {
-                'borg_id': borg_id,
-                'dna_hash': dna_hash,
-                'address': address,
-                'created_at': datetime.utcnow().isoformat(),
-                'storage_method': 'macos_keychain_address_primary'
+                "borg_id": borg_id,
+                "dna_hash": dna_hash,
+                "address": address,
+                "created_at": datetime.utcnow().isoformat(),
+                "storage_method": "macos_keychain_address_primary",
             }
 
             # Store metadata in keystore file using address as key
@@ -146,7 +159,7 @@ class BorgAddressManagerAddressPrimary:
             self.audit_logger.log_event(
                 "borg_keychain_storage_success",
                 f"Keypair stored in macOS Keychain for address {address}",
-                {"borg_id": borg_id, "address": address, "service_name": service_name}
+                {"borg_id": borg_id, "address": address, "service_name": service_name},
             )
 
             # Anchor DNA hash on-chain
@@ -154,52 +167,60 @@ class BorgAddressManagerAddressPrimary:
 
             # Prepare database record with address as primary key
             address_record = {
-                'substrate_address': address,  # PRIMARY KEY
-                'borg_id': borg_id,           # Now a regular field
-                'dna_hash': dna_hash,
-                'creator_public_key': creator_public_key,
-                'creator_signature': creator_signature,
-                'anchoring_tx_hash': anchoring_tx_hash,
-                'anchoring_status': 'confirmed',
-                'key_storage_method': 'macos_keychain_address_primary',
-                'created_at': datetime.utcnow().isoformat(),
-                'last_sync': datetime.utcnow().isoformat()
+                "substrate_address": address,  # PRIMARY KEY
+                "borg_id": borg_id,  # Now a regular field
+                "dna_hash": dna_hash,
+                "creator_public_key": creator_public_key,
+                "creator_signature": creator_signature,
+                "anchoring_tx_hash": anchoring_tx_hash,
+                "anchoring_status": "confirmed",
+                "key_storage_method": "macos_keychain_address_primary",
+                "created_at": datetime.utcnow().isoformat(),
+                "last_sync": datetime.utcnow().isoformat(),
             }
 
             # Store in Supabase if available
             if self.supabase:
                 try:
                     # Insert or update using address as primary key
-                    result = self.supabase.table('borg_addresses').upsert(
-                        address_record,
-                        on_conflict='substrate_address'  # Address is now primary key
-                    ).execute()
+                    result = (
+                        self.supabase.table("borg_addresses")
+                        .upsert(
+                            address_record,
+                            on_conflict="substrate_address",  # Address is now primary key
+                        )
+                        .execute()
+                    )
 
                     # Initialize balance records for both currencies
-                    for currency in ['WND', 'USDB']:
+                    for currency in ["WND", "USDB"]:
                         balance_record = {
-                            'substrate_address': address,  # Reference address instead of borg_id
-                            'currency': currency,
-                            'balance_wei': 0,
-                            'last_updated': datetime.utcnow().isoformat()
+                            "substrate_address": address,  # Reference address instead of borg_id
+                            "currency": currency,
+                            "balance_wei": 0,
+                            "last_updated": datetime.utcnow().isoformat(),
                         }
-                        self.supabase.table('borg_balances').upsert(
+                        self.supabase.table("borg_balances").upsert(
                             balance_record,
-                            on_conflict='substrate_address,currency'  # Composite key with address
+                            on_conflict="substrate_address,currency",  # Composite key with address
                         ).execute()
 
                 except Exception as db_error:
                     self.audit_logger.log_event(
                         "supabase_storage_failed",
                         f"Failed to store borg {borg_id} in Supabase: {str(db_error)}",
-                        {"borg_id": borg_id, "address": address, "error": str(db_error)}
+                        {
+                            "borg_id": borg_id,
+                            "address": address,
+                            "error": str(db_error),
+                        },
                     )
                     print(f"⚠️  Supabase storage failed: {db_error}")
 
                 self.audit_logger.log_event(
                     "borg_registered_address_primary",
                     f"Borg {borg_id} registered with address {address} (Address-Primary Keychain)",
-                    {"borg_id": borg_id, "address": address}
+                    {"borg_id": borg_id, "address": address},
                 )
 
                 # Update caches
@@ -207,39 +228,36 @@ class BorgAddressManagerAddressPrimary:
                 self._borg_id_cache[borg_id] = address
 
                 return {
-                    'success': True,
-                    'borg_id': borg_id,
-                    'address': address,
-                    'dna_hash': dna_hash,
-                    'storage_method': 'macos_keychain_address_primary'
+                    "success": True,
+                    "borg_id": borg_id,
+                    "address": address,
+                    "dna_hash": dna_hash,
+                    "storage_method": "macos_keychain_address_primary",
                 }
             else:
                 # Fallback without database
                 return {
-                    'success': True,
-                    'borg_id': borg_id,
-                    'address': address,
-                    'dna_hash': dna_hash,
-                    'storage_method': 'macos_keychain_address_primary',
-                    'warning': 'No database connection - address not persisted'
+                    "success": True,
+                    "borg_id": borg_id,
+                    "address": address,
+                    "dna_hash": dna_hash,
+                    "storage_method": "macos_keychain_address_primary",
+                    "warning": "No database connection - address not persisted",
                 }
 
         except Exception as e:
             self.audit_logger.log_event(
                 "borg_registration_failed",
                 f"Failed to register borg {borg_id}: {str(e)}",
-                {"borg_id": borg_id, "error": str(e)}
+                {"borg_id": borg_id, "error": str(e)},
             )
-            return {
-                'success': False,
-                'error': str(e),
-                'borg_id': borg_id
-            }
+            return {"success": False, "error": str(e), "borg_id": borg_id}
 
     def _store_keypair_in_keychain(self, service_name: str, keypair: Keypair) -> bool:
         """Store keypair components in macOS Keychain."""
         try:
             import keyring
+
             # Store each component separately for security
             keyring.set_password(service_name, "private_key", keypair.private_key.hex())
             keyring.set_password(service_name, "public_key", keypair.public_key.hex())
@@ -251,7 +269,7 @@ class BorgAddressManagerAddressPrimary:
             self.audit_logger.log_event(
                 "keychain_storage_failed",
                 f"Failed to store keypair in macOS Keychain: {str(e)}",
-                {"service_name": service_name, "error": str(e)}
+                {"service_name": service_name, "error": str(e)},
             )
             return False
 
@@ -272,9 +290,14 @@ class BorgAddressManagerAddressPrimary:
         # Query database
         if self.supabase:
             try:
-                rest_result = self.supabase.table('borg_addresses').select('substrate_address').eq('borg_id', borg_id).execute()
+                rest_result = (
+                    self.supabase.table("borg_addresses")
+                    .select("substrate_address")
+                    .eq("borg_id", borg_id)
+                    .execute()
+                )
                 if rest_result.data:
-                    address = rest_result.data[0]['substrate_address']
+                    address = rest_result.data[0]["substrate_address"]
                     # Update caches
                     self._borg_id_cache[borg_id] = address
                     return address
@@ -283,7 +306,7 @@ class BorgAddressManagerAddressPrimary:
                 self.audit_logger.log_event(
                     "address_lookup_failed",
                     f"Failed to lookup address for borg {borg_id}: {str(e)}",
-                    {"borg_id": borg_id, "error": str(e)}
+                    {"borg_id": borg_id, "error": str(e)},
                 )
 
         return None
@@ -300,18 +323,28 @@ class BorgAddressManagerAddressPrimary:
         """
         # Check cache first
         if address in self._address_cache:
-            return self._address_cache[address].get('borg_id')
+            return self._address_cache[address].get("borg_id")
 
         # Query database
         if self.supabase:
             try:
-                rest_result = self.supabase.table('borg_addresses').select('borg_id').eq('substrate_address', address).execute()
+                rest_result = (
+                    self.supabase.table("borg_addresses")
+                    .select("borg_id")
+                    .eq("substrate_address", address)
+                    .execute()
+                )
                 if rest_result.data:
-                    borg_id = rest_result.data[0]['borg_id']
+                    borg_id = rest_result.data[0]["borg_id"]
                     # Update cache if we have full record
                     if address not in self._address_cache:
                         # Fetch full record for cache
-                        full_result = self.supabase.table('borg_addresses').select('*').eq('substrate_address', address).execute()
+                        full_result = (
+                            self.supabase.table("borg_addresses")
+                            .select("*")
+                            .eq("substrate_address", address)
+                            .execute()
+                        )
                         if full_result.data:
                             self._address_cache[address] = full_result.data[0]
                             self._borg_id_cache[borg_id] = address
@@ -321,7 +354,7 @@ class BorgAddressManagerAddressPrimary:
                 self.audit_logger.log_event(
                     "borg_id_lookup_failed",
                     f"Failed to lookup borg_id for address {address}: {str(e)}",
-                    {"address": address, "error": str(e)}
+                    {"address": address, "error": str(e)},
                 )
 
         return None
@@ -343,7 +376,7 @@ class BorgAddressManagerAddressPrimary:
             address = None
             borg_id = None
 
-            if identifier.startswith('5'):  # SS58 address format
+            if identifier.startswith("5"):  # SS58 address format
                 address = identifier
                 borg_id = self.get_borg_id(address)
             else:
@@ -355,7 +388,7 @@ class BorgAddressManagerAddressPrimary:
                 self.audit_logger.log_event(
                     "keypair_lookup_failed",
                     f"Could not resolve address for identifier {identifier}",
-                    {"identifier": identifier}
+                    {"identifier": identifier},
                 )
                 return None
 
@@ -364,6 +397,7 @@ class BorgAddressManagerAddressPrimary:
 
             # Retrieve keypair components from macOS Keychain
             import keyring
+
             private_key_hex = keyring.get_password(service_name, "private_key")
             public_key_hex = keyring.get_password(service_name, "public_key")
             stored_address = keyring.get_password(service_name, "address")
@@ -372,7 +406,7 @@ class BorgAddressManagerAddressPrimary:
                 self.audit_logger.log_event(
                     "keypair_not_found",
                     f"No keypair found in macOS Keychain for {identifier}",
-                    {"identifier": identifier, "service_name": service_name}
+                    {"identifier": identifier, "service_name": service_name},
                 )
                 return None
 
@@ -381,7 +415,11 @@ class BorgAddressManagerAddressPrimary:
                 self.audit_logger.log_event(
                     "keypair_address_mismatch",
                     f"Keyring address mismatch for {identifier}: expected {address}, got {stored_address}",
-                    {"identifier": identifier, "expected": address, "stored": stored_address}
+                    {
+                        "identifier": identifier,
+                        "expected": address,
+                        "stored": stored_address,
+                    },
                 )
                 return None
 
@@ -391,12 +429,14 @@ class BorgAddressManagerAddressPrimary:
                 keypair = Keypair(private_key=private_key)
 
                 # Verify keypair integrity
-                if (keypair.public_key.hex() != public_key_hex or
-                    keypair.ss58_address != address):
+                if (
+                    keypair.public_key.hex() != public_key_hex
+                    or keypair.ss58_address != address
+                ):
                     self.audit_logger.log_event(
                         "keypair_integrity_check_failed",
                         f"Keypair integrity check failed for {identifier}",
-                        {"identifier": identifier}
+                        {"identifier": identifier},
                     )
                     return None
 
@@ -404,14 +444,18 @@ class BorgAddressManagerAddressPrimary:
                 self.audit_logger.log_event(
                     "keypair_reconstruction_failed",
                     f"Failed to reconstruct keypair for {identifier}: {str(key_error)}",
-                    {"identifier": identifier, "error": str(key_error)}
+                    {"identifier": identifier, "error": str(key_error)},
                 )
                 return None
 
             self.audit_logger.log_event(
                 "keypair_retrieved_from_keychain",
                 f"Keypair successfully retrieved from macOS Keychain for {identifier}",
-                {"identifier": identifier, "address": address, "service_name": service_name}
+                {
+                    "identifier": identifier,
+                    "address": address,
+                    "service_name": service_name,
+                },
             )
 
             return keypair
@@ -420,7 +464,7 @@ class BorgAddressManagerAddressPrimary:
             self.audit_logger.log_event(
                 "keypair_retrieval_error",
                 f"Error retrieving keypair for {identifier}: {str(e)}",
-                {"identifier": identifier, "error": str(e)}
+                {"identifier": identifier, "error": str(e)},
             )
             return None
 
@@ -439,31 +483,39 @@ class BorgAddressManagerAddressPrimary:
         if not self.supabase:
             return False
 
-        if currency not in ['WND', 'USDB']:
+        if currency not in ["WND", "USDB"]:
             raise ValueError(f"Invalid currency: {currency}")
 
         # Resolve address
-        address = identifier if identifier.startswith('5') else self.get_borg_address(identifier)
+        address = (
+            identifier
+            if identifier.startswith("5")
+            else self.get_borg_address(identifier)
+        )
         if not address:
             return False
 
         try:
             balance_record = {
-                'substrate_address': address,
-                'currency': currency,
-                'balance_wei': balance_wei,
-                'last_updated': datetime.utcnow().isoformat()
+                "substrate_address": address,
+                "currency": currency,
+                "balance_wei": balance_wei,
+                "last_updated": datetime.utcnow().isoformat(),
             }
 
-            self.supabase.table('borg_balances').upsert(
-                balance_record,
-                on_conflict='substrate_address,currency'
+            self.supabase.table("borg_balances").upsert(
+                balance_record, on_conflict="substrate_address,currency"
             ).execute()
 
             self.audit_logger.log_event(
                 "balance_synced",
                 f"Balance synced for {identifier}: {balance_wei} {currency}",
-                {"identifier": identifier, "address": address, "currency": currency, "balance_wei": balance_wei}
+                {
+                    "identifier": identifier,
+                    "address": address,
+                    "currency": currency,
+                    "balance_wei": balance_wei,
+                },
             )
 
             return True
@@ -472,7 +524,7 @@ class BorgAddressManagerAddressPrimary:
             self.audit_logger.log_event(
                 "balance_sync_failed",
                 f"Failed to sync balance for {identifier}: {str(e)}",
-                {"identifier": identifier, "currency": currency, "error": str(e)}
+                {"identifier": identifier, "currency": currency, "error": str(e)},
             )
             return False
 
@@ -490,19 +542,29 @@ class BorgAddressManagerAddressPrimary:
         if not self.supabase:
             return None
 
-        if currency not in ['WND', 'USDB']:
+        if currency not in ["WND", "USDB"]:
             raise ValueError(f"Invalid currency: {currency}")
 
         # Resolve address
-        address = identifier if identifier.startswith('5') else self.get_borg_address(identifier)
+        address = (
+            identifier
+            if identifier.startswith("5")
+            else self.get_borg_address(identifier)
+        )
         if not address:
             return None
 
         try:
-            result = self.supabase.table('borg_balances').select('balance_wei').eq('substrate_address', address).eq('currency', currency).execute()
+            result = (
+                self.supabase.table("borg_balances")
+                .select("balance_wei")
+                .eq("substrate_address", address)
+                .eq("currency", currency)
+                .execute()
+            )
 
             if result.data:
-                balance = result.data[0]['balance_wei']
+                balance = result.data[0]["balance_wei"]
                 return balance
             else:
                 return 0
@@ -511,7 +573,7 @@ class BorgAddressManagerAddressPrimary:
             self.audit_logger.log_event(
                 "balance_lookup_failed",
                 f"Failed to lookup balance for {identifier}: {str(e)}",
-                {"identifier": identifier, "currency": currency, "error": str(e)}
+                {"identifier": identifier, "currency": currency, "error": str(e)},
             )
             return None
 
@@ -526,13 +588,17 @@ class BorgAddressManagerAddressPrimary:
             return []
 
         try:
-            result = self.supabase.table('borg_addresses').select('borg_id,substrate_address,dna_hash').execute()
+            result = (
+                self.supabase.table("borg_addresses")
+                .select("borg_id,substrate_address,dna_hash")
+                .execute()
+            )
             return result.data or []
         except Exception as e:
             self.audit_logger.log_event(
                 "borg_list_failed",
                 f"Failed to list registered borgs: {str(e)}",
-                {"error": str(e)}
+                {"error": str(e)},
             )
             return []
 

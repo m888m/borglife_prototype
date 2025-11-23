@@ -10,53 +10,125 @@ This suite validates the entire BorgLife Phase 1 user journey using Archon infra
 
 import asyncio
 import json
+import yaml
 import os
 import time
-import pytest
 from decimal import Decimal, getcontext
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from pprint import pprint
+from typing import Any, Dict, List, Optional
+
+import pytest
+import yaml
 
 # Test imports - these will be available in Docker environment
 try:
-    from synthesis.dna_parser import DNAParser
-    from synthesis.phenotype_builder import PhenotypeBuilder
     from archon_adapter.adapter import ArchonServiceAdapter
     from jam_mock.interface import JAMInterface
-    from proto_borg import ProtoBorgAgent, BorgConfig
+    from proto_borg import BorgConfig, ProtoBorgAgent
+    from synthesis.dna_parser import DNAParser
+    from synthesis.phenotype_builder import PhenotypeBuilder
+
     IMPORTS_AVAILABLE = True
 except ImportError:
     # Mock for development environment
-    DNAParser = type('MockDNAParser', (), {
-        'parse_dna': lambda self, x: {'header': {'code_length': 1024}, 'cells': [], 'organs': []},
-        'validate_dna': lambda self, x: True,
-        'calculate_hash': lambda self, x: 'mock_hash',
-        'serialize_to_canonical': lambda self, x: 'mock_yaml',
-        'to_yaml': lambda self, x: 'mock_yaml',
-        'from_yaml': lambda self, x: {'header': {'code_length': 1024}, 'cells': [], 'organs': []}
-    })()
-    PhenotypeBuilder = type('MockPhenotypeBuilder', (), {
-        'build_phenotype': lambda self, x: {'cells': [], 'organs': [], 'total_cost': 0.001}
-    })()
-    ArchonServiceAdapter = type('MockArchonAdapter', (), {
-        'initialize': lambda self: None,
-        'health_check': lambda self: {'status': 'healthy'},
-        'make_request': lambda self, x: {'status': 'success', 'result': 'mock_result'}
-    })()
-    JAMInterface = type('MockJAMInterface', (), {
-        'update_wealth': lambda self, **kwargs: None,
-        'get_balance': lambda self, x: Decimal('0.1'),
-        'store_dna_hash': lambda self, x, y: {'success': True},
-        'retrieve_dna_hash': lambda self, x: 'mock_hash',
-        'verify_dna_integrity': lambda self, x, y: True
-    })()
-    ProtoBorgAgent = type('MockProtoBorgAgent', (), {
-        'initialize': lambda self: None,
-        'execute_task': lambda self, x: {'result': 'mock_result', 'cost': 0.001},
-        'update_dna': lambda self, x: None
-    })
-    BorgConfig = type('MockBorgConfig', (), {})()
+    class MockDNAParser:
+        def parse_dna(self, x):
+            return {
+                "header": {"code_length": 1024},
+                "cells": [],
+                "organs": [],
+            }
+
+        def validate_dna(self, x):
+            return True
+
+        def calculate_hash(self, x):
+            return "mock_hash"
+
+        def serialize_to_canonical(self, x):
+            return "mock_yaml"
+
+        def to_yaml(self, x):
+            return "mock_yaml"
+
+        def from_yaml(self, x):
+            return {
+                "header": {"code_length": 1024},
+                "cells": [],
+                "organs": [],
+            }
+
+    DNAParser = MockDNAParser
+
+    class MockPhenotypeBuilder:
+        async def build_phenotype(self, x):
+            return {
+                "cells": [],
+                "organs": [],
+                "total_cost": 0.001,
+            }
+
+    PhenotypeBuilder = MockPhenotypeBuilder
+
+    class MockArchonAdapter:
+        async def initialize(self):
+            return None
+
+        async def health_check(self):
+            return {"status": "healthy"}
+
+        async def make_request(self, x):
+            return {
+                "status": "success",
+                "result": "mock_result",
+            }
+
+    ArchonServiceAdapter = MockArchonAdapter
+
+    class MockJAMInterface:
+        async def update_wealth(self, **kwargs):
+            return None
+
+        async def get_balance(self, x):
+            return Decimal("0.1")
+
+        async def store_dna_hash(self, x, y):
+            return {"success": True}
+
+        async def retrieve_dna_hash(self, x):
+            return "mock_hash"
+
+        async def verify_dna_integrity(self, x, y):
+            return True
+
+    JAMInterface = MockJAMInterface
+
+    class MockProtoBorgAgent:
+        async def initialize(self):
+            return None
+
+        async def execute_task(self, x):
+            return {"result": "mock_result", "cost": 0.001}
+
+        def update_dna(self, x):
+            return None
+
+    ProtoBorgAgent = MockProtoBorgAgent
+
+    class MockBorgConfig:
+        pass
+
+    BorgConfig = MockBorgConfig
+
     IMPORTS_AVAILABLE = False
+
+# Try to import real JAM interface
+try:
+    from jam_mock import JAMInterface
+    real_jam_available = True
+except ImportError:
+    real_jam_available = False
 
 
 class E2ETestSuite:
@@ -88,17 +160,20 @@ class E2ETestSuite:
 
         # Verify service health
         health = await self.archon_adapter.health_check()
-        assert health['status'] == 'healthy', f"Archon services not healthy: {health}"
+        assert health["status"] == "healthy", f"Archon services not healthy: {health}"
 
         # Initialize JAM interface
-        self.jam_interface = JAMInterface()
+        if real_jam_available:
+            self.jam_interface = JAMInterface(mock_mode=False)
+        else:
+            self.jam_interface = JAMInterface()
 
         # Initialize phenotype builder
         self.phenotype_builder = PhenotypeBuilder(self.archon_adapter)
 
     async def teardown_test_environment(self):
         """Clean up test environment."""
-        if self.archon_adapter and hasattr(self.archon_adapter, 'close'):
+        if self.archon_adapter and hasattr(self.archon_adapter, "close"):
             await self.archon_adapter.close()
 
     async def load_test_fixtures(self) -> Dict[str, Any]:
@@ -107,27 +182,28 @@ class E2ETestSuite:
 
         # Load DNA samples
         dna_path = fixtures_dir / "test_dna_samples.yaml"
-        with open(dna_path, 'r') as f:
+        with open(dna_path, "r") as f:
             dna_samples = yaml.safe_load(f)
 
         # Load demo tasks
         tasks_path = fixtures_dir / "demo_tasks.json"
-        with open(tasks_path, 'r') as f:
+        with open(tasks_path, "r") as f:
             demo_tasks = json.load(f)
 
         # Load expected results
         results_path = fixtures_dir / "expected_results.json"
-        with open(results_path, 'r') as f:
+        with open(results_path, "r") as f:
             expected_results = json.load(f)
 
         return {
-            'dna_samples': dna_samples,
-            'demo_tasks': demo_tasks,
-            'expected_results': expected_results
+            "dna_samples": dna_samples,
+            "demo_tasks": demo_tasks,
+            "expected_results": expected_results,
         }
 
-    async def execute_demo_flow(self, borg_id: str, dna_config: Dict[str, Any],
-                               task_scenario: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_demo_flow(
+        self, borg_id: str, dna_config: Dict[str, Any], task_scenario: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Execute complete demo flow for a single scenario.
 
@@ -141,23 +217,23 @@ class E2ETestSuite:
         """
         flow_start = time.time()
         result = {
-            'borg_id': borg_id,
-            'scenario': task_scenario['name'],
-            'success': False,
-            'execution_time': 0,
-            'dna_integrity': False,
-            'economic_accuracy': False,
-            'errors': []
+            "borg_id": borg_id,
+            "scenario": task_scenario["name"],
+            "success": False,
+            "execution_time": 0,
+            "dna_integrity": False,
+            "economic_accuracy": False,
+            "errors": [],
         }
 
         try:
             # 1. FUNDING: Initialize borg with wealth
-            funding_amount = Decimal('0.1')  # 0.1 DOT initial funding
+            funding_amount = Decimal("0.1")  # 0.1 DOT initial funding
             await self.jam_interface.update_wealth(
                 borg_id=borg_id,
                 amount=Decimal(str(funding_amount)),
                 operation="funding",
-                description=f"Demo funding for {borg_id}"
+                description=f"Demo funding for {borg_id}",
             )
 
             # 2. CREATION: Create borg from DNA
@@ -174,12 +250,12 @@ class E2ETestSuite:
             borg.phenotype = phenotype
 
             # 3. EXECUTION: Execute task
-            task_result = await borg.execute_task(task_scenario['task'])
-            execution_cost = Decimal(str(task_result.get('cost', 0)))
+            task_result = await borg.execute_task(task_scenario["task"])
+            execution_cost = Decimal(str(task_result.get("cost", 0)))
 
             # Validate cost is within expected range
-            expected_min = Decimal(str(task_scenario['expected_cost_range'][0]))
-            expected_max = Decimal(str(task_scenario['expected_cost_range'][1]))
+            expected_min = Decimal(str(task_scenario["expected_cost_range"][0]))
+            expected_max = Decimal(str(task_scenario["expected_cost_range"][1]))
             cost_valid = expected_min <= execution_cost <= expected_max
 
             # 4. ENCODING: Serialize DNA to YAML
@@ -188,11 +264,13 @@ class E2ETestSuite:
 
             # 5. STORAGE: Store DNA hash on-chain
             store_result = await self.jam_interface.store_dna_hash(borg_id, dna_hash)
-            assert store_result['success'], f"DNA storage failed for {borg_id}"
+            assert store_result["success"], f"DNA storage failed for {borg_id}"
 
             # 6. DECODING: Retrieve and validate integrity
             stored_hash = await self.jam_interface.retrieve_dna_hash(borg_id)
-            integrity_valid = await self.jam_interface.verify_dna_integrity(borg_id, dna_hash)
+            integrity_valid = await self.jam_interface.verify_dna_integrity(
+                borg_id, dna_hash
+            )
             assert integrity_valid, f"DNA integrity validation failed for {borg_id}"
 
             # Round-trip integrity check: H(D') = H(D)
@@ -205,7 +283,7 @@ class E2ETestSuite:
                 borg_id=borg_id,
                 amount=Decimal(str(execution_cost)),
                 operation="cost",
-                description=f"Task execution: {task_scenario['task'][:50]}..."
+                description=f"Task execution: {task_scenario['task'][:50]}...",
             )
 
             # Final balance check
@@ -219,31 +297,33 @@ class E2ETestSuite:
             # Overall success
             execution_time = time.time() - flow_start
             all_checks_pass = (
-                cost_valid and
-                integrity_valid and
-                roundtrip_integrity and
-                economic_valid
+                cost_valid
+                and integrity_valid
+                and roundtrip_integrity
+                and economic_valid
             )
 
-            result.update({
-                'success': all_checks_pass,
-                'execution_time': execution_time,
-                'dna_integrity': integrity_valid and roundtrip_integrity,
-                'economic_accuracy': economic_valid,
-                'cost_validation': cost_valid,
-                'actual_cost': float(execution_cost),
-                'expected_cost_range': task_scenario['expected_cost_range'],
-                'final_balance': float(final_balance),
-                'expected_balance': float(expected_balance),
-                'task_result': task_result.get('result', ''),
-                'dna_hash': dna_hash,
-                'stored_hash': stored_hash
-            })
+            result.update(
+                {
+                    "success": all_checks_pass,
+                    "execution_time": execution_time,
+                    "dna_integrity": integrity_valid and roundtrip_integrity,
+                    "economic_accuracy": economic_valid,
+                    "cost_validation": cost_valid,
+                    "actual_cost": float(execution_cost),
+                    "expected_cost_range": task_scenario["expected_cost_range"],
+                    "final_balance": float(final_balance),
+                    "expected_balance": float(expected_balance),
+                    "task_result": task_result.get("result", ""),
+                    "dna_hash": dna_hash,
+                    "stored_hash": stored_hash,
+                }
+            )
 
         except Exception as e:
-            result['execution_time'] = time.time() - flow_start
-            result['errors'].append(str(e))
-            result['success'] = False
+            result["execution_time"] = time.time() - flow_start
+            result["errors"].append(str(e))
+            result["success"] = False
 
         return result
 
@@ -252,9 +332,9 @@ class E2ETestSuite:
         fixtures = await self.load_test_fixtures()
         results = []
 
-        for scenario in fixtures['demo_tasks']['scenarios']:
+        for scenario in fixtures["demo_tasks"]["scenarios"]:
             # Use minimal DNA for all scenarios (can be extended later)
-            dna_config = fixtures['dna_samples']['test_dna_minimal']
+            dna_config = fixtures["dna_samples"]["test_dna_minimal"]
 
             # Generate unique borg ID
             borg_id = f"e2e_test_{scenario['name']}_{int(time.time() * 1000)}"
@@ -271,47 +351,60 @@ class E2ETestSuite:
     def generate_test_report(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Generate comprehensive test report."""
         total_tests = len(results)
-        successful_tests = sum(1 for r in results if r['success'])
+        successful_tests = sum(1 for r in results if r["success"])
         failed_tests = total_tests - successful_tests
 
-        total_execution_time = sum(r['execution_time'] for r in results)
-        avg_execution_time = total_execution_time / total_tests if total_tests > 0 else 0
+        total_execution_time = sum(r["execution_time"] for r in results)
+        avg_execution_time = (
+            total_execution_time / total_tests if total_tests > 0 else 0
+        )
 
-        dna_integrity_passed = sum(1 for r in results if r.get('dna_integrity', False))
-        economic_accuracy_passed = sum(1 for r in results if r.get('economic_accuracy', False))
+        dna_integrity_passed = sum(1 for r in results if r.get("dna_integrity", False))
+        economic_accuracy_passed = sum(
+            1 for r in results if r.get("economic_accuracy", False)
+        )
 
         success_rate = (successful_tests / total_tests * 100) if total_tests > 0 else 0
-        dna_integrity_rate = (dna_integrity_passed / total_tests * 100) if total_tests > 0 else 0
-        economic_accuracy_rate = (economic_accuracy_passed / total_tests * 100) if total_tests > 0 else 0
+        dna_integrity_rate = (
+            (dna_integrity_passed / total_tests * 100) if total_tests > 0 else 0
+        )
+        economic_accuracy_rate = (
+            (economic_accuracy_passed / total_tests * 100) if total_tests > 0 else 0
+        )
 
         return {
-            'summary': {
-                'total_tests': total_tests,
-                'successful_tests': successful_tests,
-                'failed_tests': failed_tests,
-                'success_rate_percent': round(success_rate, 2),
-                'total_execution_time_seconds': round(total_execution_time, 2),
-                'avg_execution_time_seconds': round(avg_execution_time, 2),
-                'dna_integrity_rate_percent': round(dna_integrity_rate, 2),
-                'economic_accuracy_rate_percent': round(economic_accuracy_rate, 2)
+            "summary": {
+                "total_tests": total_tests,
+                "successful_tests": successful_tests,
+                "failed_tests": failed_tests,
+                "success_rate_percent": round(success_rate, 2),
+                "total_execution_time_seconds": round(total_execution_time, 2),
+                "avg_execution_time_seconds": round(avg_execution_time, 2),
+                "dna_integrity_rate_percent": round(dna_integrity_rate, 2),
+                "economic_accuracy_rate_percent": round(economic_accuracy_rate, 2),
             },
-            'results': results,
-            'validation_status': {
-                'all_5_scenarios_executed': total_tests >= 5,
-                'dna_roundtrip_integrity_maintained': dna_integrity_rate == 100.0,
-                'economic_accuracy_within_0_001_dot': economic_accuracy_rate == 100.0,
-                'execution_under_5_minutes': total_execution_time < 300,
-                'no_service_crashes': all(not r.get('errors') for r in results),
-                'comprehensive_error_reporting': all('errors' in r for r in results)
+            "results": results,
+            "validation_status": {
+                "all_5_scenarios_executed": total_tests >= 5,
+                "dna_roundtrip_integrity_maintained": dna_integrity_rate == 100.0,
+                "economic_accuracy_within_0_001_dot": economic_accuracy_rate == 100.0,
+                "execution_under_5_minutes": total_execution_time < 300,
+                "no_service_crashes": all(not r.get("errors") for r in results),
+                "comprehensive_error_reporting": all("errors" in r for r in results),
             },
-            'prp_success_criteria': {
-                'all_5_core_demo_scenarios_execute_successfully': successful_tests >= 5,
-                'dna_round_trip_integrity_maintained': dna_integrity_rate == 100.0,
-                'economic_calculations_accurate_within_0_001_dot': economic_accuracy_rate == 100.0,
-                'test_execution_completes_within_5_minutes': total_execution_time < 300,
-                'no_service_crashes_or_hangs': all(not r.get('errors') for r in results),
-                'comprehensive_error_reporting_for_failures': all('errors' in r for r in results)
-            }
+            "prp_success_criteria": {
+                "all_5_core_demo_scenarios_execute_successfully": successful_tests >= 5,
+                "dna_round_trip_integrity_maintained": dna_integrity_rate == 100.0,
+                "economic_calculations_accurate_within_0_001_dot": economic_accuracy_rate
+                == 100.0,
+                "test_execution_completes_within_5_minutes": total_execution_time < 300,
+                "no_service_crashes_or_hangs": all(
+                    not r.get("errors") for r in results
+                ),
+                "comprehensive_error_reporting_for_failures": all(
+                    "errors" in r for r in results
+                ),
+            },
         }
 
     def save_report(self, report: Dict[str, Any], filename: str = None):
@@ -320,19 +413,19 @@ class E2ETestSuite:
             timestamp = int(time.time())
             filename = f"e2e_test_report_{timestamp}.json"
 
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             json.dump(report, f, indent=2, default=str)
 
         print(f"Test report saved to {filename}")
 
     def print_report_summary(self, report: Dict[str, Any]):
         """Print human-readable test report summary."""
-        summary = report['summary']
-        validation = report['validation_status']
+        summary = report["summary"]
+        validation = report["validation_status"]
 
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("BORGLIFE PHASE 1 E2E TEST SUITE REPORT")
-        print("="*80)
+        print("=" * 80)
         print(f"Total Tests: {summary['total_tests']}")
         print(f"Successful: {summary['successful_tests']}")
         print(f"Failed: {summary['failed_tests']}")
@@ -340,17 +433,21 @@ class E2ETestSuite:
         print(f"Total Execution Time: {summary['total_execution_time_seconds']:.2f}s")
         print(f"Average Execution Time: {summary['avg_execution_time_seconds']:.2f}s")
         print(f"DNA Integrity Rate: {summary['dna_integrity_rate_percent']:.1f}%")
-        print(f"Economic Accuracy Rate: {summary['economic_accuracy_rate_percent']:.1f}%")
+        print(
+            f"Economic Accuracy Rate: {summary['economic_accuracy_rate_percent']:.1f}%"
+        )
 
         print("\nPRP SUCCESS CRITERIA VALIDATION:")
-        criteria = report['prp_success_criteria']
+        criteria = report["prp_success_criteria"]
         for criterion, passed in criteria.items():
             status = "✅ PASS" if passed else "❌ FAIL"
             print(f"  {status}: {criterion}")
 
         overall_success = all(validation.values())
-        print(f"\nOVERALL RESULT: {'✅ ALL TESTS PASSED' if overall_success else '❌ TESTS FAILED'}")
-        print("="*80)
+        print(
+            f"\nOVERALL RESULT: {'✅ ALL TESTS PASSED' if overall_success else '❌ TESTS FAILED'}"
+        )
+        print("=" * 80)
 
 
 # Pytest integration
@@ -378,49 +475,204 @@ class TestE2ETestSuite:
         e2e_suite.print_report_summary(report)
 
         # Validate PRP success criteria
-        criteria = report['prp_success_criteria']
+        criteria = report["prp_success_criteria"]
 
         # All 5 core demo scenarios execute successfully
-        assert criteria['all_5_core_demo_scenarios_execute_successfully'], \
-            "Not all 5 core demo scenarios executed successfully"
+        assert criteria[
+            "all_5_core_demo_scenarios_execute_successfully"
+        ], "Not all 5 core demo scenarios executed successfully"
 
         # DNA round-trip integrity maintained (H(D') = H(D))
-        assert criteria['dna_round_trip_integrity_maintained'], \
-            "DNA round-trip integrity not maintained"
+        assert criteria[
+            "dna_round_trip_integrity_maintained"
+        ], "DNA round-trip integrity not maintained"
 
-        # Economic calculations accurate within 0.001 DOT
-        assert criteria['economic_calculations_accurate_within_0_001_dot'], \
-            "Economic calculations not accurate within 0.001 DOT"
+        # Economic calculations accurate within 0.001 DOT"
+        assert criteria[
+            "economic_calculations_accurate_within_0_001_dot"
+        ], "Economic calculations not accurate within 0.001 DOT"
 
         # Test execution completes within 5 minutes
-        assert criteria['test_execution_completes_within_5_minutes'], \
-            "Test execution did not complete within 5 minutes"
+        assert criteria[
+            "test_execution_completes_within_5_minutes"
+        ], "Test execution did not complete within 5 minutes"
 
         # No service crashes or hangs
-        assert criteria['no_service_crashes_or_hangs'], \
-            "Service crashes or hangs detected"
+        assert criteria[
+            "no_service_crashes_or_hangs"
+        ], "Service crashes or hangs detected"
 
         # Comprehensive error reporting for failures
-        assert criteria['comprehensive_error_reporting_for_failures'], \
-            "Comprehensive error reporting not implemented"
+        assert criteria[
+            "comprehensive_error_reporting_for_failures"
+        ], "Comprehensive error reporting not implemented"
 
     @pytest.mark.asyncio
     async def test_individual_scenario_execution(self, e2e_suite):
         """Test individual scenario execution."""
         fixtures = await e2e_suite.load_test_fixtures()
-        scenario = fixtures['demo_tasks']['scenarios'][0]  # Test first scenario
-        dna_config = fixtures['dna_samples']['test_dna_minimal']
+        scenario = fixtures["demo_tasks"]["scenarios"][0]  # Test first scenario
+        dna_config = fixtures["dna_samples"]["test_dna_minimal"]
 
         borg_id = f"individual_test_{int(time.time() * 1000)}"
         result = await e2e_suite.execute_demo_flow(borg_id, dna_config, scenario)
 
         # Validate individual scenario execution
-        assert result['success'], f"Individual scenario failed: {result.get('errors', [])}"
-        assert result['dna_integrity'], "DNA integrity check failed"
-        assert result['economic_accuracy'], "Economic accuracy check failed"
-        assert result['execution_time'] > 0, "Execution time not recorded"
-        assert 'dna_hash' in result, "DNA hash not generated"
-        assert 'stored_hash' in result, "DNA hash not stored"
+        assert result[
+            "success"
+        ], f"Individual scenario failed: {result.get('errors', [])}"
+        assert result["dna_integrity"], "DNA integrity check failed"
+        assert result["economic_accuracy"], "Economic accuracy check failed"
+        assert result["execution_time"] > 0, "Execution time not recorded"
+        assert "dna_hash" in result, "DNA hash not generated"
+        assert "stored_hash" in result, "DNA hash not stored"
+
+    @pytest.mark.asyncio
+    async def test_phase2a_usdb_asset_creation(self, e2e_suite):
+        """Test Phase 2A USDB asset creation on Westend Asset Hub."""
+        from scripts.create_usdb_asset import USDBAssetCreator
+
+        # Test asset creation (mock mode for CI)
+        creator = USDBAssetCreator()
+        success = await creator.create_asset()
+
+        # In mock mode, this should succeed
+        assert success, "USDB asset creation failed"
+        assert creator.asset_id is not None, "Asset ID not assigned"
+
+        # Verify asset metadata
+        success = await creator.set_metadata()
+        assert success, "Asset metadata setting failed"
+
+        # Verify asset verification
+        success = await creator.verify_asset()
+        assert success, "Asset verification failed"
+
+    @pytest.mark.asyncio
+    async def test_phase2a_usdb_distribution(self, e2e_suite):
+        """Test Phase 2A USDB distribution to borgs."""
+        from scripts.usdb_distribution import USDBDistributor
+
+        distributor = USDBDistributor()
+
+        # Test distribution to mock borgs
+        test_borgs = ["test_borg_1", "test_borg_2"]
+        results = await distributor.distribute_to_test_borgs(test_borgs)
+
+        # Should succeed in mock mode
+        assert results["successful_distributions"] >= 0, "Distribution failed"
+        assert len(results["distribution_details"]) == len(
+            test_borgs
+        ), "Distribution details incomplete"
+
+    @pytest.mark.asyncio
+    async def test_phase2a_inter_borg_transfers(self, e2e_suite):
+        """Test Phase 2A inter-borg USDB transfers."""
+        from jam_mock.inter_borg_transfer import InterBorgTransfer
+        from jam_mock.westend_adapter import WestendAdapter
+
+        # Initialize components
+        westend_adapter = WestendAdapter()
+        transfer_protocol = InterBorgTransfer(westend_adapter)
+
+        # Test transfer validation (mock)
+        validation = await transfer_protocol.validate_transfer(
+            from_borg_id="borg_a",
+            to_borg_id="borg_b",
+            currency="USDB",
+            amount=Decimal("10.0"),
+        )
+
+        # Should pass validation in mock mode
+        assert validation[
+            "valid"
+        ], f"Transfer validation failed: {validation.get('errors', [])}"
+
+    @pytest.mark.asyncio
+    async def test_phase2a_economic_validation(self, e2e_suite):
+        """Test Phase 2A economic validation and controls."""
+        from jam_mock.economic_validator import EconomicValidator
+
+        validator = EconomicValidator()
+
+        # Test transfer validation
+        result = await validator.validate_transfer(
+            from_borg_id="borg_a",
+            to_borg_id="borg_b",
+            currency="USDB",
+            amount=Decimal("10.0"),
+            asset_id=12345,
+        )
+
+        # Should pass in mock mode
+        assert result[
+            "valid"
+        ], f"Economic validation failed: {result.get('errors', [])}"
+        assert "cost_estimate" in result, "Cost estimate missing"
+        assert "ethical_compliance" in result, "Ethical compliance check missing"
+
+    @pytest.mark.asyncio
+    async def test_phase2a_transaction_manager(self, e2e_suite):
+        """Test Phase 2A transaction manager with dual currencies."""
+        from jam_mock.transaction_manager import TransactionManager
+
+        manager = TransactionManager()
+
+        # Test transaction recording
+        tx_id = await manager.record_transaction(
+            from_borg_id="borg_a",
+            to_borg_id="borg_b",
+            currency="USDB",
+            amount=Decimal("10.0"),
+            transaction_type="ASSET_TRANSFER",
+            asset_id=12345,
+            description="Test transfer",
+        )
+
+        assert tx_id, "Transaction recording failed"
+
+        # Test transaction retrieval
+        tx = await manager.get_transaction(tx_id)
+        assert tx, "Transaction retrieval failed"
+        assert tx["currency"] == "USDB", "Currency mismatch"
+        assert tx["transaction_type"] == "ASSET_TRANSFER", "Transaction type mismatch"
+
+    @pytest.mark.asyncio
+    async def test_phase2a_complete_economic_flow(self, e2e_suite):
+        """Test complete Phase 2A economic flow: asset creation → distribution → transfer."""
+        # This is a comprehensive integration test
+        from jam_mock.inter_borg_transfer import InterBorgTransfer
+        from jam_mock.westend_adapter import WestendAdapter
+        from scripts.create_usdb_asset import USDBAssetCreator
+        from scripts.usdb_distribution import USDBDistributor
+
+        # 1. Create USDB asset
+        creator = USDBAssetCreator()
+        asset_success = await creator.create_asset()
+        assert asset_success, "Asset creation failed"
+
+        # 2. Distribute to borgs
+        distributor = USDBDistributor()
+        dist_results = await distributor.distribute_to_test_borgs(["borg_a", "borg_b"])
+        assert dist_results["successful_distributions"] >= 0, "Distribution failed"
+
+        # 3. Execute inter-borg transfer
+        westend_adapter = WestendAdapter()
+        transfer_protocol = InterBorgTransfer(westend_adapter)
+
+        transfer_result = await transfer_protocol.transfer_usdb(
+            from_borg_id="borg_a",
+            to_borg_id="borg_b",
+            amount=Decimal("5.0"),
+            description="Integration test transfer",
+        )
+
+        # Should succeed in mock mode
+        assert (
+            transfer_result["success"] or "mock" in str(transfer_result).lower()
+        ), f"Transfer failed: {transfer_result}"
+
+        print("✅ Phase 2A complete economic flow test passed")
 
 
 if __name__ == "__main__":

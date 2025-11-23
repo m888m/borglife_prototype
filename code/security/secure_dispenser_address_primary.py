@@ -6,31 +6,36 @@ This version maintains dispenser functionality while being compatible with
 the new address-primary borg management system.
 """
 
-import os
-import json
 import hashlib
+import json
+import os
 import re
-from typing import Dict, Any, Optional
-from decimal import Decimal
+import sys
 from datetime import datetime, timedelta
-from substrateinterface import Keypair
+from decimal import Decimal
+from typing import Any, Dict, Optional
+
 import keyring
+from substrateinterface import Keypair
 
 from .dna_anchor import DNAAanchor
-import sys
-import os
+
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from jam_mock.demo_audit_logger import DemoAuditLogger
 
 # Load Supabase credentials for dispenser
 try:
     from dotenv import load_dotenv
-    load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env.borglife'))
+
+    load_dotenv(
+        dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env.borglife")
+    )
     import os
+
     from supabase import create_client
 
-    supabase_url = os.getenv('SUPABASE_URL')
-    supabase_key = os.getenv('SUPABASE_SECRET_KEY')
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_SECRET_KEY")
 
     if supabase_url and supabase_key:
         dispenser_supabase_client = create_client(supabase_url, supabase_key)
@@ -66,9 +71,9 @@ class SecureDispenserAddressPrimary:
         self.keyring_service = KeyringService(ss58_format=42, address_prefix="5")
 
         # Transfer limits and controls
-        self.max_transfer_amount = Decimal('3.0')   # Max 3.0 WND per transfer
-        self.daily_limit = Decimal('9.0')           # Max 9.0 WND per day
-        self.min_balance_threshold = Decimal('0.1') # Alert when balance drops below
+        self.max_transfer_amount = Decimal("3.0")  # Max 3.0 WND per transfer
+        self.daily_limit = Decimal("9.0")  # Max 9.0 WND per day
+        self.min_balance_threshold = Decimal("0.1")  # Alert when balance drops below
 
         # Session management
         self.unlocked_keypair: Optional[Keypair] = None
@@ -85,7 +90,9 @@ class SecureDispenserAddressPrimary:
         """Ensure keystore exists and is properly configured."""
         if not os.path.exists(self.keystore_path):
             print("⚠️  Dispenser keystore not found - run setup first")
-            print("Run: python3 -c \"from code.security.secure_dispenser_address_primary import SecureDispenserAddressPrimary; d = SecureDispenserAddressPrimary(); d.setup_keystore()\"")
+            print(
+                'Run: python3 -c "from code.security.secure_dispenser_address_primary import SecureDispenserAddressPrimary; d = SecureDispenserAddressPrimary(); d.setup_keystore()"'
+            )
             return False
         return True
 
@@ -107,7 +114,7 @@ class SecureDispenserAddressPrimary:
             Substrate address or None if not found
         """
         # Check if it's already an address (SS58 format)
-        if borg_identifier.startswith('5') and len(borg_identifier) == 48:
+        if borg_identifier.startswith("5") and len(borg_identifier) == 48:
             return borg_identifier
 
         # Check cache first
@@ -117,7 +124,8 @@ class SecureDispenserAddressPrimary:
         # Try to resolve via database (address-primary system)
         try:
             # Import here to avoid circular imports
-            from jam_mock.borg_address_manager_address_primary import BorgAddressManagerAddressPrimary
+            from jam_mock.borg_address_manager_address_primary import \
+                BorgAddressManagerAddressPrimary
 
             # Try to get a manager instance (this is a simplified approach)
             # In production, this would be injected as a dependency
@@ -132,7 +140,7 @@ class SecureDispenserAddressPrimary:
             self.audit_logger.log_event(
                 "borg_address_resolution_failed",
                 f"Failed to resolve address for {borg_identifier}: {str(e)}",
-                {"borg_identifier": borg_identifier, "error": str(e)}
+                {"borg_identifier": borg_identifier, "error": str(e)},
             )
 
         return None
@@ -150,12 +158,12 @@ class SecureDispenserAddressPrimary:
         try:
             # Get dispenser seed from config or parameter
             if not dispenser_seed:
-                config_path = '.borglife_config'
+                config_path = ".borglife_config"
                 if os.path.exists(config_path):
-                    with open(config_path, 'r') as f:
+                    with open(config_path, "r") as f:
                         for line in f:
-                            if line.startswith('WND_DISPENSER_SEED='):
-                                dispenser_seed = line.split('=', 1)[1].strip()
+                            if line.startswith("WND_DISPENSER_SEED="):
+                                dispenser_seed = line.split("=", 1)[1].strip()
                                 break
 
             if not dispenser_seed:
@@ -181,15 +189,17 @@ class SecureDispenserAddressPrimary:
 
             # Store metadata in keystore file (no sensitive data)
             keystore_data = {
-                'seed_hash': hashlib.sha256(dispenser_seed.encode()).hexdigest(),  # Never store actual seed
-                'ss58_address': keypair.ss58_address,
-                'created_at': datetime.utcnow().isoformat(),
-                'setup_version': '4.0',  # Updated for address-primary compatibility
-                'storage_method': 'macos_keychain_address_primary_compatible'
+                "seed_hash": hashlib.sha256(
+                    dispenser_seed.encode()
+                ).hexdigest(),  # Never store actual seed
+                "ss58_address": keypair.ss58_address,
+                "created_at": datetime.utcnow().isoformat(),
+                "setup_version": "4.0",  # Updated for address-primary compatibility
+                "storage_method": "macos_keychain_address_primary_compatible",
             }
 
             # Write keystore metadata
-            with open(self.keystore_path, 'w') as f:
+            with open(self.keystore_path, "w") as f:
                 json.dump(keystore_data, f, indent=2)
 
             # Set file permissions to owner-only
@@ -198,10 +208,16 @@ class SecureDispenserAddressPrimary:
             self.audit_logger.log_event(
                 "dispenser_keystore_created_address_primary",
                 f"Secure dispenser keystore created with address-primary compatibility for address {keypair.ss58_address}",
-                {"address": keypair.ss58_address, "setup_version": "4.0", "storage": "macos_keychain"}
+                {
+                    "address": keypair.ss58_address,
+                    "setup_version": "4.0",
+                    "storage": "macos_keychain",
+                },
             )
 
-            print(f"✅ Dispenser keystore created with address-primary compatibility: {self.keystore_path}")
+            print(
+                f"✅ Dispenser keystore created with address-primary compatibility: {self.keystore_path}"
+            )
             print(f"   Address: {keypair.ss58_address}")
             print("   🔐 Keypair stored securely in macOS Keychain")
             return True
@@ -210,7 +226,7 @@ class SecureDispenserAddressPrimary:
             self.audit_logger.log_event(
                 "dispenser_keystore_setup_failed",
                 f"Failed to setup dispenser keystore: {str(e)}",
-                {"error": str(e)}
+                {"error": str(e)},
             )
             print(f"❌ Failed to setup keystore: {e}")
             return False
@@ -230,12 +246,14 @@ class SecureDispenserAddressPrimary:
             if not os.path.exists(self.keystore_path):
                 raise ValueError("Keystore not found")
 
-            with open(self.keystore_path, 'r') as f:
+            with open(self.keystore_path, "r") as f:
                 keystore_data = json.load(f)
 
             # Verify setup version compatibility
-            if keystore_data.get('setup_version') not in ['3.0', '4.0']:
-                raise ValueError("Incompatible keystore version - please recreate keystore")
+            if keystore_data.get("setup_version") not in ["3.0", "4.0"]:
+                raise ValueError(
+                    "Incompatible keystore version - please recreate keystore"
+                )
 
             # Load keypair from macOS Keychain
             service_name = self._get_keyring_service_name()
@@ -248,7 +266,7 @@ class SecureDispenserAddressPrimary:
                 raise ValueError("Failed to load keypair from macOS Keychain")
 
             # Verify address matches stored metadata
-            if self.unlocked_keypair.ss58_address != keystore_data.get('ss58_address'):
+            if self.unlocked_keypair.ss58_address != keystore_data.get("ss58_address"):
                 raise ValueError("Keypair address mismatch - possible tampering")
 
             self.session_start = datetime.utcnow()
@@ -259,8 +277,8 @@ class SecureDispenserAddressPrimary:
                 {
                     "address": self.unlocked_keypair.ss58_address,
                     "session_duration_hours": session_duration_hours,
-                    "keychain_load_successful": True
-                }
+                    "keychain_load_successful": True,
+                },
             )
 
             print(f"✅ Dispenser unlocked for {session_duration_hours} hour session")
@@ -273,7 +291,7 @@ class SecureDispenserAddressPrimary:
             self.audit_logger.log_event(
                 "dispenser_unlock_failed",
                 f"Failed to unlock dispenser: {str(e)}",
-                {"error": str(e)}
+                {"error": str(e)},
             )
             print(f"❌ Failed to unlock dispenser: {e}")
             return False
@@ -295,14 +313,17 @@ class SecureDispenserAddressPrimary:
             self.session_start = None
 
             self.audit_logger.log_event(
-                "dispenser_locked",
-                "Dispenser session locked and keys cleared",
-                {}
+                "dispenser_locked", "Dispenser session locked and keys cleared", {}
             )
 
             print("🔒 Dispenser session locked")
 
-    async def transfer_wnd_to_borg(self, borg_identifier: str, amount_wnd: float, borg_id_for_logging: Optional[str] = None) -> Dict[str, Any]:
+    async def transfer_wnd_to_borg(
+        self,
+        borg_identifier: str,
+        amount_wnd: float,
+        borg_id_for_logging: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Transfer WND tokens from dispenser to borg address using live Westend network.
 
@@ -317,71 +338,82 @@ class SecureDispenserAddressPrimary:
             Transfer result with success status and transaction details
         """
         result = {
-            'success': False,
-            'error': None,
-            'transaction_hash': None,
-            'amount_transferred': None,
-            'from_address': None,
-            'to_address': None,
-            'borg_identifier': borg_identifier,
-            'block_number': None,
-            'block_hash': None
+            "success": False,
+            "error": None,
+            "transaction_hash": None,
+            "amount_transferred": None,
+            "from_address": None,
+            "to_address": None,
+            "borg_identifier": borg_identifier,
+            "block_number": None,
+            "block_hash": None,
         }
 
         try:
             # Validate session
             if not self.is_session_active():
-                result['error'] = 'Dispenser session not active - unlock required'
+                result["error"] = "Dispenser session not active - unlock required"
                 return result
 
             # Resolve borg address from identifier
             borg_address = self._resolve_borg_address(borg_identifier)
             if not borg_address:
-                result['error'] = f'Could not resolve address for borg identifier: {borg_identifier}'
+                result["error"] = (
+                    f"Could not resolve address for borg identifier: {borg_identifier}"
+                )
                 return result
 
-            result['to_address'] = borg_address
+            result["to_address"] = borg_address
 
             # Validate inputs
             if amount_wnd <= 0:
-                result['error'] = 'Transfer amount must be positive'
+                result["error"] = "Transfer amount must be positive"
                 return result
 
             if amount_wnd > float(self.max_transfer_amount):
-                result['error'] = f'Transfer amount {amount_wnd} exceeds maximum {self.max_transfer_amount}'
+                result["error"] = (
+                    f"Transfer amount {amount_wnd} exceeds maximum {self.max_transfer_amount}"
+                )
                 return result
 
             # Check daily limit
             today = datetime.utcnow().date().isoformat()
-            daily_used = self.daily_usage.get(today, Decimal('0'))
+            daily_used = self.daily_usage.get(today, Decimal("0"))
             amount_decimal = Decimal(str(amount_wnd))
 
             if daily_used + amount_decimal > self.daily_limit:
-                result['error'] = f'Daily limit exceeded: {daily_used + amount_decimal} > {self.daily_limit}'
+                result["error"] = (
+                    f"Daily limit exceeded: {daily_used + amount_decimal} > {self.daily_limit}"
+                )
                 return result
 
             # Initialize WestendAdapter for live transfer
             from jam_mock.westend_adapter import WestendAdapter
-            westend_adapter = WestendAdapter("https://westend.api.onfinality.io/public-ws")
+
+            westend_adapter = WestendAdapter(
+                "https://westend.api.onfinality.io/public-ws"
+            )
             westend_adapter.set_keypair(self.unlocked_keypair)
 
             # Convert WND to planck units
-            amount_planck = int(amount_wnd * (10 ** 12))
+            amount_planck = int(amount_wnd * (10**12))
 
             # Check dispenser balance before transfer
-            dispenser_balance = await westend_adapter.get_wnd_balance(self.unlocked_keypair.ss58_address)
+            dispenser_balance = await westend_adapter.get_wnd_balance(
+                self.unlocked_keypair.ss58_address
+            )
             if dispenser_balance < amount_planck:
-                result['error'] = f'Insufficient dispenser balance: {dispenser_balance} < {amount_planck} planck'
+                result["error"] = (
+                    f"Insufficient dispenser balance: {dispenser_balance} < {amount_planck} planck"
+                )
                 return result
 
             # Execute transfer
             transfer_result = await westend_adapter.transfer_wnd(
-                self.unlocked_keypair.ss58_address,
-                borg_address,
-                amount_planck
+                self.unlocked_keypair.ss58_address, borg_address, amount_planck
             )
 
-            if transfer_result.get('success'):
+            if transfer_result.get("success"):
                 # Update daily usage
                 self.daily_usage[today] = daily_used + amount_decimal
 
@@ -395,25 +427,27 @@ class SecureDispenserAddressPrimary:
                     "dispenser_wnd_transfer_completed_address_primary",
                     f"Transferred {amount_wnd} WND from dispenser to borg {log_borg_id} (address-primary compatible)",
                     {
-                        'borg_identifier': borg_identifier,
-                        'borg_address': borg_address,
-                        'dispenser_address': self.unlocked_keypair.ss58_address,
-                        'amount_wnd': amount_wnd,
-                        'amount_planck': amount_planck,
-                        'transaction_hash': transfer_result['transaction_hash'],
-                        'block_number': transfer_result.get('block_number'),
-                        'block_hash': transfer_result.get('block_hash')
-                    }
+                        "borg_identifier": borg_identifier,
+                        "borg_address": borg_address,
+                        "dispenser_address": self.unlocked_keypair.ss58_address,
+                        "amount_wnd": amount_wnd,
+                        "amount_planck": amount_planck,
+                        "transaction_hash": transfer_result["transaction_hash"],
+                        "block_number": transfer_result.get("block_number"),
+                        "block_hash": transfer_result.get("block_hash"),
+                    },
                 )
 
-                result.update({
-                    'success': True,
-                    'transaction_hash': transfer_result['transaction_hash'],
-                    'amount_transferred': amount_planck,
-                    'from_address': self.unlocked_keypair.ss58_address,
-                    'block_number': transfer_result.get('block_number'),
-                    'block_hash': transfer_result.get('block_hash')
-                })
+                result.update(
+                    {
+                        "success": True,
+                        "transaction_hash": transfer_result["transaction_hash"],
+                        "amount_transferred": amount_planck,
+                        "from_address": self.unlocked_keypair.ss58_address,
+                        "block_number": transfer_result.get("block_number"),
+                        "block_hash": transfer_result.get("block_hash"),
+                    }
+                )
 
                 print(f"✅ Transferred {amount_wnd} WND to borg {log_borg_id}")
                 print(f"   Transaction: {transfer_result['transaction_hash']}")
@@ -421,47 +455,51 @@ class SecureDispenserAddressPrimary:
                 return result
 
             else:
-                result['error'] = transfer_result.get('error', 'Transfer failed')
+                result["error"] = transfer_result.get("error", "Transfer failed")
                 return result
 
         except Exception as e:
-            result['error'] = str(e)
+            result["error"] = str(e)
             log_borg_id = borg_id_for_logging or borg_identifier
             self.audit_logger.log_event(
                 "dispenser_wnd_transfer_failed",
                 f"Failed to transfer WND to borg {log_borg_id}: {str(e)}",
                 {
-                    'borg_identifier': borg_identifier,
-                    'amount_requested': amount_wnd,
-                    'error': str(e)
-                }
+                    "borg_identifier": borg_identifier,
+                    "amount_requested": amount_wnd,
+                    "error": str(e),
+                },
             )
             return result
 
     def get_status(self) -> Dict[str, Any]:
         """Get dispenser status and security information."""
         status = {
-            'session_active': self.is_session_active(),
-            'keystore_exists': os.path.exists(self.keystore_path),
-            'max_transfer_amount': str(self.max_transfer_amount),
-            'daily_limit': str(self.daily_limit),
-            'min_balance_threshold': str(self.min_balance_threshold),
-            'address_primary_compatible': True
+            "session_active": self.is_session_active(),
+            "keystore_exists": os.path.exists(self.keystore_path),
+            "max_transfer_amount": str(self.max_transfer_amount),
+            "daily_limit": str(self.daily_limit),
+            "min_balance_threshold": str(self.min_balance_threshold),
+            "address_primary_compatible": True,
         }
 
         # Add session info if active
         if self.is_session_active() and self.unlocked_keypair:
-            status.update({
-                'dispenser_address': self.unlocked_keypair.ss58_address,
-                'session_start': self.session_start.isoformat() if self.session_start else None
-            })
+            status.update(
+                {
+                    "dispenser_address": self.unlocked_keypair.ss58_address,
+                    "session_start": (
+                        self.session_start.isoformat() if self.session_start else None
+                    ),
+                }
+            )
 
         # Add daily usage
         today = datetime.utcnow().date().isoformat()
-        status['daily_usage'] = str(self.daily_usage.get(today, Decimal('0')))
+        status["daily_usage"] = str(self.daily_usage.get(today, Decimal("0")))
 
         # Add cache info
-        status['borg_address_cache_size'] = len(self._borg_address_cache)
+        status["borg_address_cache_size"] = len(self._borg_address_cache)
 
         return status
 
@@ -470,21 +508,23 @@ class SecureDispenserAddressPrimary:
         try:
             keypair = Keypair.create_from_seed(seed)
             # Immediately clear seed from memory
-            seed = '\x00' * len(seed)
+            seed = "\x00" * len(seed)
             return keypair
         except Exception as e:
-            seed = '\x00' * len(seed)
+            seed = "\x00" * len(seed)
             raise
 
     def _get_usdb_asset_id(self) -> Optional[int]:
         """Get USDB asset ID from configuration."""
         try:
-            config_path = os.path.join(os.path.dirname(__file__), '..', '.borglife_config')
+            config_path = os.path.join(
+                os.path.dirname(__file__), "..", ".borglife_config"
+            )
             if os.path.exists(config_path):
-                with open(config_path, 'r') as f:
+                with open(config_path, "r") as f:
                     for line in f:
-                        if line.startswith('USDB_ASSET_ID='):
-                            return int(line.split('=', 1)[1].strip())
+                        if line.startswith("USDB_ASSET_ID="):
+                            return int(line.split("=", 1)[1].strip())
         except Exception as e:
             print(f"Warning: Could not read USDB asset ID from config: {e}")
 

@@ -1,21 +1,28 @@
-import pytest
 from typing import Dict
+
+import pytest
+
 try:
     from archon_adapter import ArchonServiceAdapter
-    from synthesis import DNAParser, PhenotypeBuilder, BorgPhenotype
     from proto_borg import ProtoBorgAgent
+    from synthesis import BorgPhenotype, DNAParser, PhenotypeBuilder
 except ImportError:
     # Mock imports for testing when modules are not available
     class ArchonServiceAdapter:
         pass
+
     class DNAParser:
         pass
+
     class PhenotypeBuilder:
         pass
+
     class BorgPhenotype:
         pass
+
     class ProtoBorgAgent:
         pass
+
 
 @pytest.mark.asyncio
 async def test_archon_health():
@@ -23,11 +30,12 @@ async def test_archon_health():
     adapter = ArchonServiceAdapter()
     health = await adapter.check_health()
     # Check for expected health structure (may not have all services running)
-    assert 'overall' in health
-    assert 'details' in health
+    assert "overall" in health
+    assert "details" in health
     # In test environment, we just verify the health check doesn't crash
     # Services may not be running, which is acceptable for unit tests
-    assert isinstance(health['overall'], bool)
+    assert isinstance(health["overall"], bool)
+
 
 @pytest.mark.asyncio
 async def test_rag_query():
@@ -36,8 +44,9 @@ async def test_rag_query():
     await adapter.initialize()
 
     result = await adapter.perform_rag_query("What is BorgLife?")
-    assert 'results' in result
-    assert len(result['results']) > 0
+    assert "results" in result
+    assert len(result["results"]) > 0
+
 
 @pytest.mark.asyncio
 async def test_dna_parsing():
@@ -56,6 +65,7 @@ async def test_dna_parsing():
     dna = parser.from_yaml(yaml_dna)
     assert dna.header.code_length == 1024
 
+
 @pytest.mark.asyncio
 async def test_phenotype_building():
     """Test phenotype building from DNA"""
@@ -66,13 +76,14 @@ async def test_phenotype_building():
     builder = PhenotypeBuilder(adapter)
 
     # Load test DNA
-    with open('tests/fixtures/test_dna.yaml') as f:
+    with open("tests/fixtures/test_dna.yaml") as f:
         dna = parser.from_yaml(f.read())
 
     # Build phenotype
     phenotype = await builder.build(dna)
     assert len(phenotype.cells) > 0
     assert len(phenotype.organs) > 0
+
 
 @pytest.mark.asyncio
 async def test_end_to_end_task_execution():
@@ -83,7 +94,7 @@ async def test_end_to_end_task_execution():
 
     # Parse DNA
     parser = DNAParser()
-    with open('borg_dna.yaml') as f:
+    with open("borg_dna.yaml") as f:
         dna = parser.from_yaml(f.read())
 
     # Build phenotype
@@ -93,6 +104,7 @@ async def test_end_to_end_task_execution():
     # Execute task
     result = await phenotype.execute_task("Summarize BorgLife whitepaper")
     assert result is not None
+
 
 @pytest.mark.asyncio
 async def test_full_demo_loop():
@@ -112,7 +124,7 @@ async def test_full_demo_loop():
 
     # Encode DNA to YAML
     dna_yaml = borg.dna_parser.to_yaml(borg.dna)
-    assert 'header' in dna_yaml
+    assert "header" in dna_yaml
 
     # Mock on-chain storage (verify hash consistency)
     dna_hash = hash(dna_yaml)
@@ -120,12 +132,14 @@ async def test_full_demo_loop():
     retrieved_dna = borg.dna_parser.from_yaml(dna_yaml)
     assert retrieved_dna.header.service_index == borg.dna.header.service_index
 
+
 @pytest.mark.asyncio
 async def test_sponsor_ui_integration():
     """Test sponsor UI workflow (requires running Streamlit)"""
     # This would test the UI endpoints, but for CI use API tests
     # Verify UI can connect to borg agent
     pass
+
 
 @pytest.mark.asyncio
 async def test_archon_failure_graceful_degradation():

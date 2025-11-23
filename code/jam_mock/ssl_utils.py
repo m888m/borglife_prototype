@@ -4,11 +4,11 @@ SSL/TLS utilities for Kusama RPC connections.
 Provides SSL context configuration and testing utilities for LibreSSL compatibility.
 """
 
-import ssl
 import asyncio
-from typing import Dict, Any, Optional, List
 import socket
+import ssl
 import time
+from typing import Any, Dict, List, Optional
 
 
 class SSLUtils:
@@ -36,7 +36,7 @@ class SSLUtils:
         context.verify_mode = ssl.CERT_NONE
 
         # Set maximum TLS version to 1.2 for LibreSSL compatibility
-        if hasattr(context, 'maximum_version') and hasattr(ssl, 'TLSVersion'):
+        if hasattr(context, "maximum_version") and hasattr(ssl, "TLSVersion"):
             try:
                 context.maximum_version = ssl.TLSVersion.TLSv1_2
                 context.minimum_version = ssl.TLSVersion.TLSv1
@@ -50,12 +50,12 @@ class SSLUtils:
 
         # Use permissive cipher list for maximum compatibility
         try:
-            context.set_ciphers('DEFAULT:@SECLEVEL=0')
+            context.set_ciphers("DEFAULT:@SECLEVEL=0")
         except:
             try:
-                context.set_ciphers('DEFAULT:!aNULL:!eNULL:!EXPORT')
+                context.set_ciphers("DEFAULT:!aNULL:!eNULL:!EXPORT")
             except:
-                context.set_ciphers('ALL')
+                context.set_ciphers("ALL")
 
         print(f"✅ SSL context created for testnet (LibreSSL {ssl.OPENSSL_VERSION})")
         return context
@@ -69,15 +69,23 @@ class SSLUtils:
             Dictionary with SSL library details
         """
         return {
-            'openssl_version': ssl.OPENSSL_VERSION,
-            'has_tls_1_3': hasattr(ssl, 'PROTOCOL_TLSv1_3'),
-            'available_protocols': [p for p in dir(ssl) if p.startswith('PROTOCOL_TLS')],
-            'has_tls_versions': hasattr(ssl, 'TLSVersion'),
-            'tls_versions': [v for v in dir(ssl) if v.startswith('TLSv')] if hasattr(ssl, 'TLSVersion') else []
+            "openssl_version": ssl.OPENSSL_VERSION,
+            "has_tls_1_3": hasattr(ssl, "PROTOCOL_TLSv1_3"),
+            "available_protocols": [
+                p for p in dir(ssl) if p.startswith("PROTOCOL_TLS")
+            ],
+            "has_tls_versions": hasattr(ssl, "TLSVersion"),
+            "tls_versions": (
+                [v for v in dir(ssl) if v.startswith("TLSv")]
+                if hasattr(ssl, "TLSVersion")
+                else []
+            ),
         }
 
     @staticmethod
-    async def test_ssl_connection(host: str, port: int = 443, timeout: float = 10.0) -> Dict[str, Any]:
+    async def test_ssl_connection(
+        host: str, port: int = 443, timeout: float = 10.0
+    ) -> Dict[str, Any]:
         """
         Test SSL connection to a host.
 
@@ -90,12 +98,12 @@ class SSLUtils:
             Test results dictionary
         """
         result = {
-            'host': host,
-            'port': port,
-            'success': False,
-            'error': None,
-            'ssl_info': None,
-            'response_time': None
+            "host": host,
+            "port": port,
+            "success": False,
+            "error": None,
+            "ssl_info": None,
+            "response_time": None,
         }
 
         start_time = time.time()
@@ -119,25 +127,24 @@ class SSLUtils:
             cert = ssl_sock.getpeercert()
             cipher = ssl_sock.cipher()
 
-            result.update({
-                'success': True,
-                'ssl_info': {
-                    'version': ssl_sock.version(),
-                    'cipher': cipher,
-                    'certificate_subject': cert.get('subject') if cert else None,
-                    'certificate_issuer': cert.get('issuer') if cert else None,
-                    'certificate_expires': cert.get('notAfter') if cert else None
-                },
-                'response_time': time.time() - start_time
-            })
+            result.update(
+                {
+                    "success": True,
+                    "ssl_info": {
+                        "version": ssl_sock.version(),
+                        "cipher": cipher,
+                        "certificate_subject": cert.get("subject") if cert else None,
+                        "certificate_issuer": cert.get("issuer") if cert else None,
+                        "certificate_expires": cert.get("notAfter") if cert else None,
+                    },
+                    "response_time": time.time() - start_time,
+                }
+            )
 
             ssl_sock.close()
 
         except Exception as e:
-            result.update({
-                'error': str(e),
-                'response_time': time.time() - start_time
-            })
+            result.update({"error": str(e), "response_time": time.time() - start_time})
 
         return result
 
@@ -157,13 +164,13 @@ class SSLUtils:
 
         # Test TLS versions available in LibreSSL
         tls_versions = [
-            ('TLSv1.2', ssl.PROTOCOL_TLSv1_2),
-            ('TLSv1.1', ssl.PROTOCOL_TLSv1_1),
+            ("TLSv1.2", ssl.PROTOCOL_TLSv1_2),
+            ("TLSv1.1", ssl.PROTOCOL_TLSv1_1),
         ]
 
         # Add TLS 1.3 if available
-        if hasattr(ssl, 'PROTOCOL_TLSv1_3'):
-            tls_versions.insert(0, ('TLSv1.3', ssl.PROTOCOL_TLSv1_3))
+        if hasattr(ssl, "PROTOCOL_TLSv1_3"):
+            tls_versions.insert(0, ("TLSv1.3", ssl.PROTOCOL_TLSv1_3))
 
         for version_name, protocol in tls_versions:
             try:
@@ -179,18 +186,15 @@ class SSLUtils:
                 ssl_sock.do_handshake()
 
                 results[version_name] = {
-                    'success': True,
-                    'version': ssl_sock.version(),
-                    'cipher': ssl_sock.cipher()
+                    "success": True,
+                    "version": ssl_sock.version(),
+                    "cipher": ssl_sock.cipher(),
                 }
 
                 ssl_sock.close()
 
             except Exception as e:
-                results[version_name] = {
-                    'success': False,
-                    'error': str(e)
-                }
+                results[version_name] = {"success": False, "error": str(e)}
 
         return results
 
@@ -206,18 +210,18 @@ class SSLUtils:
             Validation results
         """
         validation = {
-            'has_check_hostname': getattr(context, 'check_hostname', None),
-            'verify_mode': getattr(context, 'verify_mode', None),
-            'protocol': getattr(context, 'protocol', None),
-            'options': getattr(context, 'options', None),
-            'minimum_version': getattr(context, 'minimum_version', None),
-            'maximum_version': getattr(context, 'maximum_version', None),
-            'ciphers': None
+            "has_check_hostname": getattr(context, "check_hostname", None),
+            "verify_mode": getattr(context, "verify_mode", None),
+            "protocol": getattr(context, "protocol", None),
+            "options": getattr(context, "options", None),
+            "minimum_version": getattr(context, "minimum_version", None),
+            "maximum_version": getattr(context, "maximum_version", None),
+            "ciphers": None,
         }
 
         # Try to get cipher list
         try:
-            validation['ciphers'] = context.get_ciphers()
+            validation["ciphers"] = context.get_ciphers()
         except Exception:
             pass
 
@@ -232,9 +236,9 @@ async def test_kusama_endpoints() -> Dict[str, Any]:
         Test results for all endpoints
     """
     endpoints = [
-        ('kusama-rpc.polkadot.io', 443),
-        ('kusama.api.onfinality.io', 443),
-        ('kusama-rpc.dwellir.com', 443),
+        ("kusama-rpc.polkadot.io", 443),
+        ("kusama.api.onfinality.io", 443),
+        ("kusama-rpc.dwellir.com", 443),
     ]
 
     results = {}
@@ -244,8 +248,10 @@ async def test_kusama_endpoints() -> Dict[str, Any]:
         result = await SSLUtils.test_ssl_connection(host, port, timeout=10.0)
         results[host] = result
 
-        if result['success']:
-            print(f"✅ {host}: {result['ssl_info']['version']} - {result['ssl_info']['cipher'][0]}")
+        if result["success"]:
+            print(
+                f"✅ {host}: {result['ssl_info']['version']} - {result['ssl_info']['cipher'][0]}"
+            )
         else:
             print(f"❌ {host}: {result['error']}")
 

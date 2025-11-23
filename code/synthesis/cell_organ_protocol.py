@@ -6,13 +6,14 @@ This module implements the protocol for cells (PydanticAI agents) to communicate
 with and invoke organs (Docker MCP tools) during task execution.
 """
 
-from typing import Dict, Any, Callable, List
-import logging
 import asyncio
+import logging
+from typing import Any, Callable, Dict, List
 
 # from ..archon_adapter import ArchonServiceAdapter  # Import handled in bridge
 
 logger = logging.getLogger(__name__)
+
 
 class CellOrganBridge:
     """Bridge between cells (agents) and organs (MCP tools)"""
@@ -23,11 +24,7 @@ class CellOrganBridge:
         self.usage_stats: Dict[str, int] = {}
 
     def register_organ(
-        self,
-        organ_name: str,
-        mcp_tool: str,
-        endpoint: str,
-        borg_id: str = None
+        self, organ_name: str, mcp_tool: str, endpoint: str, borg_id: str = None
     ) -> Callable:
         """
         Register organ and return callable for cell use
@@ -41,6 +38,7 @@ class CellOrganBridge:
         Returns:
             Async callable that cells can invoke
         """
+
         async def organ_callable(**kwargs) -> Any:
             """Callable that cells use to invoke organ"""
             try:
@@ -55,7 +53,7 @@ class CellOrganBridge:
                     borg_id=borg_id or "unknown",
                     organ_name=organ_name,
                     tool=mcp_tool,
-                    params=validated_params
+                    params=validated_params,
                 )
 
                 # Log successful usage
@@ -66,10 +64,10 @@ class CellOrganBridge:
                 logger.error(f"Organ {organ_name} execution failed: {e}")
                 # Return error result instead of raising
                 return {
-                    'error': str(e),
-                    'organ': organ_name,
-                    'tool': mcp_tool,
-                    'fallback_used': True
+                    "error": str(e),
+                    "organ": organ_name,
+                    "tool": mcp_tool,
+                    "fallback_used": True,
                 }
 
         # Store metadata on callable
@@ -79,30 +77,31 @@ class CellOrganBridge:
 
         # Store in registry
         self.organ_registry[organ_name] = {
-            'callable': organ_callable,
-            'mcp_tool': mcp_tool,
-            'endpoint': endpoint,
-            'borg_id': borg_id
+            "callable": organ_callable,
+            "mcp_tool": mcp_tool,
+            "endpoint": endpoint,
+            "borg_id": borg_id,
         }
 
         logger.info(f"Registered organ: {organ_name} ({mcp_tool})")
         return organ_callable
 
-    def inject_organs_into_cell(
-        self,
-        cell_instance,
-        organ_names: List[str]
-    ):
+    def inject_organs_into_cell(self, cell_instance, organ_names: List[str]):
         """Inject organ callables into cell instance"""
         cell_instance.organs = {}
 
         for organ_name in organ_names:
             if organ_name in self.organ_registry:
-                cell_instance.organs[organ_name] = \
-                    self.organ_registry[organ_name]['callable']
-                logger.debug(f"Injected organ {organ_name} into cell {getattr(cell_instance, 'name', 'unknown')}")
+                cell_instance.organs[organ_name] = self.organ_registry[organ_name][
+                    "callable"
+                ]
+                logger.debug(
+                    f"Injected organ {organ_name} into cell {getattr(cell_instance, 'name', 'unknown')}"
+                )
             else:
-                logger.warning(f"Organ {organ_name} not found in registry, skipping injection")
+                logger.warning(
+                    f"Organ {organ_name} not found in registry, skipping injection"
+                )
 
     def _validate_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Validate parameters before organ invocation"""

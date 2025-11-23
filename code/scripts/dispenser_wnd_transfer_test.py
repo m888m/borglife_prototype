@@ -5,16 +5,18 @@ Send 1 WND from dispenser to borg 1 to prove keyring access with live transactio
 """
 
 import asyncio
-import sys
-import os
 import json
+import os
+import sys
 from datetime import datetime
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from security.secure_dispenser_address_primary import SecureDispenserAddressPrimary as SecureDispenser
-from jam_mock.borg_address_manager_address_primary import BorgAddressManagerAddressPrimary as BorgAddressManager
+from jam_mock.borg_address_manager_address_primary import \
+    BorgAddressManagerAddressPrimary as BorgAddressManager
+from security.secure_dispenser_address_primary import \
+    SecureDispenserAddressPrimary as SecureDispenser
 
 
 async def test_dispenser_wnd_transfer():
@@ -25,12 +27,12 @@ async def test_dispenser_wnd_transfer():
     print("=" * 50)
 
     results = {
-        'dispenser_unlock': False,
-        'borg_address_retrieved': False,
-        'initial_balances': {},
-        'transfer_result': {},
-        'final_balances': {},
-        'success': False
+        "dispenser_unlock": False,
+        "borg_address_retrieved": False,
+        "initial_balances": {},
+        "transfer_result": {},
+        "final_balances": {},
+        "success": False,
     }
 
     try:
@@ -44,7 +46,7 @@ async def test_dispenser_wnd_transfer():
             print("❌ Failed to unlock dispenser")
             return results
 
-        results['dispenser_unlock'] = True
+        results["dispenser_unlock"] = True
         dispenser_address = dispenser.unlocked_keypair.ss58_address
         print(f"✅ Dispenser unlocked: {dispenser_address}")
         print("🔑 Private key loaded from macOS Keychain")
@@ -52,33 +54,34 @@ async def test_dispenser_wnd_transfer():
         # Use the borg tester address directly from results file
         print("\n🔍 Using borg tester address from results file...")
         import json
-        with open("../../borg_tester_borgTester_1762782723_results.json", 'r') as f:
+
+        with open("../../borg_tester_borgTester_1762782723_results.json", "r") as f:
             borg_data = json.load(f)
 
-        borg_1_id = borg_data['borg_id']
-        borg_1_address = borg_data['address']
+        borg_1_id = borg_data["borg_id"]
+        borg_1_address = borg_data["address"]
 
         if not borg_1_address:
             print(f"❌ Could not find address for {borg_1_id}")
             return results
 
-        results['borg_address_retrieved'] = True
+        results["borg_address_retrieved"] = True
         print(f"✅ Borg 1 address: {borg_1_address}")
 
         # Check initial balances using WestendAdapter
         print("\n💰 Checking initial balances...")
         from jam_mock.westend_adapter import WestendAdapter
-        westend_adapter = WestendAdapter(
-            "https://westend.api.onfinality.io/public")
+
+        westend_adapter = WestendAdapter("https://westend.api.onfinality.io/public")
         dispenser_balance = await westend_adapter.get_wnd_balance(dispenser_address)
         borg_balance = await westend_adapter.get_wnd_balance(borg_1_address)
 
-        dispenser_wnd = dispenser_balance / (10 ** 12)
-        borg_wnd = borg_balance / (10 ** 12)
+        dispenser_wnd = dispenser_balance / (10**12)
+        borg_wnd = borg_balance / (10**12)
 
-        results['initial_balances'] = {
-            'dispenser': {'planck': dispenser_balance, 'wnd': dispenser_wnd},
-            'borg_1': {'planck': borg_balance, 'wnd': borg_wnd}
+        results["initial_balances"] = {
+            "dispenser": {"planck": dispenser_balance, "wnd": dispenser_wnd},
+            "borg_1": {"planck": borg_balance, "wnd": borg_wnd},
         }
 
         print(f"Dispenser balance: {dispenser_wnd:.6f}")
@@ -97,9 +100,9 @@ async def test_dispenser_wnd_transfer():
             borg_1_address, borg_1_id, transfer_amount
         )
 
-        results['transfer_result'] = transfer_result
+        results["transfer_result"] = transfer_result
 
-        if not transfer_result.get('success'):
+        if not transfer_result.get("success"):
             print(f"❌ Transfer failed: {transfer_result.get('error')}")
             return results
 
@@ -113,15 +116,20 @@ async def test_dispenser_wnd_transfer():
 
         # Check final balances
         print("\n💰 Checking final balances...")
-        final_dispenser_balance = await westend_adapter.get_wnd_balance(dispenser_address)
+        final_dispenser_balance = await westend_adapter.get_wnd_balance(
+            dispenser_address
+        )
         final_borg_balance = await westend_adapter.get_wnd_balance(borg_1_address)
 
-        final_dispenser_wnd = final_dispenser_balance / (10 ** 12)
-        final_borg_wnd = final_borg_balance / (10 ** 12)
+        final_dispenser_wnd = final_dispenser_balance / (10**12)
+        final_borg_wnd = final_borg_balance / (10**12)
 
-        results['final_balances'] = {
-            'dispenser': {'planck': final_dispenser_balance, 'wnd': final_dispenser_wnd},
-            'borg_1': {'planck': final_borg_balance, 'wnd': final_borg_wnd}
+        results["final_balances"] = {
+            "dispenser": {
+                "planck": final_dispenser_balance,
+                "wnd": final_dispenser_wnd,
+            },
+            "borg_1": {"planck": final_borg_balance, "wnd": final_borg_wnd},
         }
 
         print(f"Final dispenser balance: {final_dispenser_wnd:.6f}")
@@ -136,7 +144,7 @@ async def test_dispenser_wnd_transfer():
         print(f"Borg change: {borg_change:.6f}")
         # Check if transfer was successful (allowing for fees)
         if borg_change >= 0.99:  # Should receive at least 0.99 WND
-            results['success'] = True
+            results["success"] = True
             print("✅ Transfer validation PASSED")
         else:
             print("⚠️ Transfer validation WARNING - balance change may include fees")
@@ -149,7 +157,7 @@ async def test_dispenser_wnd_transfer():
 
     except Exception as e:
         print(f"❌ Test failed with error: {e}")
-        results['error'] = str(e)
+        results["error"] = str(e)
         return results
 
 
@@ -161,28 +169,32 @@ async def main():
     timestamp = int(datetime.now().timestamp())
     results_file = f"dispenser_wnd_transfer_results_{timestamp}.json"
 
-    with open(results_file, 'w') as f:
+    with open(results_file, "w") as f:
         json.dump(results, f, indent=2, default=str)
 
     print(f"\n📄 Results saved to: {results_file}")
 
     # Print summary
     print("\n" + "=" * 50)
-    if results['success']:
+    if results["success"]:
         print("🎉 DISPENSER WND TRANSFER TEST PASSED!")
         print("✅ Private key access from macOS Keychain verified")
         print("✅ Live blockchain transaction successful")
         print("✅ Dispenser can send WND transfers")
-        if 'transfer_result' in results and results['transfer_result'].get('transaction_hash'):
-            tx_hash = results['transfer_result']['transaction_hash']
+        if "transfer_result" in results and results["transfer_result"].get(
+            "transaction_hash"
+        ):
+            tx_hash = results["transfer_result"]["transaction_hash"]
             print(f"🔗 Transaction: {tx_hash}")
-            print(f"🌐 View on Westend Explorer: https://westend.subscan.io/extrinsic/{tx_hash}")
+            print(
+                f"🌐 View on Westend Explorer: https://westend.subscan.io/extrinsic/{tx_hash}"
+            )
     else:
         print("❌ DISPENSER WND TRANSFER TEST FAILED!")
-        if 'error' in results:
+        if "error" in results:
             print(f"   Error: {results['error']}")
 
-    return results['success']
+    return results["success"]
 
 
 if __name__ == "__main__":

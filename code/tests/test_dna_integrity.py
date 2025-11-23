@@ -8,16 +8,18 @@ and structural consistency across different borg configurations.
 import hashlib
 import json
 import os
+from decimal import Decimal, getcontext
+from typing import Any, Dict, List
+from unittest.mock import MagicMock
+
 import pytest
 import yaml
-from decimal import Decimal, getcontext
-from typing import Dict, Any, List
-from unittest.mock import MagicMock
 
 # Test imports - these will be available in Docker environment
 try:
     from synthesis.dna_parser import DNAParser
     from synthesis.phenotype_builder import PhenotypeBuilder
+
     IMPORTS_AVAILABLE = True
 except ImportError:
     # Mock for development environment
@@ -39,10 +41,12 @@ class TestDNAIntegrity:
                 "header": {"code_length": 1024, "gas_limit": 1000000},
                 "cells": [{"name": "test_cell", "logic_type": "rag_agent"}],
                 "organs": [],
-                "manifesto_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                "manifesto_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             }
             parser.validate_dna.return_value = True
-            parser.calculate_hash.return_value = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            parser.calculate_hash.return_value = (
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            )
             return parser
         else:
             # Real parser for Docker environment
@@ -57,7 +61,7 @@ class TestDNAIntegrity:
             builder.build_phenotype.return_value = {
                 "cells": [{"name": "test_cell", "capabilities": ["rag", "reasoning"]}],
                 "organs": [],
-                "total_cost": 0.001
+                "total_cost": 0.001,
             }
             return builder
         else:
@@ -67,15 +71,19 @@ class TestDNAIntegrity:
     @pytest.fixture
     def test_dna_samples(self) -> Dict[str, Dict[str, Any]]:
         """Load test DNA samples from fixtures."""
-        fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "test_dna_samples.yaml")
-        with open(fixture_path, 'r') as f:
+        fixture_path = os.path.join(
+            os.path.dirname(__file__), "fixtures", "test_dna_samples.yaml"
+        )
+        with open(fixture_path, "r") as f:
             return yaml.safe_load(f)
 
     @pytest.fixture
     def expected_results(self) -> Dict[str, Dict[str, Any]]:
         """Load expected results from fixtures."""
-        fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "expected_results.json")
-        with open(fixture_path, 'r') as f:
+        fixture_path = os.path.join(
+            os.path.dirname(__file__), "fixtures", "expected_results.json"
+        )
+        with open(fixture_path, "r") as f:
             return json.load(f)
 
     def test_dna_parsing_basic(self, dna_parser, test_dna_samples):
@@ -100,7 +108,9 @@ class TestDNAIntegrity:
             is_valid = dna_parser.validate_dna(dna_config)
             assert is_valid, f"DNA validation failed for {dna_name}"
 
-    def test_dna_round_trip_integrity(self, dna_parser, test_dna_samples, expected_results):
+    def test_dna_round_trip_integrity(
+        self, dna_parser, test_dna_samples, expected_results
+    ):
         """Test DNA round-trip integrity: H(D) = H(D')."""
         for dna_name, dna_config in test_dna_samples.items():
             # Parse DNA
@@ -116,8 +126,9 @@ class TestDNAIntegrity:
             roundtrip_hash = dna_parser.calculate_hash(canonical_dna)
 
             # Verify integrity: H(D) = H(D')
-            assert original_hash == roundtrip_hash, \
-                f"Round-trip integrity failed for {dna_name}: {original_hash} != {roundtrip_hash}"
+            assert (
+                original_hash == roundtrip_hash
+            ), f"Round-trip integrity failed for {dna_name}: {original_hash} != {roundtrip_hash}"
 
             # Verify against expected results
             expected = expected_results[dna_name]
@@ -136,27 +147,36 @@ class TestDNAIntegrity:
 
             # Hash should be valid SHA256
             assert len(hash1) == 64, f"Invalid hash length for {dna_name}"
-            assert all(c in "0123456789abcdef" for c in hash1), f"Invalid hash characters for {dna_name}"
+            assert all(
+                c in "0123456789abcdef" for c in hash1
+            ), f"Invalid hash characters for {dna_name}"
 
-    def test_dna_structural_validation(self, dna_parser, test_dna_samples, expected_results):
+    def test_dna_structural_validation(
+        self, dna_parser, test_dna_samples, expected_results
+    ):
         """Test DNA structural validation against expected results."""
         for dna_name, dna_config in test_dna_samples.items():
             parsed_dna = dna_parser.parse_dna(dna_config)
             expected = expected_results[dna_name]
 
             # Verify cell count
-            assert len(parsed_dna["cells"]) == expected["expected_cells"], \
-                f"Cell count mismatch for {dna_name}"
+            assert (
+                len(parsed_dna["cells"]) == expected["expected_cells"]
+            ), f"Cell count mismatch for {dna_name}"
 
             # Verify organ count
-            assert len(parsed_dna["organs"]) == expected["expected_organs"], \
-                f"Organ count mismatch for {dna_name}"
+            assert (
+                len(parsed_dna["organs"]) == expected["expected_organs"]
+            ), f"Organ count mismatch for {dna_name}"
 
             # Verify service index
-            assert parsed_dna["header"]["service_index"] == expected["service_index"], \
-                f"Service index mismatch for {dna_name}"
+            assert (
+                parsed_dna["header"]["service_index"] == expected["service_index"]
+            ), f"Service index mismatch for {dna_name}"
 
-    def test_dna_cost_calculation(self, phenotype_builder, test_dna_samples, expected_results):
+    def test_dna_cost_calculation(
+        self, phenotype_builder, test_dna_samples, expected_results
+    ):
         """Test DNA cost calculation accuracy."""
         getcontext().prec = 6  # Set decimal precision
 
@@ -169,8 +189,9 @@ class TestDNAIntegrity:
             expected_min = Decimal(str(expected["expected_cost_range"][0]))
             expected_max = Decimal(str(expected["expected_cost_range"][1]))
 
-            assert expected_min <= total_cost <= expected_max, \
-                f"Cost out of range for {dna_name}: {total_cost} not in [{expected_min}, {expected_max}]"
+            assert (
+                expected_min <= total_cost <= expected_max
+            ), f"Cost out of range for {dna_name}: {total_cost} not in [{expected_min}, {expected_max}]"
 
     def test_dna_phenotype_building(self, phenotype_builder, test_dna_samples):
         """Test phenotype building from DNA configurations."""
@@ -266,8 +287,9 @@ class TestDNAIntegrity:
             final_hash = dna_parser.calculate_hash_from_yaml(final_yaml)
 
             # CRITICAL: H(D) = H(D') - round-trip integrity maintained
-            assert original_hash == final_hash, \
-                f"Round-trip integrity FAILED for {dna_name}: {original_hash} != {final_hash}"
+            assert (
+                original_hash == final_hash
+            ), f"Round-trip integrity FAILED for {dna_name}: {original_hash} != {final_hash}"
 
             # Verify structural equivalence
             assert parsed_dna["header"] == reparsed_dna["header"]
@@ -291,8 +313,9 @@ class TestDNAIntegrity:
             yaml_hash = dna_parser.calculate_hash_from_yaml(yaml_str)
 
             # All hashes should be identical (H(D) = H(D'))
-            assert dict_hash == reparse_hash == yaml_hash, \
-                f"Hash inconsistency for {dna_name}: {dict_hash} != {reparse_hash} != {yaml_hash}"
+            assert (
+                dict_hash == reparse_hash == yaml_hash
+            ), f"Hash inconsistency for {dna_name}: {dict_hash} != {reparse_hash} != {yaml_hash}"
 
             # Verify this is the core success criteria for BorgLife Phase 1
             # DNA integrity must be maintained through all transformations

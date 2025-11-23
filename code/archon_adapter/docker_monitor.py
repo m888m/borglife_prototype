@@ -1,7 +1,9 @@
-from typing import Dict, List, Any, Optional
 import asyncio
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
 import httpx
+
 
 class DockerMCPMonitor:
     """Monitor Docker MCP organ health and performance"""
@@ -27,7 +29,7 @@ class DockerMCPMonitor:
 
         history = self.health_history[organ_name]
         total_checks = len(history)
-        healthy_checks = sum(1 for h in history if h['healthy'])
+        healthy_checks = sum(1 for h in history if h["healthy"])
 
         return (healthy_checks / total_checks) * 100 if total_checks > 0 else 0.0
 
@@ -36,25 +38,25 @@ class DockerMCPMonitor:
         # This would integrate with Docker API
         # For now, return static data
         return {
-            'gmail': {
-                'endpoint': 'http://mcp-gmail:8080',
-                'version': '1.2.0',
-                'compatible': True,
-                'update_available': False,
-                'recommended_version': None
+            "gmail": {
+                "endpoint": "http://mcp-gmail:8080",
+                "version": "1.2.0",
+                "compatible": True,
+                "update_available": False,
+                "recommended_version": None,
             },
-            'stripe': {
-                'endpoint': 'http://mcp-stripe:8080',
-                'version': '2.3.0',
-                'compatible': True,
-                'update_available': False,
-                'recommended_version': None
+            "stripe": {
+                "endpoint": "http://mcp-stripe:8080",
+                "version": "2.3.0",
+                "compatible": True,
+                "update_available": False,
+                "recommended_version": None,
             },
-            'bitcoin': {
-                'endpoint': 'http://mcp-bitcoin:8080',
-                'version': '1.1.0',
-                'compatible': True,
-                'update_available': False,
-                'recommended_version': None
-            }
+            "bitcoin": {
+                "endpoint": "http://mcp-bitcoin:8080",
+                "version": "1.1.0",
+                "compatible": True,
+                "update_available": False,
+                "recommended_version": None,
+            },
         }

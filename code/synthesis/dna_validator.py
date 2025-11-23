@@ -6,14 +6,15 @@ Handles validation of BorgLife DNA structures including manifesto hash verificat
 service indexing, and round-trip integrity checks.
 """
 
-from typing import List, Dict, Any, Optional
 import hashlib
 import logging
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from .dna_parser import BorgDNA, DNAHeader, Cell, Organ, BorgReputation
+from .dna_parser import BorgDNA, BorgReputation, Cell, DNAHeader, Organ
 
 logger = logging.getLogger(__name__)
+
 
 class DNAValidator:
     """Validate DNA integrity and structure"""
@@ -68,7 +69,10 @@ class DNAValidator:
         # Check manifesto hash
         if not dna.manifesto_hash:
             errors.append("Missing manifesto_hash")
-        elif not DNAValidator.SKIP_MANIFESTO_VALIDATION and dna.manifesto_hash != DNAValidator.UNIVERSAL_PRINCIPLES_HASH:
+        elif (
+            not DNAValidator.SKIP_MANIFESTO_VALIDATION
+            and dna.manifesto_hash != DNAValidator.UNIVERSAL_PRINCIPLES_HASH
+        ):
             errors.append("Manifesto hash does not match Universal Principles")
 
         # Check reputation (optional, but validate if present)
@@ -80,7 +84,9 @@ class DNAValidator:
             # Rating distribution should sum to total_ratings
             distribution_sum = sum(dna.reputation.rating_distribution.values())
             if distribution_sum != dna.reputation.total_ratings:
-                errors.append(f"Rating distribution sum ({distribution_sum}) doesn't match total_ratings ({dna.reputation.total_ratings})")
+                errors.append(
+                    f"Rating distribution sum ({distribution_sum}) doesn't match total_ratings ({dna.reputation.total_ratings})"
+                )
 
         return errors
 

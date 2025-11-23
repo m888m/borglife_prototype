@@ -6,13 +6,15 @@ Ensures Borglife can work with different versions of Archon
 and provides feature detection capabilities.
 """
 
-from typing import Dict, List, Optional, Tuple, Any
 import logging
+from typing import Any, Dict, List, Optional, Tuple
+
 from packaging import version
 
 from .exceptions import VersionCompatibilityError
 
 logger = logging.getLogger(__name__)
+
 
 class VersionCompatibility:
     """Manages version compatibility between Borglife and Archon."""
@@ -23,34 +25,25 @@ class VersionCompatibility:
 
     # Feature availability by version
     FEATURE_MATRIX = {
-        'rag_query': {
-            'min_version': '0.1.0',
-            'description': 'RAG query functionality'
+        "rag_query": {"min_version": "0.1.0", "description": "RAG query functionality"},
+        "task_management": {
+            "min_version": "0.1.5",
+            "description": "Task creation and management",
         },
-        'task_management': {
-            'min_version': '0.1.5',
-            'description': 'Task creation and management'
+        "code_examples": {"min_version": "0.1.8", "description": "Code example search"},
+        "streaming_agents": {
+            "min_version": "0.1.2",
+            "description": "Streaming agent responses",
         },
-        'code_examples': {
-            'min_version': '0.1.8',
-            'description': 'Code example search'
+        "mcp_tools": {"min_version": "0.1.0", "description": "MCP tool invocation"},
+        "health_checks": {
+            "min_version": "0.1.0",
+            "description": "Service health endpoints",
         },
-        'streaming_agents': {
-            'min_version': '0.1.2',
-            'description': 'Streaming agent responses'
+        "project_management": {
+            "min_version": "0.1.3",
+            "description": "Project CRUD operations",
         },
-        'mcp_tools': {
-            'min_version': '0.1.0',
-            'description': 'MCP tool invocation'
-        },
-        'health_checks': {
-            'min_version': '0.1.0',
-            'description': 'Service health endpoints'
-        },
-        'project_management': {
-            'min_version': '0.1.3',
-            'description': 'Project CRUD operations'
-        }
     }
 
     def __init__(self):
@@ -79,7 +72,7 @@ class VersionCompatibility:
                 raise VersionCompatibilityError(
                     service=service,
                     current_version=current_version,
-                    required_version=f"{self.MIN_SUPPORTED_VERSION} - {self.MAX_SUPPORTED_VERSION}"
+                    required_version=f"{self.MIN_SUPPORTED_VERSION} - {self.MAX_SUPPORTED_VERSION}",
                 )
 
             self.checked_versions[service] = current_version
@@ -91,10 +84,12 @@ class VersionCompatibility:
             raise VersionCompatibilityError(
                 service=service,
                 current_version=current_version,
-                required_version="valid semver format"
+                required_version="valid semver format",
             )
 
-    def supports_feature(self, feature: str, service_version: Optional[str] = None) -> bool:
+    def supports_feature(
+        self, feature: str, service_version: Optional[str] = None
+    ) -> bool:
         """
         Check if a feature is supported in the given version.
 
@@ -118,7 +113,7 @@ class VersionCompatibility:
 
         try:
             current = version.parse(service_version)
-            min_required = version.parse(self.FEATURE_MATRIX[feature]['min_version'])
+            min_required = version.parse(self.FEATURE_MATRIX[feature]["min_version"])
 
             return current >= min_required
 
@@ -175,7 +170,7 @@ class VersionCompatibility:
                 logger.warning(f"Unknown feature for version check: {feature}")
                 continue
 
-            feature_min = self.FEATURE_MATRIX[feature]['min_version']
+            feature_min = self.FEATURE_MATRIX[feature]["min_version"]
 
             if max_min_version is None:
                 max_min_version = feature_min
@@ -198,13 +193,13 @@ class VersionCompatibility:
             Version compatibility information
         """
         return {
-            'supported_range': {
-                'min': self.MIN_SUPPORTED_VERSION,
-                'max': self.MAX_SUPPORTED_VERSION
+            "supported_range": {
+                "min": self.MIN_SUPPORTED_VERSION,
+                "max": self.MAX_SUPPORTED_VERSION,
             },
-            'features': self.FEATURE_MATRIX,
-            'checked_versions': self.checked_versions.copy(),
-            'latest_version': self._get_latest_version()
+            "features": self.FEATURE_MATRIX,
+            "checked_versions": self.checked_versions.copy(),
+            "latest_version": self._get_latest_version(),
         }
 
     def _get_latest_version(self) -> Optional[str]:
@@ -216,9 +211,7 @@ class VersionCompatibility:
         return list(self.checked_versions.values())[-1]
 
     def check_feature_compatibility(
-        self,
-        required_features: List[str],
-        available_version: str
+        self, required_features: List[str], available_version: str
     ) -> Tuple[bool, List[str]]:
         """
         Check if version supports all required features.
@@ -253,28 +246,30 @@ class VersionCompatibility:
             max_supported = version.parse(self.MAX_SUPPORTED_VERSION)
 
             recommendations = {
-                'current_version': current_version,
-                'is_latest_supported': current >= max_supported,
-                'new_features_available': [],
-                'recommended_upgrade': None
+                "current_version": current_version,
+                "is_latest_supported": current >= max_supported,
+                "new_features_available": [],
+                "recommended_upgrade": None,
             }
 
             if current < max_supported:
                 # Find features not available in current version
                 for feature, requirements in self.FEATURE_MATRIX.items():
                     if not self.supports_feature(feature, current_version):
-                        recommendations['new_features_available'].append({
-                            'feature': feature,
-                            'description': requirements['description'],
-                            'available_from': requirements['min_version']
-                        })
+                        recommendations["new_features_available"].append(
+                            {
+                                "feature": feature,
+                                "description": requirements["description"],
+                                "available_from": requirements["min_version"],
+                            }
+                        )
 
-                recommendations['recommended_upgrade'] = self.MAX_SUPPORTED_VERSION
+                recommendations["recommended_upgrade"] = self.MAX_SUPPORTED_VERSION
 
             return recommendations
 
         except version.InvalidVersion:
             return {
-                'error': f'Invalid version format: {current_version}',
-                'current_version': current_version
+                "error": f"Invalid version format: {current_version}",
+                "current_version": current_version,
             }

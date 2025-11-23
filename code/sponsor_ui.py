@@ -9,17 +9,17 @@ Streamlit-based interface for sponsors to:
 - Monitor progress and view results
 """
 
-import streamlit as st
 import asyncio
 import json
-from decimal import Decimal
-from typing import Optional, Dict, Any
 import time
+from decimal import Decimal
+from typing import Any, Dict, Optional
 
+import streamlit as st
+from archon_adapter import ArchonConfig, ArchonServiceAdapter
 # Import BorgLife components
 from jam_mock import JAMInterface, LocalJAMMock, WestendAdapter
-from synthesis import DNAParser, PhenotypeBuilder, BorgDNA
-from archon_adapter import ArchonServiceAdapter, ArchonConfig
+from synthesis import BorgDNA, DNAParser, PhenotypeBuilder
 
 
 class SponsorUI:
@@ -40,13 +40,13 @@ class SponsorUI:
     def setup_page(self):
         """Configure Streamlit page."""
         st.set_page_config(
-            page_title="BorgLife Phase 1 Demo",
-            page_icon="🤖",
-            layout="wide"
+            page_title="BorgLife Phase 1 Demo", page_icon="🤖", layout="wide"
         )
 
         st.title("🤖 BorgLife Phase 1 Demo")
-        st.markdown("*End-to-end demo: funding → execution → encoding → storage → decoding*")
+        st.markdown(
+            "*End-to-end demo: funding → execution → encoding → storage → decoding*"
+        )
 
         # Sidebar for configuration
         self.setup_sidebar()
@@ -59,7 +59,7 @@ class SponsorUI:
         jam_mode = st.sidebar.selectbox(
             "JAM Mode",
             ["local", "westend", "hybrid"],
-            help="Local for development, Westend for production validation"
+            help="Local for development, Westend for production validation",
         )
 
         # Initialize components based on mode
@@ -80,7 +80,9 @@ class SponsorUI:
                 self.jam = LocalJAMMock()
             elif jam_mode == "westend":
                 # Note: In real implementation, would need keypair from wallet
-                westend_adapter = WestendAdapter(rpc_url="wss://westend-rpc.polkadot.io")
+                westend_adapter = WestendAdapter(
+                    rpc_url="wss://westend-rpc.polkadot.io"
+                )
                 self.jam = westend_adapter
             else:  # hybrid
                 self.jam = LocalJAMMock()  # Primary local, could add Westend validation
@@ -100,16 +102,16 @@ class SponsorUI:
         """Display current service status."""
         # JAM status
         jam_health = asyncio.run(self.jam.health_check())
-        st.sidebar.metric("JAM Status", jam_health.get('status', 'unknown'))
+        st.sidebar.metric("JAM Status", jam_health.get("status", "unknown"))
 
         # Archon status
         archon_health = asyncio.run(self.archon_adapter.check_health())
-        st.sidebar.metric("Archon Status", archon_health.get('status', 'unknown'))
+        st.sidebar.metric("Archon Status", archon_health.get("status", "unknown"))
 
         # Current borg
         if self.current_borg:
-            st.sidebar.metric("Active Borg", self.current_borg['id'])
-            wealth = asyncio.run(self.jam.get_wealth_balance(self.current_borg['id']))
+            st.sidebar.metric("Active Borg", self.current_borg["id"])
+            wealth = asyncio.run(self.jam.get_wealth_balance(self.current_borg["id"]))
             st.sidebar.metric("Wealth Balance", f"{wealth:.4f} DOT")
 
     def main_interface(self):
@@ -118,9 +120,15 @@ class SponsorUI:
             st.warning("⚠️ Please initialize services in the sidebar first.")
             return
 
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "🏦 Fund Borg", "🧬 Create Borg", "🎯 Execute Task", "💰 Fund Management", "📊 Results & History"
-        ])
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(
+            [
+                "🏦 Fund Borg",
+                "🧬 Create Borg",
+                "🎯 Execute Task",
+                "💰 Fund Management",
+                "📊 Results & History",
+            ]
+        )
 
         with tab1:
             self.fund_borg_tab()
@@ -141,10 +149,12 @@ class SponsorUI:
         """Tab for funding borgs with DOT."""
         st.header("🏦 Fund a Borg")
 
-        st.markdown("""
+        st.markdown(
+            """
         **Step 1:** Fund a borg with DOT tokens. This provides the economic incentive
         for autonomous execution and evolution.
-        """)
+        """
+        )
 
         col1, col2 = st.columns(2)
 
@@ -152,7 +162,7 @@ class SponsorUI:
             borg_id = st.text_input(
                 "Borg ID",
                 value=f"borg_{int(time.time())}",
-                help="Unique identifier for the borg"
+                help="Unique identifier for the borg",
             )
 
             funding_amount = st.number_input(
@@ -161,7 +171,7 @@ class SponsorUI:
                 max_value=10.0,
                 value=0.1,
                 step=0.1,
-                help="Amount of DOT to fund the borg"
+                help="Amount of DOT to fund the borg",
             )
 
         with col2:
@@ -171,27 +181,31 @@ class SponsorUI:
                 # In Phase 1, we'll simulate funding
                 st.session_state.wallet_connected = True
 
-            if st.session_state.get('wallet_connected'):
+            if st.session_state.get("wallet_connected"):
                 st.success("✅ Wallet connected (simulated)")
 
         if st.button("💰 Fund Borg", type="primary"):
-            if not st.session_state.get('wallet_connected'):
+            if not st.session_state.get("wallet_connected"):
                 st.error("Please connect your wallet first")
                 return
 
             try:
                 # Simulate funding by updating wealth
-                asyncio.run(self.jam.update_wealth(
-                    borg_id=borg_id,
-                    amount=Decimal(str(funding_amount)),
-                    operation="revenue",
-                    description=f"Initial funding from sponsor"
-                ))
+                asyncio.run(
+                    self.jam.update_wealth(
+                        borg_id=borg_id,
+                        amount=Decimal(str(funding_amount)),
+                        operation="revenue",
+                        description=f"Initial funding from sponsor",
+                    )
+                )
 
-                st.success(f"✅ Successfully funded borg {borg_id} with {funding_amount} DOT")
+                st.success(
+                    f"✅ Successfully funded borg {borg_id} with {funding_amount} DOT"
+                )
 
                 # Store current borg
-                self.current_borg = {'id': borg_id, 'funded': True}
+                self.current_borg = {"id": borg_id, "funded": True}
 
             except Exception as e:
                 st.error(f"Funding failed: {e}")
@@ -200,30 +214,33 @@ class SponsorUI:
         """Tab for creating borgs from DNA."""
         st.header("🧬 Create Borg from DNA")
 
-        st.markdown("""
+        st.markdown(
+            """
         **Step 2:** Upload DNA configuration and create an executable borg phenotype.
         The DNA defines the borg's cells (logic) and organs (tools).
-        """)
+        """
+        )
 
         # DNA upload/input
         dna_input_method = st.radio(
-            "DNA Input Method",
-            ["Upload YAML File", "Use Example DNA", "Paste YAML"]
+            "DNA Input Method", ["Upload YAML File", "Use Example DNA", "Paste YAML"]
         )
 
         dna: Optional[BorgDNA] = None
 
         if dna_input_method == "Upload YAML File":
-            uploaded_file = st.file_uploader("Upload DNA YAML file", type=['yaml', 'yml'])
+            uploaded_file = st.file_uploader(
+                "Upload DNA YAML file", type=["yaml", "yml"]
+            )
             if uploaded_file:
-                dna_yaml = uploaded_file.read().decode('utf-8')
+                dna_yaml = uploaded_file.read().decode("utf-8")
                 dna = DNAParser.from_yaml(dna_yaml)
 
         elif dna_input_method == "Use Example DNA":
             if st.button("Generate Example DNA"):
                 dna = DNAParser.create_example_dna()
                 dna_yaml = DNAParser.to_yaml(dna)
-                st.code(dna_yaml, language='yaml')
+                st.code(dna_yaml, language="yaml")
 
         else:  # Paste YAML
             dna_yaml = st.text_area("Paste DNA YAML", height=300)
@@ -267,20 +284,20 @@ class SponsorUI:
                 st.success("✅ Borg created successfully!")
 
                 # Store borg data
-                self.current_borg.update({
-                    'dna': dna,
-                    'phenotype': phenotype,
-                    'created_at': time.time()
-                })
+                self.current_borg.update(
+                    {"dna": dna, "phenotype": phenotype, "created_at": time.time()}
+                )
 
                 # Display phenotype info
                 st.markdown("### Phenotype Summary")
-                st.json({
-                    'borg_id': self.current_borg['id'],
-                    'cells': list(phenotype.cells.keys()),
-                    'organs': list(phenotype.organs.keys()),
-                    'cost_estimate': phenotype._estimate_execution_cost()
-                })
+                st.json(
+                    {
+                        "borg_id": self.current_borg["id"],
+                        "cells": list(phenotype.cells.keys()),
+                        "organs": list(phenotype.organs.keys()),
+                        "cost_estimate": phenotype._estimate_execution_cost(),
+                    }
+                )
 
             except Exception as e:
                 st.error(f"Borg creation failed: {e}")
@@ -289,12 +306,14 @@ class SponsorUI:
         """Tab for executing tasks with the borg."""
         st.header("🎯 Execute Task")
 
-        st.markdown("""
+        st.markdown(
+            """
         **Step 3:** Submit a task for the borg to execute using its phenotype.
         The borg will use its cells and organs to complete the task.
-        """)
+        """
+        )
 
-        if not self.current_borg or 'phenotype' not in self.current_borg:
+        if not self.current_borg or "phenotype" not in self.current_borg:
             st.warning("⚠️ Please create a borg first.")
             return
 
@@ -303,7 +322,7 @@ class SponsorUI:
             "Task Description",
             height=100,
             placeholder="Describe the task for the borg to execute...",
-            help="Be specific about what you want the borg to accomplish"
+            help="Be specific about what you want the borg to accomplish",
         )
 
         # Task examples
@@ -312,7 +331,7 @@ class SponsorUI:
             "Summarize the key evolution mechanisms in BorgLife whitepaper sections 4-7",
             "Analyze code examples for DNA parsing patterns",
             "Create a task for GP evolution research planning",
-            "Research the latest developments in autonomous AI agents"
+            "Research the latest developments in autonomous AI agents",
         ]
 
         selected_example = st.selectbox("Or choose an example:", [""] + example_tasks)
@@ -327,15 +346,15 @@ class SponsorUI:
 
             try:
                 with st.spinner("Executing task..."):
-                    phenotype = self.current_borg['phenotype']
+                    phenotype = self.current_borg["phenotype"]
                     result = asyncio.run(phenotype.execute_task(task_description))
 
                 # Record execution
                 execution_record = {
-                    'timestamp': time.time(),
-                    'task': task_description,
-                    'result': result,
-                    'borg_id': self.current_borg['id']
+                    "timestamp": time.time(),
+                    "task": task_description,
+                    "result": result,
+                    "borg_id": self.current_borg["id"],
                 }
                 self.execution_history.append(execution_record)
 
@@ -343,7 +362,7 @@ class SponsorUI:
                 st.success("✅ Task executed successfully!")
 
                 st.markdown("### Execution Result")
-                if 'error' in result:
+                if "error" in result:
                     st.error(f"Execution Error: {result['error']}")
                 else:
                     st.info(f"**Cell Used:** {result.get('cell_used', 'unknown')}")
@@ -351,12 +370,14 @@ class SponsorUI:
                     st.info(f"**Result:** {result.get('result', 'No result')}")
 
                     # Update wealth
-                    asyncio.run(self.jam.update_wealth(
-                        borg_id=self.current_borg['id'],
-                        amount=Decimal(str(result.get('cost', 0))),
-                        operation="cost",
-                        description=f"Task execution: {task_description[:50]}..."
-                    ))
+                    asyncio.run(
+                        self.jam.update_wealth(
+                            borg_id=self.current_borg["id"],
+                            amount=Decimal(str(result.get("cost", 0))),
+                            operation="cost",
+                            description=f"Task execution: {task_description[:50]}...",
+                        )
+                    )
 
             except Exception as e:
                 st.error(f"Task execution failed: {e}")
@@ -365,17 +386,19 @@ class SponsorUI:
         """Tab for fund management and USDB transfers."""
         st.header("💰 Fund Management & USDB Transfers")
 
-        st.markdown("""
+        st.markdown(
+            """
         **Phase 2A:** Manage dual-currency balances and execute secure USDB transfers between borgs.
         USDB enables economic wealth storage separate from WND operational costs.
-        """)
+        """
+        )
 
         if not self.current_borg:
             st.warning("⚠️ Please fund and create a borg first.")
             return
 
         # Initialize fund management components if needed
-        if not hasattr(self, 'fund_manager'):
+        if not hasattr(self, "fund_manager"):
             self._init_fund_management()
 
         col1, col2 = st.columns(2)
@@ -393,18 +416,18 @@ class SponsorUI:
         """Initialize fund management components."""
         try:
             from jam_mock.borg_address_manager import BorgAddressManager
-            from jam_mock.inter_borg_transfer import InterBorgTransfer
-            from jam_mock.economic_validator import EconomicValidator
-            from jam_mock.ethical_compliance_monitor import EthicalComplianceMonitor
             from jam_mock.demo_cost_controller import DemoCostController
+            from jam_mock.economic_validator import EconomicValidator
+            from jam_mock.ethical_compliance_monitor import \
+                EthicalComplianceMonitor
+            from jam_mock.inter_borg_transfer import InterBorgTransfer
             from jam_mock.transaction_manager import TransactionManager
 
             # Mock Supabase client for demo
             supabase_client = None
 
             self.address_manager = BorgAddressManager(
-                supabase_client=supabase_client,
-                audit_logger=DemoAuditLogger()
+                supabase_client=supabase_client, audit_logger=DemoAuditLogger()
             )
 
             self.cost_controller = DemoCostController()
@@ -412,19 +435,19 @@ class SponsorUI:
             self.economic_validator = EconomicValidator(
                 cost_controller=self.cost_controller,
                 compliance_monitor=self.compliance_monitor,
-                supabase_client=supabase_client
+                supabase_client=supabase_client,
             )
 
             self.transaction_manager = TransactionManager(
                 kusama_adapter=self.jam,
-                keypair_manager=None  # Would need proper keypair manager
+                keypair_manager=None,  # Would need proper keypair manager
             )
 
             self.transfer_protocol = InterBorgTransfer(
                 westend_adapter=self.jam,
                 address_manager=self.address_manager,
                 economic_validator=self.economic_validator,
-                transaction_manager=self.transaction_manager
+                transaction_manager=self.transaction_manager,
             )
 
             self.fund_manager = True
@@ -440,10 +463,10 @@ class SponsorUI:
         try:
             # Get balance summary
             balance_summary = asyncio.run(
-                self.transfer_protocol.get_borg_balance_summary(self.current_borg['id'])
+                self.transfer_protocol.get_borg_balance_summary(self.current_borg["id"])
             )
 
-            if 'error' in balance_summary:
+            if "error" in balance_summary:
                 st.error(f"Failed to load balances: {balance_summary['error']}")
                 return
 
@@ -451,12 +474,12 @@ class SponsorUI:
             col1, col2 = st.columns(2)
 
             with col1:
-                wnd_balance = balance_summary['balances']['WND']['database']
+                wnd_balance = balance_summary["balances"]["WND"]["database"]
                 st.metric("WND Balance", f"{wnd_balance} WND")
                 st.caption("Blockchain operations & gas fees")
 
             with col2:
-                usdb_balance = balance_summary['balances']['USDB']['database']
+                usdb_balance = balance_summary["balances"]["USDB"]["database"]
                 st.metric("USDB Balance", f"{usdb_balance} USDB")
                 st.caption("Economic wealth & transfers")
 
@@ -482,8 +505,7 @@ class SponsorUI:
         # Transfer form
         with st.form("usdb_transfer"):
             to_borg_id = st.text_input(
-                "Recipient Borg ID",
-                help="ID of the borg to receive USDB"
+                "Recipient Borg ID", help="ID of the borg to receive USDB"
             )
 
             amount = st.number_input(
@@ -492,13 +514,11 @@ class SponsorUI:
                 max_value=1000.0,
                 value=10.0,
                 step=0.1,
-                help="Amount of USDB to transfer"
+                help="Amount of USDB to transfer",
             )
 
             description = st.text_area(
-                "Description (Optional)",
-                height=60,
-                help="Purpose of the transfer"
+                "Description (Optional)", height=60, help="Purpose of the transfer"
             )
 
             submitted = st.form_submit_button("💸 Transfer USDB", type="primary")
@@ -511,14 +531,16 @@ class SponsorUI:
                 try:
                     with st.spinner("Processing transfer..."):
                         # Execute transfer
-                        result = asyncio.run(self.transfer_protocol.transfer_usdb(
-                            from_borg_id=self.current_borg['id'],
-                            to_borg_id=to_borg_id,
-                            amount=Decimal(str(amount)),
-                            description=description or "Manual transfer"
-                        ))
+                        result = asyncio.run(
+                            self.transfer_protocol.transfer_usdb(
+                                from_borg_id=self.current_borg["id"],
+                                to_borg_id=to_borg_id,
+                                amount=Decimal(str(amount)),
+                                description=description or "Manual transfer",
+                            )
+                        )
 
-                    if result['success']:
+                    if result["success"]:
                         st.success("✅ Transfer completed successfully!")
                         st.info(f"Transaction ID: {result['transfer_id']}")
                         st.info(f"Blockchain TX: {result['transaction_hash']}")
@@ -527,7 +549,7 @@ class SponsorUI:
                         st.rerun()
                     else:
                         st.error("❌ Transfer failed:")
-                        for error in result.get('errors', []):
+                        for error in result.get("errors", []):
                             st.error(f"  • {error}")
 
                 except Exception as e:
@@ -540,7 +562,9 @@ class SponsorUI:
         try:
             # Get transfer history
             history = asyncio.run(
-                self.transfer_protocol.get_transfer_history(self.current_borg['id'], limit=10)
+                self.transfer_protocol.get_transfer_history(
+                    self.current_borg["id"], limit=10
+                )
             )
 
             if not history:
@@ -552,13 +576,22 @@ class SponsorUI:
 
             df_data = []
             for transfer in history:
-                df_data.append({
-                    'Direction': transfer['direction'].title(),
-                    'Amount': f"{transfer['amount']} USDB",
-                    'Counterparty': transfer['to_borg_id'] if transfer['direction'] == 'sent' else transfer['from_borg_id'],
-                    'Status': transfer['status'].title(),
-                    'Date': time.strftime('%Y-%m-%d %H:%M', time.localtime(float(transfer['created_at'])))
-                })
+                df_data.append(
+                    {
+                        "Direction": transfer["direction"].title(),
+                        "Amount": f"{transfer['amount']} USDB",
+                        "Counterparty": (
+                            transfer["to_borg_id"]
+                            if transfer["direction"] == "sent"
+                            else transfer["from_borg_id"]
+                        ),
+                        "Status": transfer["status"].title(),
+                        "Date": time.strftime(
+                            "%Y-%m-%d %H:%M",
+                            time.localtime(float(transfer["created_at"])),
+                        ),
+                    }
+                )
 
             df = pd.DataFrame(df_data)
             st.dataframe(df, use_container_width=True)
@@ -576,8 +609,12 @@ class SponsorUI:
 
         # Summary metrics
         total_executions = len(self.execution_history)
-        successful_executions = len([e for e in self.execution_history if 'error' not in e.get('result', {})])
-        total_cost = sum(float(e.get('result', {}).get('cost', 0)) for e in self.execution_history)
+        successful_executions = len(
+            [e for e in self.execution_history if "error" not in e.get("result", {})]
+        )
+        total_cost = sum(
+            float(e.get("result", {}).get("cost", 0)) for e in self.execution_history
+        )
 
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -585,7 +622,14 @@ class SponsorUI:
         with col2:
             st.metric("Successful", successful_executions)
         with col3:
-            st.metric("Success Rate", f"{successful_executions/total_executions*100:.1f}%" if total_executions > 0 else "0%")
+            st.metric(
+                "Success Rate",
+                (
+                    f"{successful_executions/total_executions*100:.1f}%"
+                    if total_executions > 0
+                    else "0%"
+                ),
+            )
         with col4:
             st.metric("Total Cost", f"{total_cost:.6f} DOT")
 
@@ -593,38 +637,48 @@ class SponsorUI:
         st.markdown("### Execution History")
 
         for i, execution in enumerate(reversed(self.execution_history)):
-            with st.expander(f"Execution {len(self.execution_history)-i}: {execution['task'][:50]}..."):
+            with st.expander(
+                f"Execution {len(self.execution_history)-i}: {execution['task'][:50]}..."
+            ):
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    st.write(f"**Timestamp:** {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(execution['timestamp']))}")
+                    st.write(
+                        f"**Timestamp:** {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(execution['timestamp']))}"
+                    )
                     st.write(f"**Borg ID:** {execution['borg_id']}")
 
                 with col2:
-                    result = execution.get('result', {})
-                    if 'error' in result:
+                    result = execution.get("result", {})
+                    if "error" in result:
                         st.error(f"**Error:** {result['error']}")
                     else:
                         st.write(f"**Cell Used:** {result.get('cell_used', 'unknown')}")
                         st.write(f"**Cost:** {result.get('cost', 0):.6f} DOT")
 
-                if 'result' in execution and 'result' in execution['result']:
+                if "result" in execution and "result" in execution["result"]:
                     st.markdown("**Result:**")
-                    st.code(execution['result']['result'], language='text')
+                    st.code(execution["result"]["result"], language="text")
 
         # Wealth tracking
         if self.current_borg:
             st.markdown("### Wealth Tracking")
             try:
-                balance = asyncio.run(self.jam.get_wealth_balance(self.current_borg['id']))
-                transactions = asyncio.run(self.jam.get_transaction_history(self.current_borg['id'], limit=10))
+                balance = asyncio.run(
+                    self.jam.get_wealth_balance(self.current_borg["id"])
+                )
+                transactions = asyncio.run(
+                    self.jam.get_transaction_history(self.current_borg["id"], limit=10)
+                )
 
                 st.metric("Current Balance", f"{balance:.6f} DOT")
 
                 if transactions:
                     st.markdown("**Recent Transactions:**")
                     for tx in reversed(transactions[-5:]):  # Show last 5
-                        st.write(f"• {tx['operation'].title()}: {tx['amount']:.6f} DOT - {tx['description']}")
+                        st.write(
+                            f"• {tx['operation'].title()}: {tx['amount']:.6f} DOT - {tx['description']}"
+                        )
 
             except Exception as e:
                 st.error(f"Failed to load wealth data: {e}")

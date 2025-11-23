@@ -5,13 +5,14 @@ This module handles the reverse mapping from executable borg phenotypes back to
 DNA structures suitable for JAM protocol storage and integrity verification.
 """
 
-from typing import Dict, Any, Optional
 import hashlib
 import json
 from datetime import datetime
+from typing import Any, Dict, Optional
 
-from .dna_parser import BorgDNA, DNAHeader, Cell, Organ
+from .dna_parser import BorgDNA, Cell, DNAHeader, Organ
 from .phenotype_builder import BorgPhenotype
+
 
 class PhenotypeEncoder:
     """
@@ -23,10 +24,10 @@ class PhenotypeEncoder:
 
     def __init__(self):
         self.encoding_stats = {
-            'total_encodings': 0,
-            'successful_encodings': 0,
-            'failed_encodings': 0,
-            'avg_encoding_time': 0.0
+            "total_encodings": 0,
+            "successful_encodings": 0,
+            "failed_encodings": 0,
+            "avg_encoding_time": 0.0,
         }
 
     def encode(self, phenotype: BorgPhenotype) -> BorgDNA:
@@ -56,7 +57,7 @@ class PhenotypeEncoder:
             header = DNAHeader(
                 code_length=self._estimate_code_length(phenotype),
                 gas_limit=phenotype.dna.header.gas_limit,
-                service_index=phenotype.dna.header.service_index
+                service_index=phenotype.dna.header.service_index,
             )
 
             # Encode cells with full runtime state
@@ -74,14 +75,14 @@ class PhenotypeEncoder:
                 header=header,
                 cells=cells,
                 organs=organs,
-                manifesto_hash=phenotype.dna.manifesto_hash
+                manifesto_hash=phenotype.dna.manifesto_hash,
             )
 
             # Validate integrity
             if not self._validate_encoding_integrity(phenotype.dna, encoded_dna):
                 raise EncodingError(
                     phenotype.dna.header.service_index,
-                    "Round-trip integrity validation failed"
+                    "Round-trip integrity validation failed",
                 )
 
             # Update stats
@@ -94,10 +95,7 @@ class PhenotypeEncoder:
             encoding_time = (datetime.utcnow() - start_time).total_seconds()
             self._update_encoding_stats(False, encoding_time)
             borg_id = phenotype.dna.header.service_index if phenotype.dna else "unknown"
-            raise EncodingError(
-                borg_id,
-                f"Phenotype encoding failed: {e}"
-            )
+            raise EncodingError(borg_id, f"Phenotype encoding failed: {e}")
 
     def _encode_cell(self, cell_name: str, cell_instance) -> Cell:
         """
@@ -111,9 +109,9 @@ class PhenotypeEncoder:
         """
         return Cell(
             name=cell_name,
-            logic_type=getattr(cell_instance, 'logic_type', 'unknown'),
+            logic_type=getattr(cell_instance, "logic_type", "unknown"),
             parameters=self._extract_cell_params(cell_instance),
-            cost_estimate=self._calculate_cell_cost(cell_instance)
+            cost_estimate=self._calculate_cell_cost(cell_instance),
         )
 
     def _encode_organ(self, organ_name: str, organ_callable) -> Organ:
@@ -128,10 +126,10 @@ class PhenotypeEncoder:
         """
         return Organ(
             name=organ_name,
-            mcp_tool=getattr(organ_callable, 'tool_name', organ_name),
-            url=getattr(organ_callable, 'endpoint', ''),
-            abi_version=getattr(organ_callable, 'version', '1.0'),
-            price_cap=self._calculate_organ_price_cap(organ_callable)
+            mcp_tool=getattr(organ_callable, "tool_name", organ_name),
+            url=getattr(organ_callable, "endpoint", ""),
+            abi_version=getattr(organ_callable, "version", "1.0"),
+            price_cap=self._calculate_organ_price_cap(organ_callable),
         )
 
     def _extract_cell_params(self, cell_instance) -> Dict[str, Any]:
@@ -147,22 +145,22 @@ class PhenotypeEncoder:
         params = {}
 
         # Extract base parameters
-        if hasattr(cell_instance, 'parameters'):
+        if hasattr(cell_instance, "parameters"):
             params.update(cell_instance.parameters)
-        elif hasattr(cell_instance, 'base_parameters'):
+        elif hasattr(cell_instance, "base_parameters"):
             params.update(cell_instance.base_parameters)
 
         # Add runtime optimizations
-        if hasattr(cell_instance, 'optimized_params'):
-            params['runtime_optimizations'] = cell_instance.optimized_params
+        if hasattr(cell_instance, "optimized_params"):
+            params["runtime_optimizations"] = cell_instance.optimized_params
 
         # Add performance metrics
-        if hasattr(cell_instance, 'performance_metrics'):
-            params['performance_metrics'] = cell_instance.performance_metrics
+        if hasattr(cell_instance, "performance_metrics"):
+            params["performance_metrics"] = cell_instance.performance_metrics
 
         # Add model configuration
-        if hasattr(cell_instance, 'model_config'):
-            params['model_config'] = cell_instance.model_config
+        if hasattr(cell_instance, "model_config"):
+            params["model_config"] = cell_instance.model_config
 
         return params
 
@@ -172,15 +170,22 @@ class PhenotypeEncoder:
 
         Uses execution history when available, falls back to static estimates.
         """
-        if hasattr(cell_instance, 'execution_history') and cell_instance.execution_history:
+        if (
+            hasattr(cell_instance, "execution_history")
+            and cell_instance.execution_history
+        ):
             costs = []
             for execution in cell_instance.execution_history:
-                if 'cost' in execution:
-                    costs.append(float(execution['cost']))
-            return sum(costs) / len(costs) if costs else getattr(cell_instance, 'cost_estimate', 0.001)
+                if "cost" in execution:
+                    costs.append(float(execution["cost"]))
+            return (
+                sum(costs) / len(costs)
+                if costs
+                else getattr(cell_instance, "cost_estimate", 0.001)
+            )
 
         # Fallback to static cost estimate
-        return getattr(cell_instance, 'cost_estimate', 0.001)
+        return getattr(cell_instance, "cost_estimate", 0.001)
 
     def _calculate_organ_price_cap(self, organ_callable) -> float:
         """
@@ -188,7 +193,7 @@ class PhenotypeEncoder:
 
         Uses stored price cap, with fallback to default.
         """
-        return getattr(organ_callable, 'price_cap', 0.001)
+        return getattr(organ_callable, "price_cap", 0.001)
 
     def _estimate_code_length(self, phenotype: BorgPhenotype) -> int:
         """
@@ -203,21 +208,23 @@ class PhenotypeEncoder:
 
         # Add length for cells
         cell_length = sum(
-            len(str(getattr(cell, 'parameters', {}))) +
-            len(str(getattr(cell, 'execution_history', [])))
+            len(str(getattr(cell, "parameters", {})))
+            + len(str(getattr(cell, "execution_history", [])))
             for cell in phenotype.cells.values()
         )
 
         # Add length for organs
         organ_length = sum(
-            len(str(getattr(organ, 'tool_name', ''))) +
-            len(str(getattr(organ, 'endpoint', '')))
+            len(str(getattr(organ, "tool_name", "")))
+            + len(str(getattr(organ, "endpoint", "")))
             for organ in phenotype.organs.values()
         )
 
         return base_length + cell_length + organ_length
 
-    def _validate_encoding_integrity(self, original_dna: BorgDNA, encoded_dna: BorgDNA) -> bool:
+    def _validate_encoding_integrity(
+        self, original_dna: BorgDNA, encoded_dna: BorgDNA
+    ) -> bool:
         """
         Validate that encoding preserves DNA integrity.
 
@@ -253,40 +260,46 @@ class PhenotypeEncoder:
         """
         # Serialize to canonical format using DNAParser
         from .dna_parser import DNAParser
+
         parser = DNAParser()
         dna_yaml = parser.to_yaml(dna)
 
         # Compute hash for integrity verification
-        dna_hash = hashlib.sha256(dna_yaml.encode('utf-8')).hexdigest()
+        dna_hash = hashlib.sha256(dna_yaml.encode("utf-8")).hexdigest()
 
         return {
-            'dna_hash': dna_hash,
-            'dna_yaml': dna_yaml,
-            'service_index': dna.header.service_index,
-            'code_length': dna.header.code_length,
-            'cell_count': len(dna.cells),
-            'organ_count': len(dna.organs),
-            'manifesto_hash': dna.manifesto_hash,
-            'prepared_at': datetime.utcnow().isoformat(),
-            'encoder_version': '1.0.0'
+            "dna_hash": dna_hash,
+            "dna_yaml": dna_yaml,
+            "service_index": dna.header.service_index,
+            "code_length": dna.header.code_length,
+            "cell_count": len(dna.cells),
+            "organ_count": len(dna.organs),
+            "manifesto_hash": dna.manifesto_hash,
+            "prepared_at": datetime.utcnow().isoformat(),
+            "encoder_version": "1.0.0",
         }
 
     def _update_encoding_stats(self, success: bool, encoding_time: float):
         """Update encoding statistics."""
-        self.encoding_stats['total_encodings'] += 1
+        self.encoding_stats["total_encodings"] += 1
 
         if success:
-            self.encoding_stats['successful_encodings'] += 1
+            self.encoding_stats["successful_encodings"] += 1
         else:
-            self.encoding_stats['failed_encodings'] += 1
+            self.encoding_stats["failed_encodings"] += 1
 
         # Update rolling average
-        total_time = self.encoding_stats['avg_encoding_time'] * (self.encoding_stats['total_encodings'] - 1)
-        self.encoding_stats['avg_encoding_time'] = (total_time + encoding_time) / self.encoding_stats['total_encodings']
+        total_time = self.encoding_stats["avg_encoding_time"] * (
+            self.encoding_stats["total_encodings"] - 1
+        )
+        self.encoding_stats["avg_encoding_time"] = (
+            total_time + encoding_time
+        ) / self.encoding_stats["total_encodings"]
 
     def get_encoding_stats(self) -> Dict[str, Any]:
         """Get encoding statistics."""
         return self.encoding_stats.copy()
+
 
 class EncodingError(Exception):
     """Raised when phenotype encoding fails."""

@@ -5,18 +5,18 @@ Creates a new borg tester with keypair stored in keyring and database entry.
 """
 
 import asyncio
-import sys
-import os
-import time
 import json
+import os
+import sys
+import time
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from jam_mock.secure_borg_creation import create_secure_borg
-from jam_mock.borg_address_manager import BorgAddressManager
-from substrateinterface import Keypair
 import keyring
+from jam_mock.borg_address_manager import BorgAddressManager
+from jam_mock.secure_borg_creation import create_secure_borg
+from substrateinterface import Keypair
 
 
 async def main():
@@ -36,11 +36,11 @@ async def main():
         print("\\n🔐 Creating borg with keyring storage...")
         result = create_secure_borg(borg_id, dna_hash)
 
-        if not result['success']:
+        if not result["success"]:
             print(f"❌ Borg creation failed: {result['error']}")
             return False
 
-        borg_address = result['address']
+        borg_address = result["address"]
         print(f"✅ Borg created successfully!")
         print(f"   Address: {borg_address}")
         print(f"   Keypair stored in macOS Keychain")
@@ -70,7 +70,9 @@ async def main():
         print("\\n🔧 Testing keypair reconstruction...")
         try:
             private_key_bytes = bytes.fromhex(private_key)
-            reconstructed_keypair = Keypair(private_key=private_key_bytes, ss58_format=42)
+            reconstructed_keypair = Keypair(
+                private_key=private_key_bytes, ss58_format=42
+            )
 
             if reconstructed_keypair.ss58_address != borg_address:
                 print("❌ Keypair reconstruction failed - address mismatch")
@@ -94,22 +96,23 @@ async def main():
         # Add to address manager
         print("\\n📋 Adding to address manager...")
         from jam_mock.borg_address_manager import BorgAddressManager
+
         address_manager = BorgAddressManager()
         address_manager.register_borg_address(borg_id, dna_hash)
         print("✅ Added to address manager")
 
         # Save results
         results = {
-            'borg_id': borg_id,
-            'address': borg_address,
-            'service_name': service_name,
-            'created_at': time.time(),
-            'keyring_verified': True,
-            'address_manager_added': True
+            "borg_id": borg_id,
+            "address": borg_address,
+            "service_name": service_name,
+            "created_at": time.time(),
+            "keyring_verified": True,
+            "address_manager_added": True,
         }
 
         results_file = f"borg_tester_{borg_id}_results.json"
-        with open(results_file, 'w') as f:
+        with open(results_file, "w") as f:
             json.dump(results, f, indent=2)
 
         print(f"\\n📄 Results saved to: {results_file}")

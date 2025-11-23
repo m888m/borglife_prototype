@@ -23,33 +23,35 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Load test-specific .env.test if exists (override)
+test_env_path = Path(__file__).parent / ".env.test"
+if test_env_path.exists():
+    load_dotenv(str(test_env_path), override=True)
+    print(f"Loaded test env from {test_env_path}")
+else:
+    print("No code/tests/.env.test found - using root .env (copy .env.test.example)")
+
 
 # ============================================================================
 # PYTEST CONFIGURATION
 # ============================================================================
+
 
 def pytest_configure(config):
     """Configure pytest with custom markers."""
     config.addinivalue_line(
         "markers", "asyncio: mark test as async (deselect with '-m \"not asyncio\"')"
     )
-    config.addinivalue_line(
-        "markers", "integration: mark test as integration test"
-    )
-    config.addinivalue_line(
-        "markers", "e2e: mark test as end-to-end test"
-    )
-    config.addinivalue_line(
-        "markers", "slow: mark test as slow running"
-    )
-    config.addinivalue_line(
-        "markers", "ui: mark test as UI interaction test"
-    )
+    config.addinivalue_line("markers", "integration: mark test as integration test")
+    config.addinivalue_line("markers", "e2e: mark test as end-to-end test")
+    config.addinivalue_line("markers", "slow: mark test as slow running")
+    config.addinivalue_line("markers", "ui: mark test as UI interaction test")
 
 
 # ============================================================================
 # EVENT LOOP FIXTURE
 # ============================================================================
+
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -62,6 +64,7 @@ def event_loop():
 # ============================================================================
 # ENVIRONMENT & CONFIGURATION FIXTURES
 # ============================================================================
+
 
 @pytest.fixture(scope="session")
 def test_config() -> Dict[str, Any]:
@@ -88,13 +91,14 @@ def fixtures_dir() -> Path:
 # TEST DATA FIXTURES
 # ============================================================================
 
+
 @pytest.fixture(scope="session")
 def test_dna_samples(fixtures_dir: Path) -> Dict[str, Dict[str, Any]]:
     """Load test DNA samples from YAML file."""
     dna_file = fixtures_dir / "test_dna_samples.yaml"
     if not dna_file.exists():
         pytest.skip(f"Test DNA samples not found at {dna_file}")
-    
+
     with open(dna_file, "r") as f:
         return yaml.safe_load(f)
 
@@ -105,7 +109,7 @@ def demo_tasks(fixtures_dir: Path) -> Dict[str, Any]:
     tasks_file = fixtures_dir / "demo_tasks.json"
     if not tasks_file.exists():
         pytest.skip(f"Demo tasks not found at {tasks_file}")
-    
+
     with open(tasks_file, "r") as f:
         return json.load(f)
 
@@ -116,7 +120,7 @@ def expected_results(fixtures_dir: Path) -> Dict[str, Any]:
     results_file = fixtures_dir / "expected_results.json"
     if not results_file.exists():
         pytest.skip(f"Expected results not found at {results_file}")
-    
+
     with open(results_file, "r") as f:
         return json.load(f)
 
@@ -124,6 +128,7 @@ def expected_results(fixtures_dir: Path) -> Dict[str, Any]:
 # ============================================================================
 # SERVICE FIXTURES
 # ============================================================================
+
 
 @pytest_asyncio.fixture
 async def archon_adapter(test_config: Dict[str, Any]):
@@ -159,7 +164,7 @@ async def borg_agent(test_config: Dict[str, Any]):
     """Initialize ProtoBorgAgent for testing."""
     borg = None
     try:
-        from proto_borg import ProtoBorgAgent, BorgConfig
+        from proto_borg import BorgConfig, ProtoBorgAgent
 
         config = BorgConfig(
             service_index="test-borg-001",
@@ -185,6 +190,7 @@ async def dna_parser():
     """Initialize DNA parser."""
     try:
         from synthesis import DNAParser
+
         return DNAParser()
     except ImportError:
         pytest.skip("DNA parser not available")
@@ -195,6 +201,7 @@ async def phenotype_builder(archon_adapter):
     """Initialize phenotype builder."""
     try:
         from synthesis import PhenotypeBuilder
+
         return PhenotypeBuilder(archon_adapter)
     except ImportError:
         pytest.skip("Phenotype builder not available")
@@ -227,6 +234,7 @@ async def jam_interface(test_config: Dict[str, Any]):
 # HEALTH CHECK FIXTURES
 # ============================================================================
 
+
 @pytest_asyncio.fixture
 async def service_health_check(archon_adapter):
     """Verify all services are healthy before test."""
@@ -244,6 +252,7 @@ async def service_health_check(archon_adapter):
 # UTILITY FIXTURES
 # ============================================================================
 
+
 @pytest.fixture
 def decimal_tolerance() -> Decimal:
     """Standard tolerance for Decimal comparisons."""
@@ -259,13 +268,14 @@ def test_timeout(test_config: Dict[str, Any]) -> int:
 @pytest.fixture
 def async_timeout():
     """Async timeout context manager."""
+
     @pytest.fixture
     async def _timeout(seconds: int = 30):
         try:
             yield
         except asyncio.TimeoutError:
             pytest.fail(f"Test timed out after {seconds} seconds")
-    
+
     return _timeout
 
 
@@ -273,16 +283,17 @@ def async_timeout():
 # CLEANUP FIXTURES
 # ============================================================================
 
+
 @pytest.fixture
 def cleanup_resources():
     """Cleanup resources after test."""
     resources = []
-    
+
     def register_cleanup(resource, cleanup_func):
         resources.append((resource, cleanup_func))
-    
+
     yield register_cleanup
-    
+
     # Cleanup in reverse order
     for resource, cleanup_func in reversed(resources):
         try:
@@ -298,25 +309,26 @@ def cleanup_resources():
 # MARKERS & PARAMETRIZATION
 # ============================================================================
 
+
 def pytest_collection_modifyitems(config, items):
     """Add markers to tests based on naming conventions."""
     for item in items:
         # Add asyncio marker to async tests
         if asyncio.iscoroutinefunction(item.function):
             item.add_marker(pytest.mark.asyncio)
-        
+
         # Add integration marker to integration tests
         if "integration" in item.nodeid:
             item.add_marker(pytest.mark.integration)
-        
+
         # Add e2e marker to e2e tests
         if "e2e" in item.nodeid:
             item.add_marker(pytest.mark.e2e)
-        
+
         # Add slow marker to slow tests
         if "slow" in item.nodeid or "performance" in item.nodeid:
             item.add_marker(pytest.mark.slow)
-        
+
         # Add ui marker to UI tests
         if "ui" in item.nodeid:
             item.add_marker(pytest.mark.ui)

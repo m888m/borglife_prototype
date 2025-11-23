@@ -8,9 +8,10 @@ and async context management. Addresses all gotchas mentioned in PRP.
 import asyncio
 import json
 import os
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from decimal import Decimal
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Test imports - these will be available in Docker environment
 try:
@@ -18,6 +19,7 @@ try:
     from jam_mock.interface import JAMInterface
     from proto_borg import ProtoBorgAgent
     from synthesis.dna_parser import DNAParser
+
     IMPORTS_AVAILABLE = True
 except ImportError:
     # Mock for development environment
@@ -36,7 +38,10 @@ class TestErrorHandling:
         """Fixture for Archon adapter with error simulation capabilities."""
         if not IMPORTS_AVAILABLE:
             adapter = AsyncMock()
-            adapter.health_check.return_value = {"status": "healthy", "services": ["mcp", "database"]}
+            adapter.health_check.return_value = {
+                "status": "healthy",
+                "services": ["mcp", "database"],
+            }
             adapter.simulate_service_failure = AsyncMock()
             adapter.simulate_service_down = AsyncMock()
             adapter.restore_service = AsyncMock()
@@ -58,7 +63,9 @@ class TestErrorHandling:
             borg = AsyncMock()
             borg.initialize = AsyncMock()
             borg.cleanup = AsyncMock()
-            borg.execute_task = AsyncMock(return_value={"success": True, "cost": Decimal('0.001')})
+            borg.execute_task = AsyncMock(
+                return_value={"success": True, "cost": Decimal("0.001")}
+            )
             borg.simulate_failure = AsyncMock()
             borg.simulate_timeout = AsyncMock()
             yield borg
@@ -73,8 +80,10 @@ class TestErrorHandling:
         """Fixture for JAM interface with error handling."""
         if not IMPORTS_AVAILABLE:
             interface = AsyncMock()
-            interface.get_balance.return_value = Decimal('1.5')
-            interface.transfer = AsyncMock(return_value={"tx_hash": "0x123", "status": "confirmed"})
+            interface.get_balance.return_value = Decimal("1.5")
+            interface.transfer = AsyncMock(
+                return_value={"tx_hash": "0x123", "status": "confirmed"}
+            )
             interface.simulate_network_failure = AsyncMock()
             interface.simulate_insufficient_funds = AsyncMock()
             yield interface
@@ -140,8 +149,10 @@ class TestErrorHandling:
             await archon_adapter.make_request("test_request")
 
         # Should provide meaningful error message
-        assert "service unavailable" in str(exc_info.value).lower() or \
-               "unavailable" in str(exc_info.value).lower()
+        assert (
+            "service unavailable" in str(exc_info.value).lower()
+            or "unavailable" in str(exc_info.value).lower()
+        )
 
         # Restore service
         await archon_adapter.restore_service()
@@ -160,7 +171,7 @@ class TestErrorHandling:
         with pytest.raises(asyncio.TimeoutError) as exc_info:
             await asyncio.wait_for(
                 proto_borg.execute_task("timeout_test_task"),
-                timeout=1.0  # Short timeout for test
+                timeout=1.0,  # Short timeout for test
             )
 
         # Verify timeout was handled properly
@@ -219,14 +230,14 @@ class TestErrorHandling:
         # Transfer should fail gracefully
         with pytest.raises(Exception) as exc_info:
             await jam_interface.transfer(
-                to_address="test_address",
-                amount=Decimal('0.1'),
-                memo="test transfer"
+                to_address="test_address", amount=Decimal("0.1"), memo="test transfer"
             )
 
         # Should indicate network/connectivity issue
-        assert any(term in str(exc_info.value).lower() for term in
-                  ["network", "connection", "connectivity", "unavailable"])
+        assert any(
+            term in str(exc_info.value).lower()
+            for term in ["network", "connection", "connectivity", "unavailable"]
+        )
 
     @pytest.mark.asyncio
     async def test_insufficient_funds_handling(self, jam_interface):
@@ -238,17 +249,20 @@ class TestErrorHandling:
         with pytest.raises(Exception) as exc_info:
             await jam_interface.transfer(
                 to_address="test_address",
-                amount=Decimal('1000.0'),  # Large amount
-                memo="insufficient funds test"
+                amount=Decimal("1000.0"),  # Large amount
+                memo="insufficient funds test",
             )
 
         # Should indicate insufficient funds
-        assert any(term in str(exc_info.value).lower() for term in
-                  ["insufficient", "funds", "balance", "amount"])
+        assert any(
+            term in str(exc_info.value).lower()
+            for term in ["insufficient", "funds", "balance", "amount"]
+        )
 
     @pytest.mark.asyncio
     async def test_concurrent_error_scenarios(self, archon_adapter):
         """Test handling multiple concurrent error scenarios."""
+
         async def error_operation(operation_id: int):
             try:
                 if operation_id % 3 == 0:
@@ -258,14 +272,22 @@ class TestErrorHandling:
                 elif operation_id % 3 == 1:
                     # Simulate service failure
                     await archon_adapter.simulate_service_failure()
-                    result = await archon_adapter.make_request(f"operation_{operation_id}")
+                    result = await archon_adapter.make_request(
+                        f"operation_{operation_id}"
+                    )
                     return result
                 else:
                     # Normal operation
-                    result = await archon_adapter.make_request(f"operation_{operation_id}")
+                    result = await archon_adapter.make_request(
+                        f"operation_{operation_id}"
+                    )
                     return result
             except Exception as e:
-                return {"status": "error", "operation_id": operation_id, "error": str(e)}
+                return {
+                    "status": "error",
+                    "operation_id": operation_id,
+                    "error": str(e),
+                }
 
         # Run 9 concurrent operations (3 of each type)
         tasks = [error_operation(i) for i in range(9)]
@@ -275,14 +297,20 @@ class TestErrorHandling:
         assert len(results) == 9
 
         # Count different result types
-        timeouts = sum(1 for r in results if isinstance(r, dict) and r.get("status") == "timeout")
-        errors = sum(1 for r in results if isinstance(r, dict) and r.get("status") == "error")
-        successes = sum(1 for r in results if isinstance(r, dict) and r.get("status") == "success")
+        timeouts = sum(
+            1 for r in results if isinstance(r, dict) and r.get("status") == "timeout"
+        )
+        errors = sum(
+            1 for r in results if isinstance(r, dict) and r.get("status") == "error"
+        )
+        successes = sum(
+            1 for r in results if isinstance(r, dict) and r.get("status") == "success"
+        )
 
         # Should have some of each type
         assert timeouts >= 2  # At least some timeouts
-        assert errors >= 2    # At least some errors
-        assert successes >= 2 # At least some successes
+        assert errors >= 2  # At least some errors
+        assert successes >= 2  # At least some successes
 
     @pytest.mark.asyncio
     async def test_error_recovery_with_retry_logic(self, archon_adapter):
@@ -371,8 +399,10 @@ class TestErrorHandling:
         except Exception as e:
             # Verify error contains useful context
             error_str = str(e)
-            assert any(term in error_str.lower() for term in
-                      ["error", "failed", "unavailable", "service"])
+            assert any(
+                term in error_str.lower()
+                for term in ["error", "failed", "unavailable", "service"]
+            )
 
             # In real implementation, error should include:
             # - Operation that failed
@@ -455,9 +485,10 @@ class TestErrorHandling:
 
         # Error should indicate service unavailability
         error_msg = str(exc_info.value).lower()
-        assert any(term in error_msg for term in
-                  ["unavailable", "outage", "down", "failed", "service"]), \
-               f"Error message should indicate service unavailability: {error_msg}"
+        assert any(
+            term in error_msg
+            for term in ["unavailable", "outage", "down", "failed", "service"]
+        ), f"Error message should indicate service unavailability: {error_msg}"
 
         # System should not crash or hang
         # (In real implementation, this would test circuit breaker timeout)
@@ -492,6 +523,8 @@ class TestErrorHandling:
         # Operations should be independent
         for i, result in enumerate(results):
             if i % 2 == 0:
-                assert result["status"] == "success", f"Even operation {i} should succeed"
+                assert (
+                    result["status"] == "success"
+                ), f"Even operation {i} should succeed"
             else:
                 assert result["status"] == "error", f"Odd operation {i} should fail"

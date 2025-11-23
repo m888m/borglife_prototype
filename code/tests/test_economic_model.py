@@ -8,17 +8,18 @@ handling for economic model correctness within 0.001 DOT tolerance.
 import decimal
 import json
 import os
+from decimal import ROUND_HALF_UP, Decimal, getcontext
+from typing import Any, Dict, List
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from decimal import Decimal, getcontext, ROUND_HALF_UP
-from typing import Dict, Any, List
-from unittest.mock import MagicMock, AsyncMock
-from typing import Dict
 
 # Test imports - these will be available in Docker environment
 try:
-    from proto_borg import ProtoBorg
     from jam_mock.interface import JAMInterface
+    from proto_borg import ProtoBorg
     from synthesis import BorgPhenotype
+
     IMPORTS_AVAILABLE = True
 except ImportError:
     # Mock for development environment
@@ -31,7 +32,7 @@ except ImportError:
 class TestEconomicModel:
     """Test suite for economic model validation."""
 
-    ECONOMIC_ACCURACY_TOLERANCE = Decimal('0.001')  # 0.001 DOT tolerance
+    ECONOMIC_ACCURACY_TOLERANCE = Decimal("0.001")  # 0.001 DOT tolerance
     DECIMAL_PRECISION = 6
 
     @pytest.fixture(autouse=True)
@@ -46,12 +47,23 @@ class TestEconomicModel:
         if not IMPORTS_AVAILABLE:
             # Mock borg for development
             borg = AsyncMock()
-            borg.get_wealth.return_value = Decimal('1.5')
-            borg.calculate_task_cost.return_value = Decimal('0.0025')
-            borg.process_payment.return_value = {"status": "success", "tx_hash": "0x123"}
+            borg.get_wealth.return_value = Decimal("1.5")
+            borg.calculate_task_cost.return_value = Decimal("0.0025")
+            borg.process_payment.return_value = {
+                "status": "success",
+                "tx_hash": "0x123",
+            }
             borg.get_transaction_history.return_value = [
-                {"amount": Decimal('0.1'), "type": "credit", "timestamp": "2025-01-01T00:00:00Z"},
-                {"amount": Decimal('0.05'), "type": "debit", "timestamp": "2025-01-02T00:00:00Z"}
+                {
+                    "amount": Decimal("0.1"),
+                    "type": "credit",
+                    "timestamp": "2025-01-01T00:00:00Z",
+                },
+                {
+                    "amount": Decimal("0.05"),
+                    "type": "debit",
+                    "timestamp": "2025-01-02T00:00:00Z",
+                },
             ]
             yield borg
         else:
@@ -67,9 +79,9 @@ class TestEconomicModel:
         if not IMPORTS_AVAILABLE:
             # Mock interface for development
             interface = AsyncMock()
-            interface.get_balance.return_value = Decimal('2.0')
+            interface.get_balance.return_value = Decimal("2.0")
             interface.validate_transaction.return_value = True
-            interface.get_fee_estimate.return_value = Decimal('0.0001')
+            interface.get_fee_estimate.return_value = Decimal("0.0001")
             yield interface
         else:
             # Real interface for Docker environment
@@ -81,8 +93,10 @@ class TestEconomicModel:
     @pytest.fixture
     def expected_results(self) -> Dict[str, Dict[str, Any]]:
         """Load expected results from fixtures."""
-        fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "expected_results.json")
-        with open(fixture_path, 'r') as f:
+        fixture_path = os.path.join(
+            os.path.dirname(__file__), "fixtures", "expected_results.json"
+        )
+        with open(fixture_path, "r") as f:
             return json.load(f)
 
     def test_decimal_precision_setup(self):
@@ -103,8 +117,8 @@ class TestEconomicModel:
 
         # Verify precision (should not have excessive decimal places)
         wealth_str = str(wealth)
-        if '.' in wealth_str:
-            decimal_places = len(wealth_str.split('.')[1])
+        if "." in wealth_str:
+            decimal_places = len(wealth_str.split(".")[1])
             assert decimal_places <= self.DECIMAL_PRECISION
 
     @pytest.mark.asyncio
@@ -112,7 +126,7 @@ class TestEconomicModel:
         """Test cost calculation with required precision."""
         # Test cost calculation for different DNA configurations
         for dna_name, expected in expected_results.items():
-            if dna_name.startswith('test_dna'):
+            if dna_name.startswith("test_dna"):
                 cost = await proto_borg.calculate_task_cost(dna_name)
 
                 # Verify cost is Decimal
@@ -122,12 +136,15 @@ class TestEconomicModel:
                 expected_min = Decimal(str(expected["expected_cost_range"][0]))
                 expected_max = Decimal(str(expected["expected_cost_range"][1]))
 
-                assert expected_min <= cost <= expected_max, \
-                    f"Cost {cost} out of range [{expected_min}, {expected_max}] for {dna_name}"
+                assert (
+                    expected_min <= cost <= expected_max
+                ), f"Cost {cost} out of range [{expected_min}, {expected_max}] for {dna_name}"
 
                 # Verify precision tolerance
-                assert abs(cost - expected_min) <= self.ECONOMIC_ACCURACY_TOLERANCE or \
-                       abs(cost - expected_max) <= self.ECONOMIC_ACCURACY_TOLERANCE
+                assert (
+                    abs(cost - expected_min) <= self.ECONOMIC_ACCURACY_TOLERANCE
+                    or abs(cost - expected_max) <= self.ECONOMIC_ACCURACY_TOLERANCE
+                )
 
     @pytest.mark.asyncio
     async def test_billing_accuracy_validation(self, proto_borg, jam_interface):
@@ -147,7 +164,9 @@ class TestEconomicModel:
 
         # Verify wealth was correctly debited
         new_wealth = await proto_borg.get_wealth()
-        previous_wealth = await proto_borg.get_wealth()  # This would be stored before payment
+        previous_wealth = (
+            await proto_borg.get_wealth()
+        )  # This would be stored before payment
 
         # Note: In real implementation, we'd compare against stored previous value
         # For this test, we just verify the wealth is still valid
@@ -165,8 +184,8 @@ class TestEconomicModel:
 
             # Verify amount precision
             amount_str = str(transaction["amount"])
-            if '.' in amount_str:
-                decimal_places = len(amount_str.split('.')[1])
+            if "." in amount_str:
+                decimal_places = len(amount_str.split(".")[1])
                 assert decimal_places <= self.DECIMAL_PRECISION
 
             # Verify transaction has required fields
@@ -207,24 +226,24 @@ class TestEconomicModel:
         assert fee >= 0
 
         # Fee should be reasonable (not excessive)
-        assert fee <= Decimal('0.01')  # Max reasonable fee
+        assert fee <= Decimal("0.01")  # Max reasonable fee
 
         # Fee should have appropriate precision
         fee_str = str(fee)
-        if '.' in fee_str:
-            decimal_places = len(fee_str.split('.')[1])
+        if "." in fee_str:
+            decimal_places = len(fee_str.split(".")[1])
             assert decimal_places <= self.DECIMAL_PRECISION
 
     @pytest.mark.asyncio
     async def test_payment_validation(self, proto_borg, jam_interface):
         """Test payment validation with economic constraints."""
         # Test valid payment
-        valid_amount = Decimal('0.1')
+        valid_amount = Decimal("0.1")
         is_valid = await jam_interface.validate_transaction(valid_amount)
         assert is_valid is True
 
         # Test invalid payment (negative amount)
-        invalid_amount = Decimal('-0.1')
+        invalid_amount = Decimal("-0.1")
         is_valid = await jam_interface.validate_transaction(invalid_amount)
         assert is_valid is False
 
@@ -236,11 +255,11 @@ class TestEconomicModel:
         """Test decimal arithmetic maintains precision."""
         # Test various decimal operations
         amounts = [
-            Decimal('0.1'),
-            Decimal('0.05'),
-            Decimal('0.025'),
-            Decimal('0.0125'),
-            Decimal('0.00625')
+            Decimal("0.1"),
+            Decimal("0.05"),
+            Decimal("0.025"),
+            Decimal("0.0125"),
+            Decimal("0.00625"),
         ]
 
         # Test summation
@@ -249,12 +268,12 @@ class TestEconomicModel:
 
         # Verify precision is maintained
         total_str = str(total)
-        if '.' in total_str:
-            decimal_places = len(total_str.split('.')[1])
+        if "." in total_str:
+            decimal_places = len(total_str.split(".")[1])
             assert decimal_places <= self.DECIMAL_PRECISION
 
         # Test that total equals expected value
-        expected_total = Decimal('0.19375')
+        expected_total = Decimal("0.19375")
         assert abs(total - expected_total) <= self.ECONOMIC_ACCURACY_TOLERANCE
 
     @pytest.mark.asyncio
@@ -265,12 +284,12 @@ class TestEconomicModel:
         assert zero_cost == 0 or zero_cost >= 0
 
         # Test very small amounts
-        tiny_amount = Decimal('0.000001')
+        tiny_amount = Decimal("0.000001")
         is_valid = await proto_borg.validate_amount(tiny_amount)
         # Small amounts should be valid (depending on implementation)
 
         # Test large amounts
-        large_amount = Decimal('1000.0')
+        large_amount = Decimal("1000.0")
         is_valid = await proto_borg.validate_amount(large_amount)
         # Large amounts should be handled appropriately
 
@@ -280,7 +299,9 @@ class TestEconomicModel:
         import asyncio
 
         async def perform_operation(operation_id: int):
-            cost = await proto_borg.calculate_task_cost(f"concurrent_task_{operation_id}")
+            cost = await proto_borg.calculate_task_cost(
+                f"concurrent_task_{operation_id}"
+            )
             return cost
 
         # Perform 5 concurrent operations

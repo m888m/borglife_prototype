@@ -1,6 +1,9 @@
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 import streamlit as st
+
 from .rating_system import BorgRatingSystem
+
 
 class FeedbackCollector:
     """UI integration for collecting borg ratings"""
@@ -13,7 +16,7 @@ class FeedbackCollector:
         borg_id: str,
         sponsor_id: str,
         task_result: Any,
-        task_description: str = ""
+        task_description: str = "",
     ) -> Optional[int]:
         """
         Display rating widget in Streamlit UI
@@ -39,7 +42,7 @@ class FeedbackCollector:
                 max_value=5,
                 value=3,
                 help="1 = Not useful, 5 = Extremely useful",
-                key=f"rating_{borg_id}_{sponsor_id}"
+                key=f"rating_{borg_id}_{sponsor_id}",
             )
 
             # Optional feedback
@@ -47,7 +50,7 @@ class FeedbackCollector:
                 "Optional feedback",
                 placeholder="What did you like or dislike about this borg's performance?",
                 height=80,
-                key=f"feedback_{borg_id}_{sponsor_id}"
+                key=f"feedback_{borg_id}_{sponsor_id}",
             )
 
             # Task context summary
@@ -58,22 +61,28 @@ class FeedbackCollector:
             submit_key = f"submit_rating_{borg_id}_{sponsor_id}"
             if st.button("Submit Rating", key=submit_key):
                 # Submit rating
-                success = asyncio.run(self.rating_system.submit_rating(
-                    borg_id=borg_id,
-                    sponsor_id=sponsor_id,
-                    rating=rating,
-                    feedback=feedback if feedback.strip() else None,
-                    task_context=task_description[:200]  # Truncate for storage
-                ))
+                success = asyncio.run(
+                    self.rating_system.submit_rating(
+                        borg_id=borg_id,
+                        sponsor_id=sponsor_id,
+                        rating=rating,
+                        feedback=feedback if feedback.strip() else None,
+                        task_context=task_description[:200],  # Truncate for storage
+                    )
+                )
 
                 if success:
                     st.success("✅ Rating submitted! Thank you for your feedback.")
                     st.balloons()  # Celebration effect
 
                     # Show current reputation
-                    reputation = asyncio.run(self.rating_system.calculate_reputation(borg_id))
-                    if reputation['total_ratings'] > 0:
-                        st.info(f"📊 Borg now has {reputation['total_ratings']} rating(s) with an average of {reputation['average_rating']} ⭐")
+                    reputation = asyncio.run(
+                        self.rating_system.calculate_reputation(borg_id)
+                    )
+                    if reputation["total_ratings"] > 0:
+                        st.info(
+                            f"📊 Borg now has {reputation['total_ratings']} rating(s) with an average of {reputation['average_rating']} ⭐"
+                        )
 
                     return rating
                 else:
@@ -88,7 +97,7 @@ class FeedbackCollector:
         """
         reputation = asyncio.run(self.rating_system.calculate_reputation(borg_id))
 
-        if reputation['total_ratings'] == 0:
+        if reputation["total_ratings"] == 0:
             st.caption("No ratings yet")
             return
 
@@ -98,13 +107,13 @@ class FeedbackCollector:
             st.metric("Average Rating", f"{reputation['average_rating']} ⭐")
 
         with col2:
-            st.metric("Total Ratings", reputation['total_ratings'])
+            st.metric("Total Ratings", reputation["total_ratings"])
 
         with col3:
             # Show star distribution
             stars = []
             for star in range(5, 0, -1):
-                count = reputation['rating_distribution'].get(star, 0)
+                count = reputation["rating_distribution"].get(star, 0)
                 if count > 0:
                     stars.append(f"{star}⭐: {count}")
             st.caption(" | ".join(stars))
@@ -115,7 +124,7 @@ class FeedbackCollector:
         sponsor_id: str,
         rating: int,
         feedback: Optional[str] = None,
-        task_context: Optional[str] = None
+        task_context: Optional[str] = None,
     ) -> bool:
         """
         Async method for programmatic rating collection
@@ -125,5 +134,5 @@ class FeedbackCollector:
             sponsor_id=sponsor_id,
             rating=rating,
             feedback=feedback,
-            task_context=task_context
+            task_context=task_context,
         )

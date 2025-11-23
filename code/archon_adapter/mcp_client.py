@@ -1,15 +1,24 @@
-from typing import Dict, Any, Optional, List
 import asyncio
 from datetime import datetime
-from .exceptions import RateLimitExceededError, InsufficientFundsError, AllFallbacksFailedError
-from .fallback_manager import OrganFallbackManager, FallbackLevel
-from .rate_limiter import OrganRateLimiter
+from typing import Any, Dict, List, Optional
+
 from .docker_mcp_billing import DockerMCPBilling
+from .exceptions import (AllFallbacksFailedError, InsufficientFundsError,
+                         RateLimitExceededError)
+from .fallback_manager import FallbackLevel, OrganFallbackManager
+from .rate_limiter import OrganRateLimiter
+
 
 class MCPClient:
     """Enhanced MCP client with rate limiting and billing"""
 
-    def __init__(self, archon_adapter, fallback_manager: OrganFallbackManager, rate_limiter: OrganRateLimiter, billing_manager: DockerMCPBilling):
+    def __init__(
+        self,
+        archon_adapter,
+        fallback_manager: OrganFallbackManager,
+        rate_limiter: OrganRateLimiter,
+        billing_manager: DockerMCPBilling,
+    ):
         self.archon_adapter = archon_adapter
         self.fallback_manager = fallback_manager
         self.rate_limiter = rate_limiter
@@ -21,7 +30,7 @@ class MCPClient:
         organ_name: str,
         tool: str,
         params: Dict[str, Any],
-        use_fallbacks: bool = True
+        use_fallbacks: bool = True,
     ) -> Dict[str, Any]:
         """
         Call organ with automatic fallback support
@@ -36,33 +45,37 @@ class MCPClient:
         """
         if use_fallbacks:
             try:
-                result, level, description = await self.fallback_manager.execute_with_fallback(
-                    borg_id, organ_name, tool, params
+                result, level, description = (
+                    await self.fallback_manager.execute_with_fallback(
+                        borg_id, organ_name, tool, params
+                    )
                 )
 
                 return {
-                    'result': result,
-                    'fallback_used': level != FallbackLevel.PRIMARY,
-                    'fallback_level': level.name,
-                    'fallback_description': description
+                    "result": result,
+                    "fallback_used": level != FallbackLevel.PRIMARY,
+                    "fallback_level": level.name,
+                    "fallback_description": description,
                 }
             except AllFallbacksFailedError as e:
                 # All fallbacks failed - return error info
                 return {
-                    'result': None,
-                    'error': str(e),
-                    'fallback_used': True,
-                    'fallback_level': 'FAILED',
-                    'fallback_description': 'All fallbacks exhausted'
+                    "result": None,
+                    "error": str(e),
+                    "fallback_used": True,
+                    "fallback_level": "FAILED",
+                    "fallback_description": "All fallbacks exhausted",
                 }
         else:
             # No fallbacks - direct call
-            result = await self.archon_adapter.call_organ(borg_id, organ_name, tool, params)
+            result = await self.archon_adapter.call_organ(
+                borg_id, organ_name, tool, params
+            )
             return {
-                'result': result,
-                'fallback_used': False,
-                'fallback_level': 'PRIMARY',
-                'fallback_description': f"Direct call to {organ_name}"
+                "result": result,
+                "fallback_used": False,
+                "fallback_level": "PRIMARY",
+                "fallback_description": f"Direct call to {organ_name}",
             }
 
     async def call_organ(
@@ -71,7 +84,7 @@ class MCPClient:
         organ_name: str,
         tool: str,
         params: Dict[str, Any],
-        wealth: Optional[float] = None
+        wealth: Optional[float] = None,
     ) -> Any:
         """
         Call Docker MCP organ with rate limiting and billing
@@ -124,7 +137,9 @@ class MCPClient:
             await self.rate_limiter._record_request(borg_id, organ_name)
             raise
 
-    async def _execute_call(self, organ_name: str, tool: str, params: Dict[str, Any]) -> Any:
+    async def _execute_call(
+        self, organ_name: str, tool: str, params: Dict[str, Any]
+    ) -> Any:
         """
         Execute the actual organ call (placeholder implementation).
 
@@ -133,9 +148,9 @@ class MCPClient:
         # Placeholder implementation - returns mock result
         # In real implementation, would call Docker MCP organ via HTTP
         return {
-            'organ': organ_name,
-            'tool': tool,
-            'params': params,
-            'result': f'Mock result from {organ_name}:{tool}',
-            'timestamp': datetime.utcnow().isoformat()
+            "organ": organ_name,
+            "tool": tool,
+            "params": params,
+            "result": f"Mock result from {organ_name}:{tool}",
+            "timestamp": datetime.utcnow().isoformat(),
         }

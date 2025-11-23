@@ -1,13 +1,15 @@
 from enum import Enum
 from typing import Optional
 
+
 class BorgState(Enum):
-    CREATED = "created"           # DNA encoded, not yet activated
-    ACTIVATING = "activating"     # Building phenotype
-    ACTIVE = "active"             # Running and accepting tasks
-    PAUSED = "paused"             # Temporarily stopped
-    TERMINATED = "terminated"     # Permanently stopped
-    RESURRECTING = "resurrecting" # Rebuilding from on-chain DNA
+    CREATED = "created"  # DNA encoded, not yet activated
+    ACTIVATING = "activating"  # Building phenotype
+    ACTIVE = "active"  # Running and accepting tasks
+    PAUSED = "paused"  # Temporarily stopped
+    TERMINATED = "terminated"  # Permanently stopped
+    RESURRECTING = "resurrecting"  # Rebuilding from on-chain DNA
+
 
 class BorgLifecycleManager:
     """Manage borg lifecycle states"""

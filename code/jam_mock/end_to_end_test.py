@@ -8,8 +8,9 @@ Westend testnet connection to DNA storage operations.
 
 import asyncio
 
+from jam_mock.advanced_keypair_features import (AdvancedKeypairManager,
+                                                TransactionSigner)
 from jam_mock.keypair_manager import KeypairManager
-from jam_mock.advanced_keypair_features import AdvancedKeypairManager, TransactionSigner
 from jam_mock.westend_adapter import WestendAdapter
 
 
@@ -21,12 +22,12 @@ async def test_end_to_end_kusama_workflow():
     print("=" * 45)
 
     results = {
-        'keypair_creation': False,
-        'address_validation': False,
-        'westend_connection': False,
-        'transaction_validation': False,
-        'wealth_tracking': False,
-        'dna_storage_simulation': False
+        "keypair_creation": False,
+        "address_validation": False,
+        "westend_connection": False,
+        "transaction_validation": False,
+        "wealth_tracking": False,
+        "dna_storage_simulation": False,
     }
 
     try:
@@ -37,15 +38,15 @@ async def test_end_to_end_kusama_workflow():
         manager = AdvancedKeypairManager()
 
         # Create test keypair
-        keypair_info = manager.create_keypair('e2e_test', save_to_disk=False)
+        keypair_info = manager.create_keypair("e2e_test", save_to_disk=False)
         print(f"   ✅ Created keypair: {keypair_info['ss58_address'][:20]}...")
 
         # Validate address format
-        is_valid, message = manager.validate_address(keypair_info['ss58_address'])
+        is_valid, message = manager.validate_address(keypair_info["ss58_address"])
         if is_valid:
             print("   ✅ Address validation passed")
-            results['keypair_creation'] = True
-            results['address_validation'] = True
+            results["keypair_creation"] = True
+            results["address_validation"] = True
         else:
             print(f"   ❌ Address validation failed: {message}")
             return results
@@ -54,15 +55,17 @@ async def test_end_to_end_kusama_workflow():
         print("\n2. 🌐 Westend Testnet Connection")
         print("-" * 32)
 
-        adapter = WestendAdapter("wss://westend.api.onfinality.io/public-ws", connect_immediately=True)
+        adapter = WestendAdapter(
+            "wss://westend.api.onfinality.io/public-ws", connect_immediately=True
+        )
 
         # Test connection
         health = await adapter.health_check()
-        if health['status'] == 'healthy':
+        if health["status"] == "healthy":
             print("   ✅ Connected to Westend testnet")
             print(f"   📊 Chain: {health.get('chain_name', 'Unknown')}")
             print(f"   🔢 Block: {health.get('block_number', 'Unknown')}")
-            results['westend_connection'] = True
+            results["westend_connection"] = True
         else:
             print(f"   ❌ Connection failed: {health.get('error', 'Unknown error')}")
             # Continue with other tests even if connection fails
@@ -73,53 +76,56 @@ async def test_end_to_end_kusama_workflow():
 
         # Create test transaction data
         test_tx = {
-            'borg_id': 'e2e-test-borg-001',
-            'dna_hash': 'a' * 64,  # 64-character hex hash
-            'metadata': {
-                'test_run': True,
-                'timestamp': '2025-11-04T08:58:00Z'
-            }
+            "borg_id": "e2e-test-borg-001",
+            "dna_hash": "a" * 64,  # 64-character hex hash
+            "metadata": {"test_run": True, "timestamp": "2025-11-04T08:58:00Z"},
         }
 
         # Validate transaction
-        validation = manager.validate_transaction('e2e_test', test_tx)
-        if validation['valid']:
+        validation = manager.validate_transaction("e2e_test", test_tx)
+        if validation["valid"]:
             print("   ✅ Transaction validation passed")
-            results['transaction_validation'] = True
+            results["transaction_validation"] = True
 
             # Show warnings if any
-            if validation['warnings']:
+            if validation["warnings"]:
                 print(f"   ⚠️  Warnings: {len(validation['warnings'])}")
-                for warning in validation['warnings'][:2]:  # Show first 2
+                for warning in validation["warnings"][:2]:  # Show first 2
                     print(f"      - {warning}")
         else:
             print("   ❌ Transaction validation failed")
-            for error in validation['errors'][:2]:  # Show first 2
+            for error in validation["errors"][:2]:  # Show first 2
                 print(f"      - {error}")
 
         # Step 4: Fee Estimation
         print("\n4. 💰 Fee Estimation")
         print("-" * 18)
 
-        fee_info = manager.estimate_transaction_fee('e2e_test', test_tx)
-        if 'estimated_fee' in fee_info:
+        fee_info = manager.estimate_transaction_fee("e2e_test", test_tx)
+        if "estimated_fee" in fee_info:
             print(f"   💵 Estimated fee: {fee_info['estimated_fee']} KSM")
             print(f"   🎯 Priority: {fee_info.get('priority', 'normal')}")
-            print(f"   📊 Fee breakdown: Base={fee_info.get('base_fee', 0)}, Size={fee_info.get('size_fee', 0)}")
+            print(
+                f"   📊 Fee breakdown: Base={fee_info.get('base_fee', 0)}, Size={fee_info.get('size_fee', 0)}"
+            )
         else:
-            print(f"   ❌ Fee estimation failed: {fee_info.get('error', 'Unknown error')}")
+            print(
+                f"   ❌ Fee estimation failed: {fee_info.get('error', 'Unknown error')}"
+            )
 
         # Step 5: Wealth Tracking
         print("\n5. 💎 Wealth Tracking")
         print("-" * 19)
 
         # Test wealth operations
-        success = await adapter.update_wealth('e2e-test-borg-001', 1.0, 'revenue', 'Test revenue')
+        success = await adapter.update_wealth(
+            "e2e-test-borg-001", 1.0, "revenue", "Test revenue"
+        )
         if success:
             print("   ✅ Wealth update successful")
-            balance = await adapter.get_wealth_balance('e2e-test-borg-001')
+            balance = await adapter.get_wealth_balance("e2e-test-borg-001")
             print(f"   💰 Current balance: {balance} DOT")
-            results['wealth_tracking'] = True
+            results["wealth_tracking"] = True
         else:
             print("   ❌ Wealth update failed")
 
@@ -133,12 +139,12 @@ async def test_end_to_end_kusama_workflow():
         print(f"   🔗 DNA Hash: {test_tx['dna_hash'][:32]}...")
 
         # Test transaction preparation (but don't submit)
-        adapter.set_keypair(manager.load_keypair('e2e_test'))
+        adapter.set_keypair(manager.load_keypair("e2e_test"))
         print("   ✅ Keypair loaded into adapter")
         print("   📝 Transaction prepared (not submitted to avoid testnet costs)")
         print("   💡 To actually submit: await adapter.store_dna_hash(...)")
 
-        results['dna_storage_simulation'] = True
+        results["dna_storage_simulation"] = True
 
         # Step 7: Cleanup
         print("\n7. 🧹 Cleanup")
@@ -177,6 +183,7 @@ async def test_end_to_end_kusama_workflow():
     except Exception as e:
         print(f"\n💥 Test failed with exception: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -187,7 +194,9 @@ async def main():
 
     if success:
         print("\n🚀 Ready for GitHub push!")
-        print("Run: git add . && git commit -m 'feat: Complete Westend testnet integration'")
+        print(
+            "Run: git add . && git commit -m 'feat: Complete Westend testnet integration'"
+        )
         print("     git push")
         sys.exit(0)
     else:

@@ -7,8 +7,8 @@ settings, and managing environment variables for different test scenarios.
 """
 
 import os
-from typing import Dict, Any, Optional
 from pathlib import Path
+from typing import Any, Dict, Optional
 
 
 class TestEnvironment:
@@ -35,25 +35,30 @@ class TestEnvironment:
         self.is_local = not self.is_ci and not self.is_docker
 
         # Determine test scope
-        self.test_scope = os.getenv('TEST_SCOPE', 'unit')  # unit, integration, e2e
+        self.test_scope = os.getenv("TEST_SCOPE", "unit")  # unit, integration, e2e
 
         # Determine mock level
-        self.mock_level = os.getenv('MOCK_LEVEL', 'full')  # none, partial, full
+        self.mock_level = os.getenv("MOCK_LEVEL", "full")  # none, partial, full
 
     def _is_ci_environment(self) -> bool:
         """Detect if running in CI environment."""
         ci_indicators = [
-            'CI', 'CONTINUOUS_INTEGRATION', 'BUILD_NUMBER',
-            'GITHUB_ACTIONS', 'GITLAB_CI', 'JENKINS_HOME'
+            "CI",
+            "CONTINUOUS_INTEGRATION",
+            "BUILD_NUMBER",
+            "GITHUB_ACTIONS",
+            "GITLAB_CI",
+            "JENKINS_HOME",
         ]
         return any(os.getenv(indicator) for indicator in ci_indicators)
 
     def _is_docker_environment(self) -> bool:
         """Detect if running in Docker environment."""
         docker_indicators = [
-            Path('/.dockerenv').exists(),
-            os.getenv('DOCKER_CONTAINER') is not None,
-            os.path.exists('/proc/1/cgroup') and 'docker' in open('/proc/1/cgroup').read()
+            Path("/.dockerenv").exists(),
+            os.getenv("DOCKER_CONTAINER") is not None,
+            os.path.exists("/proc/1/cgroup")
+            and "docker" in open("/proc/1/cgroup").read(),
         ]
         return any(docker_indicators)
 
@@ -61,74 +66,65 @@ class TestEnvironment:
         """Get service URLs based on environment."""
         if self.is_ci:
             return {
-                'archon_server': 'http://archon-server:8181',
-                'archon_mcp': 'http://archon-mcp:8051',
-                'archon_agents': 'http://archon-agents:8052'
+                "archon_server": "http://archon-server:8181",
+                "archon_mcp": "http://archon-mcp:8051",
+                "archon_agents": "http://archon-agents:8052",
             }
         elif self.is_docker:
             return {
-                'archon_server': 'http://host.docker.internal:8181',
-                'archon_mcp': 'http://host.docker.internal:8051',
-                'archon_agents': 'http://host.docker.internal:8052'
+                "archon_server": "http://host.docker.internal:8181",
+                "archon_mcp": "http://host.docker.internal:8051",
+                "archon_agents": "http://host.docker.internal:8052",
             }
         else:
             # Local development
             return {
-                'archon_server': 'http://localhost:8181',
-                'archon_mcp': 'http://localhost:8051',
-                'archon_agents': 'http://localhost:8052'
+                "archon_server": "http://localhost:8181",
+                "archon_mcp": "http://localhost:8051",
+                "archon_agents": "http://localhost:8052",
             }
 
     def should_use_mocks(self, service_name: str) -> bool:
         """Determine if mocks should be used for a service."""
-        if self.mock_level == 'none':
+        if self.mock_level == "none":
             return False
-        elif self.mock_level == 'full':
+        elif self.mock_level == "full":
             return True
         else:  # partial
             # Use mocks for external services in local development
-            external_services = ['archon_mcp', 'archon_agents']
+            external_services = ["archon_mcp", "archon_agents"]
             return service_name in external_services or self.is_local
 
-    def get_test_timeout(self, test_type: str = 'unit') -> int:
+    def get_test_timeout(self, test_type: str = "unit") -> int:
         """Get appropriate timeout for test type."""
-        timeouts = {
-            'unit': 30,
-            'integration': 120,
-            'e2e': 300
-        }
+        timeouts = {"unit": 30, "integration": 120, "e2e": 300}
         return timeouts.get(test_type, 60)
 
     def get_database_config(self) -> Dict[str, Any]:
         """Get database configuration for tests."""
         if self.is_ci:
             return {
-                'host': os.getenv('DB_HOST', 'postgres'),
-                'port': int(os.getenv('DB_PORT', '5432')),
-                'database': os.getenv('DB_NAME', 'archon_test'),
-                'user': os.getenv('DB_USER', 'archon'),
-                'password': os.getenv('DB_PASSWORD', 'archon')
+                "host": os.getenv("DB_HOST", "postgres"),
+                "port": int(os.getenv("DB_PORT", "5432")),
+                "database": os.getenv("DB_NAME", "archon_test"),
+                "user": os.getenv("DB_USER", "archon"),
+                "password": os.getenv("DB_PASSWORD", "archon"),
             }
         else:
             # Use SQLite for local testing
-            return {
-                'type': 'sqlite',
-                'database': ':memory:'
-            }
+            return {"type": "sqlite", "database": ":memory:"}
 
     def get_cache_config(self) -> Dict[str, Any]:
         """Get cache configuration for tests."""
         if self.is_ci:
             return {
-                'type': 'redis',
-                'host': os.getenv('REDIS_HOST', 'redis'),
-                'port': int(os.getenv('REDIS_PORT', '6379'))
+                "type": "redis",
+                "host": os.getenv("REDIS_HOST", "redis"),
+                "port": int(os.getenv("REDIS_PORT", "6379")),
             }
         else:
             # Use in-memory cache for local testing
-            return {
-                'type': 'memory'
-            }
+            return {"type": "memory"}
 
     def setup_environment_variables(self):
         """Setup environment variables for testing."""
@@ -139,48 +135,48 @@ class TestEnvironment:
             os.environ[env_key] = url
 
         # Test-specific variables
-        os.environ['TEST_ENVIRONMENT'] = 'true'
-        os.environ['MOCK_EXTERNAL_SERVICES'] = str(self.should_use_mocks('all'))
-        os.environ['TEST_TIMEOUT_MULTIPLIER'] = '1.0'
+        os.environ["TEST_ENVIRONMENT"] = "true"
+        os.environ["MOCK_EXTERNAL_SERVICES"] = str(self.should_use_mocks("all"))
+        os.environ["TEST_TIMEOUT_MULTIPLIER"] = "1.0"
 
         # Database config
         if not self.is_ci:
-            os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
+            os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
     def get_fixture_config(self) -> Dict[str, Any]:
         """Get configuration for test fixtures."""
         return {
-            'use_real_services': not self.should_use_mocks('all'),
-            'cleanup_after_test': True,
-            'isolate_tests': True,
-            'parallel_execution': self.is_ci,  # Enable parallel in CI
-            'capture_logs': True,
-            'record_metrics': self.is_ci
+            "use_real_services": not self.should_use_mocks("all"),
+            "cleanup_after_test": True,
+            "isolate_tests": True,
+            "parallel_execution": self.is_ci,  # Enable parallel in CI
+            "capture_logs": True,
+            "record_metrics": self.is_ci,
         }
 
     def get_mock_config(self) -> Dict[str, Any]:
         """Get configuration for mock services."""
         return {
-            'archon_mock': {
-                'enabled': self.should_use_mocks('archon_server'),
-                'record_calls': True,
-                'fail_on_unexpected_calls': False
+            "archon_mock": {
+                "enabled": self.should_use_mocks("archon_server"),
+                "record_calls": True,
+                "fail_on_unexpected_calls": False,
             },
-            'jam_mock': {
-                'enabled': self.should_use_mocks('jam'),
-                'initial_balance': 100.0,
-                'track_transactions': True
+            "jam_mock": {
+                "enabled": self.should_use_mocks("jam"),
+                "initial_balance": 100.0,
+                "track_transactions": True,
             },
-            'docker_mock': {
-                'enabled': self.should_use_mocks('docker'),
-                'simulate_failures': False,
-                'record_operations': True
-            }
+            "docker_mock": {
+                "enabled": self.should_use_mocks("docker"),
+                "simulate_failures": False,
+                "record_operations": True,
+            },
         }
 
     def is_service_available(self, service_name: str) -> bool:
         """Check if a service is available in current environment."""
-        if self.is_local and service_name in ['archon_mcp', 'archon_agents']:
+        if self.is_local and service_name in ["archon_mcp", "archon_agents"]:
             # These services might not be running locally
             return False
         return True
@@ -188,16 +184,16 @@ class TestEnvironment:
     def get_environment_info(self) -> Dict[str, Any]:
         """Get comprehensive environment information."""
         return {
-            'is_ci': self.is_ci,
-            'is_docker': self.is_docker,
-            'is_local': self.is_local,
-            'test_scope': self.test_scope,
-            'mock_level': self.mock_level,
-            'service_urls': self.get_service_urls(),
-            'database_config': self.get_database_config(),
-            'cache_config': self.get_cache_config(),
-            'fixture_config': self.get_fixture_config(),
-            'mock_config': self.get_mock_config()
+            "is_ci": self.is_ci,
+            "is_docker": self.is_docker,
+            "is_local": self.is_local,
+            "test_scope": self.test_scope,
+            "mock_level": self.mock_level,
+            "service_urls": self.get_service_urls(),
+            "database_config": self.get_database_config(),
+            "cache_config": self.get_cache_config(),
+            "fixture_config": self.get_fixture_config(),
+            "mock_config": self.get_mock_config(),
         }
 
 

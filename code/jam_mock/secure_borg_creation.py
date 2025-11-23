@@ -10,28 +10,31 @@ This module provides the standard workflow for creating borgs with:
 - Automatic security integration
 """
 
-import os
 import json
+import os
 import re
-from typing import Dict, Any, Optional
-from substrateinterface import Keypair
-from jam_mock.secure_key_storage import SecureKeypairManager
-from jam_mock.borg_address_manager import BorgAddressManager
+from typing import Any, Dict, Optional
+
 import keyring
+from jam_mock.borg_address_manager import BorgAddressManager
+from jam_mock.secure_key_storage import SecureKeypairManager
+from substrateinterface import Keypair
 
 # Load Supabase credentials
 try:
-    from dotenv import load_dotenv
     import os
-    env_path = os.path.join(os.path.dirname(__file__), '..', '.env.borglife')
+
+    from dotenv import load_dotenv
+
+    env_path = os.path.join(os.path.dirname(__file__), "..", ".env.borglife")
     print(f"Loading env from: {env_path}")
     result = load_dotenv(dotenv_path=env_path)
     print(f"load_dotenv result: {result}")
 
     from supabase import create_client
 
-    supabase_url = os.getenv('SUPABASE_URL')
-    supabase_key = os.getenv('SUPABASE_SECRET_KEY')
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_SECRET_KEY")
     print(f"SUPABASE_URL: {supabase_url}")
     print(f"SUPABASE_SECRET_KEY exists: {bool(supabase_key)}")
 
@@ -75,9 +78,9 @@ class SecureBorgCreator:
         try:
             # Store each component (same as dispenser)
             for key_type, value in [
-                ('private_key', keypair.private_key.hex()),
-                ('public_key', keypair.public_key.hex()),
-                ('address', keypair.ss58_address)
+                ("private_key", keypair.private_key.hex()),
+                ("public_key", keypair.public_key.hex()),
+                ("address", keypair.ss58_address),
             ]:
                 keyring.set_password(service_name, key_type, value)
                 stored_keys.append(key_type)
@@ -97,8 +100,10 @@ class SecureBorgCreator:
         """Safely reconstruct keypair with validation."""
         try:
             # Validate hex format and length (64 hex chars = 32 bytes)
-            if not re.match(r'^[0-9a-fA-F]{128}$', private_key_hex):
-                raise ValueError("Invalid private key format - must be 128 hex characters (64 bytes)")
+            if not re.match(r"^[0-9a-fA-F]{128}$", private_key_hex):
+                raise ValueError(
+                    "Invalid private key format - must be 128 hex characters (64 bytes)"
+                )
 
             private_key = bytes.fromhex(private_key_hex)
             keypair = Keypair(private_key=private_key, ss58_format=42)
@@ -115,8 +120,12 @@ class SecureBorgCreator:
     def _load_creator_keypair_from_keyring(self, keypair_name: str):
         """Load creator keypair from macOS Keychain with safe reconstruction."""
         try:
-            private_key_hex = keyring.get_password(self._service_name, f"{keypair_name}_private_key")
-            public_key_hex = keyring.get_password(self._service_name, f"{keypair_name}_public_key")
+            private_key_hex = keyring.get_password(
+                self._service_name, f"{keypair_name}_private_key"
+            )
+            public_key_hex = keyring.get_password(
+                self._service_name, f"{keypair_name}_public_key"
+            )
 
             if not private_key_hex or not public_key_hex:
                 return None
@@ -146,7 +155,9 @@ class SecureBorgCreator:
         """
         try:
             # Create keystore manager
-            self.key_manager = SecureKeypairManager(session_timeout_minutes=self.session_timeout_minutes)
+            self.key_manager = SecureKeypairManager(
+                session_timeout_minutes=self.session_timeout_minutes
+            )
 
             # Unlock keystore using macOS Keychain
             if not self.key_manager.unlock_keystore():
@@ -155,8 +166,7 @@ class SecureBorgCreator:
 
             # Create borg manager with shared keystore and Supabase client
             self.borg_manager = BorgAddressManager(
-                supabase_client=supabase_client,
-                keystore=self.key_manager.store
+                supabase_client=supabase_client, keystore=self.key_manager.store
             )
             self._is_initialized = True
 
@@ -169,8 +179,13 @@ class SecureBorgCreator:
             print(f"❌ Security initialization failed: {e}")
             return False
 
-    def create_borg(self, borg_id: str, dna_hash: str, creator_signature: Optional[str] = None,
-                   creator_public_key: Optional[str] = None) -> Dict[str, Any]:
+    def create_borg(
+        self,
+        borg_id: str,
+        dna_hash: str,
+        creator_signature: Optional[str] = None,
+        creator_public_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Create a borg with full security integration using dispenser-style keyring storage.
 
@@ -185,8 +200,8 @@ class SecureBorgCreator:
         """
         if not self._is_initialized:
             return {
-                'success': False,
-                'error': 'Security system not initialized - call initialize_security() first'
+                "success": False,
+                "error": "Security system not initialized - call initialize_security() first",
             }
 
         try:
@@ -200,24 +215,24 @@ class SecureBorgCreator:
 
             # Initialize anchoring variables (will be updated after anchoring)
             anchoring_tx_hash = None
-            anchoring_status = 'pending'
+            anchoring_status = "pending"
 
             # Store borg metadata in Supabase database (replacing file-based storage)
             if self.borg_manager and self.borg_manager.supabase:
                 try:
                     # Prepare database record with enhanced metadata
                     address_record = {
-                        'borg_id': borg_id,
-                        'substrate_address': keypair.ss58_address,
-                        'dna_hash': dna_hash,
-                        'keypair_encrypted': '',  # Placeholder - keypair stored in keyring only
-                        'creator_public_key': creator_public_key or '',
-                        'creator_signature': creator_signature or '',
-                        'anchoring_tx_hash': anchoring_tx_hash,
-                        'anchoring_status': anchoring_status,
-                        'keyring_service_name': borg_service_name,
-                        'setup_version': '4.0',  # Updated for Supabase-only metadata
-                        'storage_method': 'macos_keychain_supabase'
+                        "borg_id": borg_id,
+                        "substrate_address": keypair.ss58_address,
+                        "dna_hash": dna_hash,
+                        "keypair_encrypted": "",  # Placeholder - keypair stored in keyring only
+                        "creator_public_key": creator_public_key or "",
+                        "creator_signature": creator_signature or "",
+                        "anchoring_tx_hash": anchoring_tx_hash,
+                        "anchoring_status": anchoring_status,
+                        "keyring_service_name": borg_service_name,
+                        "setup_version": "4.0",  # Updated for Supabase-only metadata
+                        "storage_method": "macos_keychain_supabase",
                     }
 
                     # Store in Supabase using direct SQL (bypassing schema cache issues)
@@ -240,67 +255,84 @@ class SecureBorgCreator:
 
                     # Store in Supabase using direct table operations with address as primary key
                     insert_data = {
-                        'substrate_address': keypair.ss58_address,  # Address is now primary key
-                        'borg_id': borg_id,                         # borg_id is now just a unique alias
-                        'dna_hash': dna_hash,
-                        'keypair_encrypted': '',  # Placeholder - keypair stored in keyring only
-                        'creator_public_key': creator_public_key or '',
-                        'creator_signature': creator_signature or '',
-                        'anchoring_tx_hash': anchoring_tx_hash,
-                        'anchoring_status': anchoring_status,
-                        'keyring_service_name': borg_service_name,
-                        'setup_version': '4.0',
-                        'storage_method': 'macos_keychain_supabase'
+                        "substrate_address": keypair.ss58_address,  # Address is now primary key
+                        "borg_id": borg_id,  # borg_id is now just a unique alias
+                        "dna_hash": dna_hash,
+                        "keypair_encrypted": "",  # Placeholder - keypair stored in keyring only
+                        "creator_public_key": creator_public_key or "",
+                        "creator_signature": creator_signature or "",
+                        "anchoring_tx_hash": anchoring_tx_hash,
+                        "anchoring_status": anchoring_status,
+                        "keyring_service_name": borg_service_name,
+                        "setup_version": "4.0",
+                        "storage_method": "macos_keychain_supabase",
                     }
-                    self.borg_manager.supabase.table('borg_addresses').insert(insert_data).execute()
+                    self.borg_manager.supabase.table("borg_addresses").insert(
+                        insert_data
+                    ).execute()
 
                     # Initialize balance records for both currencies using address as foreign key
-                    for currency in ['WND', 'USDB']:
+                    for currency in ["WND", "USDB"]:
                         balance_data = {
-                            'substrate_address': keypair.ss58_address,  # Use address as foreign key
-                            'currency': currency,
-                            'balance_wei': 0
+                            "substrate_address": keypair.ss58_address,  # Use address as foreign key
+                            "currency": currency,
+                            "balance_wei": 0,
                         }
-                        self.borg_manager.supabase.table('borg_balances').insert(balance_data).execute()
+                        self.borg_manager.supabase.table("borg_balances").insert(
+                            balance_data
+                        ).execute()
 
                     keystore_path = f"Supabase:{borg_id}"  # Indicate Supabase storage
 
                 except Exception as db_error:
-                    print(f"⚠️  Supabase storage failed: {db_error} - falling back to file-based")
+                    print(
+                        f"⚠️  Supabase storage failed: {db_error} - falling back to file-based"
+                    )
                     # Fallback to file-based storage if Supabase fails
                     keystore_data = {
-                        'borg_id': borg_id,
-                        'ss58_address': keypair.ss58_address,
-                        'dna_hash': dna_hash,
-                        'created_at': json.dumps({'timestamp': str(__import__('datetime').datetime.utcnow())}, default=str),
-                        'setup_version': '4.0',
-                        'storage_method': 'macos_keychain_fallback',
-                        'service_name': borg_service_name
+                        "borg_id": borg_id,
+                        "ss58_address": keypair.ss58_address,
+                        "dna_hash": dna_hash,
+                        "created_at": json.dumps(
+                            {
+                                "timestamp": str(
+                                    __import__("datetime").datetime.utcnow()
+                                )
+                            },
+                            default=str,
+                        ),
+                        "setup_version": "4.0",
+                        "storage_method": "macos_keychain_fallback",
+                        "service_name": borg_service_name,
                     }
 
                     keystore_path = f"code/jam_mock/.{borg_id}_keystore.enc"
-                    with open(keystore_path, 'w') as f:
+                    with open(keystore_path, "w") as f:
                         json.dump(keystore_data, f, indent=2)
                     os.chmod(keystore_path, 0o600)
             else:
                 # No Supabase connection - use file-based fallback
                 keystore_data = {
-                    'borg_id': borg_id,
-                    'ss58_address': keypair.ss58_address,
-                    'dna_hash': dna_hash,
-                    'created_at': json.dumps({'timestamp': str(__import__('datetime').datetime.utcnow())}, default=str),
-                    'setup_version': '4.0',
-                    'storage_method': 'macos_keychain_fallback',
-                    'service_name': borg_service_name
+                    "borg_id": borg_id,
+                    "ss58_address": keypair.ss58_address,
+                    "dna_hash": dna_hash,
+                    "created_at": json.dumps(
+                        {"timestamp": str(__import__("datetime").datetime.utcnow())},
+                        default=str,
+                    ),
+                    "setup_version": "4.0",
+                    "storage_method": "macos_keychain_fallback",
+                    "service_name": borg_service_name,
                 }
 
                 keystore_path = f"code/jam_mock/.{borg_id}_keystore.enc"
-                with open(keystore_path, 'w') as f:
+                with open(keystore_path, "w") as f:
                     json.dump(keystore_data, f, indent=2)
                 os.chmod(keystore_path, 0o600)
 
             # Log the creation (like dispenser)
             from jam_mock.demo_audit_logger import DemoAuditLogger
+
             audit_logger = DemoAuditLogger()
             audit_logger.log_event(
                 "borg_created",
@@ -310,8 +342,8 @@ class SecureBorgCreator:
                     "address": keypair.ss58_address,
                     "dna_hash": dna_hash[:16],
                     "storage_method": "macos_keychain",
-                    "service_name": borg_service_name
-                }
+                    "service_name": borg_service_name,
+                },
             )
 
             # Store creator signature data (verification logic to be implemented later)
@@ -324,11 +356,17 @@ class SecureBorgCreator:
 
             # Anchor DNA hash on-chain (like dispenser)
             try:
-                anchoring_tx_hash = self.borg_manager.dna_anchor.anchor_dna_hash(dna_hash, borg_id)
-                anchoring_status = 'confirmed'
+                anchoring_tx_hash = self.borg_manager.dna_anchor.anchor_dna_hash(
+                    dna_hash, borg_id
+                )
+                anchoring_status = "confirmed"
 
                 # Update Supabase record with anchoring results if Supabase was used
-                if self.borg_manager and self.borg_manager.supabase and keystore_path.startswith("Supabase:"):
+                if (
+                    self.borg_manager
+                    and self.borg_manager.supabase
+                    and keystore_path.startswith("Supabase:")
+                ):
                     try:
                         update_sql = f"""
                         UPDATE borg_addresses
@@ -337,27 +375,29 @@ class SecureBorgCreator:
                             last_sync = NOW()
                         WHERE borg_id = '{borg_id}'
                         """
-                        self.borg_manager.supabase.rpc('exec_sql', {'sql': update_sql})
+                        self.borg_manager.supabase.rpc("exec_sql", {"sql": update_sql})
                         print("✅ Supabase record updated with anchoring results")
                     except Exception as update_error:
-                        print(f"⚠️  Failed to update Supabase with anchoring results: {update_error}")
+                        print(
+                            f"⚠️  Failed to update Supabase with anchoring results: {update_error}"
+                        )
 
             except Exception as anchor_error:
                 print(f"⚠️  DNA anchoring failed: {anchor_error}")
                 anchoring_tx_hash = None
-                anchoring_status = 'failed'
+                anchoring_status = "failed"
 
             result = {
-                'success': True,
-                'borg_id': borg_id,
-                'address': keypair.ss58_address,
-                'dna_hash': dna_hash,
-                'keypair_stored': True,
-                'storage_method': 'macos_keychain',
-                'service_name': borg_service_name,
-                'anchoring_tx_hash': anchoring_tx_hash,
-                'anchoring_status': anchoring_status,
-                'keystore_path': keystore_path
+                "success": True,
+                "borg_id": borg_id,
+                "address": keypair.ss58_address,
+                "dna_hash": dna_hash,
+                "keypair_stored": True,
+                "storage_method": "macos_keychain",
+                "service_name": borg_service_name,
+                "anchoring_tx_hash": anchoring_tx_hash,
+                "anchoring_status": anchoring_status,
+                "keystore_path": keystore_path,
             }
 
             print(f"✅ Borg created successfully: {borg_id}")
@@ -371,11 +411,7 @@ class SecureBorgCreator:
         except Exception as e:
             error_msg = f"Borg creation error: {str(e)}"
             print(f"❌ {error_msg}")
-            return {
-                'success': False,
-                'error': error_msg,
-                'borg_id': borg_id
-            }
+            return {"success": False, "error": error_msg, "borg_id": borg_id}
 
     def get_borg_keypair(self, borg_id: str):
         """
@@ -400,17 +436,26 @@ class SecureBorgCreator:
         if self.borg_manager and self.borg_manager.supabase:
             try:
                 # Query Supabase for borg metadata
-                result = self.borg_manager.supabase.table('borg_addresses').select('keyring_service_name, substrate_address').eq('borg_id', borg_id).execute()
+                result = (
+                    self.borg_manager.supabase.table("borg_addresses")
+                    .select("keyring_service_name, substrate_address")
+                    .eq("borg_id", borg_id)
+                    .execute()
+                )
 
                 if result.data:
                     record = result.data[0]
-                    service_name = record.get('keyring_service_name')
-                    expected_address = record.get('substrate_address')
+                    service_name = record.get("keyring_service_name")
+                    expected_address = record.get("substrate_address")
 
                     if service_name:
                         # Load keypair from macOS Keychain using service name
-                        private_key_hex = keyring.get_password(service_name, "private_key")
-                        public_key_hex = keyring.get_password(service_name, "public_key")
+                        private_key_hex = keyring.get_password(
+                            service_name, "private_key"
+                        )
+                        public_key_hex = keyring.get_password(
+                            service_name, "public_key"
+                        )
                         address = keyring.get_password(service_name, "address")
 
                         if private_key_hex and public_key_hex and address:
@@ -419,10 +464,14 @@ class SecureBorgCreator:
                                 # Use safe keypair reconstruction
                                 keypair = self._safe_load_keypair(private_key_hex)
                                 if keypair and keypair.ss58_address == address:
-                                    print(f"✅ Borg keypair loaded from Supabase + macOS Keychain: {borg_id}")
+                                    print(
+                                        f"✅ Borg keypair loaded from Supabase + macOS Keychain: {borg_id}"
+                                    )
                                     return keypair
                             else:
-                                print(f"⚠️  Address mismatch for borg {borg_id} - possible tampering")
+                                print(
+                                    f"⚠️  Address mismatch for borg {borg_id} - possible tampering"
+                                )
 
             except Exception as e:
                 print(f"⚠️  Supabase + keyring access failed: {e}")
@@ -431,10 +480,10 @@ class SecureBorgCreator:
         try:
             keystore_path = f"code/jam_mock/.{borg_id}_keystore.enc"
             if os.path.exists(keystore_path):
-                with open(keystore_path, 'r') as f:
+                with open(keystore_path, "r") as f:
                     keystore_data = json.load(f)
 
-                service_name = keystore_data.get('service_name')
+                service_name = keystore_data.get("service_name")
                 if service_name:
                     # Load keypair using dispenser-style method
                     private_key_hex = keyring.get_password(service_name, "private_key")
@@ -445,7 +494,9 @@ class SecureBorgCreator:
                         # Use safe keypair reconstruction (same as dispenser)
                         keypair = self._safe_load_keypair(private_key_hex)
                         if keypair and keypair.ss58_address == address:
-                            print(f"✅ Borg keypair loaded from file fallback + macOS Keychain: {borg_id}")
+                            print(
+                                f"✅ Borg keypair loaded from file fallback + macOS Keychain: {borg_id}"
+                            )
                             return keypair
 
         except Exception as e:
@@ -463,27 +514,31 @@ class SecureBorgCreator:
             Security status information
         """
         if not self._is_initialized:
-            return {'status': 'not_initialized'}
+            return {"status": "not_initialized"}
 
         return {
-            'status': 'active',
-            'session_timeout_minutes': self.session_timeout_minutes,
-            'keystore_unlocked': self.key_manager._is_unlocked if self.key_manager else False,
-            'borg_manager_ready': self.borg_manager is not None,
-            'security_features': [
-                'encrypted_keypair_storage',
-                'database_encryption',
-                'dna_blockchain_anchoring',
-                'comprehensive_audit_logging',
-                'hardware_keychain_security',
-                'session_timeout_protection',
-                'backup_recovery_systems'
-            ]
+            "status": "active",
+            "session_timeout_minutes": self.session_timeout_minutes,
+            "keystore_unlocked": (
+                self.key_manager._is_unlocked if self.key_manager else False
+            ),
+            "borg_manager_ready": self.borg_manager is not None,
+            "security_features": [
+                "encrypted_keypair_storage",
+                "database_encryption",
+                "dna_blockchain_anchoring",
+                "comprehensive_audit_logging",
+                "hardware_keychain_security",
+                "session_timeout_protection",
+                "backup_recovery_systems",
+            ],
         }
 
 
 # Convenience function for standard borg creation workflow
-def create_secure_borg(borg_id: str, dna_hash: str, session_timeout_minutes: int = 360) -> Dict[str, Any]:
+def create_secure_borg(
+    borg_id: str, dna_hash: str, session_timeout_minutes: int = 360
+) -> Dict[str, Any]:
     """
     Convenience function for creating borgs with automatic security using macOS Keychain.
 
@@ -499,7 +554,7 @@ def create_secure_borg(borg_id: str, dna_hash: str, session_timeout_minutes: int
 
     # Initialize security using macOS Keychain
     if not creator.initialize_security():
-        return {'success': False, 'error': 'Security initialization failed'}
+        return {"success": False, "error": "Security initialization failed"}
 
     # Create borg
     return creator.create_borg(borg_id, dna_hash)

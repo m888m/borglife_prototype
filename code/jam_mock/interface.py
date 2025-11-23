@@ -6,20 +6,22 @@ for DNA storage and retrieval. Supports both mock and real implementations.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Union
 from decimal import Decimal
 from enum import Enum
+from typing import Any, Dict, Optional, Union
 
 
 class JAMMode(Enum):
     """JAM operation modes."""
-    MOCK = "mock"           # In-memory simulation
-    TESTNET = "testnet"     # Real Kusama testnet
-    MAINNET = "mainnet"     # Polkadot mainnet (future)
+
+    MOCK = "mock"  # In-memory simulation
+    TESTNET = "testnet"  # Real Kusama testnet
+    MAINNET = "mainnet"  # Polkadot mainnet (future)
 
 
 class JAMInterface(ABC):
     """Abstract interface for JAM operations."""
+
     pass
 
 
@@ -34,7 +36,9 @@ class JAMMockInterface(JAMInterface):
     """
 
     @abstractmethod
-    async def store_dna_hash(self, borg_id: str, dna_hash: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def store_dna_hash(
+        self, borg_id: str, dna_hash: str, metadata: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Store DNA hash on-chain (accumulate phase).
 
@@ -93,7 +97,9 @@ class JAMMockInterface(JAMInterface):
         pass
 
     @abstractmethod
-    async def update_wealth(self, borg_id: str, amount: Decimal, operation: str, description: str) -> bool:
+    async def update_wealth(
+        self, borg_id: str, amount: Decimal, operation: str, description: str
+    ) -> bool:
         """
         Update wealth balance (accumulate phase).
 
@@ -156,7 +162,9 @@ class JAMMockInterface(JAMInterface):
         pass
 
     @abstractmethod
-    async def configure_testnet(self, rpc_url: str, keypair_data: Optional[Dict[str, Any]] = None) -> bool:
+    async def configure_testnet(
+        self, rpc_url: str, keypair_data: Optional[Dict[str, Any]] = None
+    ) -> bool:
         """
         Configure testnet mode parameters.
 
@@ -170,7 +178,9 @@ class JAMMockInterface(JAMInterface):
         pass
 
     @abstractmethod
-    async def retrieve_dna_hash_from_blockchain(self, borg_id: str, block_range: Optional[tuple] = None) -> Optional[Dict[str, Any]]:
+    async def retrieve_dna_hash_from_blockchain(
+        self, borg_id: str, block_range: Optional[tuple] = None
+    ) -> Optional[Dict[str, Any]]:
         """
         Retrieve DNA hash from blockchain with full transaction details.
 
@@ -194,7 +204,9 @@ class JAMMockInterface(JAMInterface):
         pass
 
     @abstractmethod
-    async def verify_dna_integrity_with_proof(self, borg_id: str, expected_hash: str) -> Dict[str, Any]:
+    async def verify_dna_integrity_with_proof(
+        self, borg_id: str, expected_hash: str
+    ) -> Dict[str, Any]:
         """
         Verify DNA integrity with cryptographic proof.
 

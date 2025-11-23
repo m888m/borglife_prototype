@@ -4,6 +4,7 @@ Synthesis Module Exceptions
 Custom exceptions for the BorgLife synthesis pipeline.
 """
 
+
 class SynthesisError(Exception):
     """Base exception for synthesis module errors."""
 
@@ -72,10 +73,18 @@ class EncodingError(SynthesisError):
 class IntegrityError(SynthesisError):
     """Raised when data integrity checks fail."""
 
-    def __init__(self, borg_id: str, message: str, expected_hash: str = None, actual_hash: str = None):
+    def __init__(
+        self,
+        borg_id: str,
+        message: str,
+        expected_hash: str = None,
+        actual_hash: str = None,
+    ):
         self.expected_hash = expected_hash
         self.actual_hash = actual_hash
         error_msg = f"Integrity check failed: {message}"
         if expected_hash and actual_hash:
-            error_msg += f" (expected: {expected_hash[:16]}..., actual: {actual_hash[:16]}...)"
+            error_msg += (
+                f" (expected: {expected_hash[:16]}..., actual: {actual_hash[:16]}...)"
+            )
         super().__init__(error_msg, borg_id)
