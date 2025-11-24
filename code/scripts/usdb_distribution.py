@@ -16,7 +16,8 @@ from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import keyring
-from dotenv import create_client, load_dotenv
+from dotenv import load_dotenv
+from supabase import create_client
 from jam_mock.borg_address_manager import BorgAddressManager
 from jam_mock.demo_audit_logger import DemoAuditLogger
 from jam_mock.demo_cost_controller import DemoCostController

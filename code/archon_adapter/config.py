@@ -7,6 +7,7 @@ Handles environment variables, service discovery, and configuration validation.
 
 import logging
 import os
+from pathlib import Path
 from typing import Optional
 
 from pydantic import BaseModel, Field, validator
@@ -17,7 +18,10 @@ logger = logging.getLogger(__name__)
 class ArchonConfig(BaseModel):
     """Configuration for Archon service integration."""
 
-    # Service URLs
+    # Toggle
+    archon_enabled: bool = Field(default=False, description="Enable Archon services")
+
+    # Service URLs - defaults will be overridden by from_env detection
     archon_server_url: str = Field(default="http://archon-server:8181")
     archon_mcp_url: str = Field(default="http://archon-mcp:8051")
     archon_agents_url: str = Field(default="http://archon-agents:8052")
@@ -109,15 +113,23 @@ class ArchonConfig(BaseModel):
 
     @classmethod
     def from_env(cls) -> "ArchonConfig":
-        """Create configuration from environment variables."""
+        """Create configuration from environment variables with docker/host detection."""
+        # Detect if running in Docker
+        is_docker = (
+            Path('/.dockerenv').exists() or
+            os.environ.get('RUNNING_IN_DOCKER') or
+            os.environ.get('DOCKER_CONTAINER')
+        )
+        
+        server_url = "http://localhost:8181" if not is_docker else "http://archon-server:8181"
+        mcp_url = "http://localhost:8051" if not is_docker else "http://archon-mcp:8051"
+        agents_url = "http://localhost:8052" if not is_docker else "http://archon-agents:8052"
+        
         return cls(
-            archon_server_url=os.getenv(
-                "ARCHON_SERVER_URL", "http://archon-server:8181"
-            ),
-            archon_mcp_url=os.getenv("ARCHON_MCP_URL", "http://archon-mcp:8051"),
-            archon_agents_url=os.getenv(
-                "ARCHON_AGENTS_URL", "http://archon-agents:8052"
-            ),
+            archon_enabled=os.getenv("ARCHON_ENABLED", "false").lower() == "true",
+            archon_server_url=os.getenv("ARCHON_SERVER_URL", server_url),
+            archon_mcp_url=os.getenv("ARCHON_MCP_URL", mcp_url),
+            archon_agents_url=os.getenv("ARCHON_AGENTS_URL", agents_url),
             supabase_url=os.getenv("ARCHON_SUPABASE_URL", os.getenv("SUPABASE_URL", "")),
             supabase_service_key=os.getenv("ARCHON_SUPABASE_SERVICE_KEY", os.getenv("SUPABASE_SERVICE_KEY", "")),
             enable_docker_mcp_organs=os.getenv(

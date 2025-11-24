@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
@@ -173,3 +174,10 @@ class CacheManager:
     async def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics"""
         return self.cache_stats.copy()
+
+    async def close(self):
+        """Close Redis connection."""
+        try:
+            await self.redis.close()
+        except Exception as e:
+            logger.warning(f"Cache close error: {e}")

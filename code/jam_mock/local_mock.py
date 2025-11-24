@@ -98,6 +98,10 @@ class LocalJAMMock(JAMInterface):
         """
         return self.wealth_balances.get(borg_id, Decimal("0"))
 
+    async def get_balance(self, borg_id: str) -> Decimal:
+        """Alias for get_wealth_balance for compatibility."""
+        return await self.get_wealth_balance(borg_id)
+
     async def update_wealth(
         self, borg_id: str, amount: Decimal, operation: str, description: str
     ) -> bool:
@@ -108,7 +112,7 @@ class LocalJAMMock(JAMInterface):
             self.wealth_balances[borg_id] = Decimal("0")
 
         # Update balance
-        if operation in ["revenue", "transfer"]:
+        if operation in ["revenue", "transfer", "funding"]:
             self.wealth_balances[borg_id] += amount
         elif operation == "cost":
             self.wealth_balances[borg_id] -= amount

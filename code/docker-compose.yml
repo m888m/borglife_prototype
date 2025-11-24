@@ -8,9 +8,9 @@ services:
       - "8501:8501"
     environment:
       - BORGLIFE_UI_PORT=8501
-      - ARCHON_SERVER_URL=http://archon-server:8181
-      - ARCHON_MCP_URL=http://archon-mcp:8051
-      - ARCHON_AGENTS_URL=http://archon-agents:8052
+      - ARCHON_SERVER_URL=http://host.docker.internal:8181
+      - ARCHON_MCP_URL=http://host.docker.internal:8051
+      - ARCHON_AGENTS_URL=http://host.docker.internal:8052
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -31,8 +31,8 @@ services:
       - "8053:8053"
     environment:
       - BORGLIFE_MCP_PORT=8053
-      - ARCHON_SERVER_URL=http://archon-server:8181
-      - ARCHON_MCP_URL=http://archon-mcp:8051
+      - ARCHON_SERVER_URL=http://host.docker.internal:8181
+      - ARCHON_MCP_URL=http://host.docker.internal:8051
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
     depends_on:
@@ -47,51 +47,51 @@ services:
       - "8054:8054"
     environment:
       - BORGLIFE_AGENT_PORT=8054
-      - ARCHON_AGENTS_URL=http://archon-agents:8052
+      - ARCHON_AGENTS_URL=http://host.docker.internal:8052
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - archon-agents
     networks:
       - borglife-network
 
-  # Archon Services (external)
-  archon-server:
-    image: archon/server:latest
-    ports:
-      - "8181:8181"
-    environment:
-      - SUPABASE_URL=${ARCHON_SUPABASE_URL:-${SUPABASE_URL}}
-      - SUPABASE_SERVICE_KEY=${ARCHON_SUPABASE_SERVICE_KEY:-${SUPABASE_SERVICE_KEY}}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-    volumes:
-      - archon_data:/app/data
-    networks:
-      - borglife-network
-
-  archon-mcp:
-    image: archon/mcp:latest
-    ports:
-      - "8051:8051"
-    environment:
-      - SUPABASE_URL=${ARCHON_SUPABASE_URL:-${SUPABASE_URL}}
-      - SUPABASE_SERVICE_KEY=${ARCHON_SUPABASE_SERVICE_KEY:-${SUPABASE_SERVICE_KEY}}
-    depends_on:
-      - archon-server
-    networks:
-      - borglife-network
-
-  archon-agents:
-    image: archon/agents:latest
-    ports:
-      - "8052:8052"
-    environment:
-      - SUPABASE_URL=${ARCHON_SUPABASE_URL:-${SUPABASE_URL}}
-      - SUPABASE_SERVICE_KEY=${ARCHON_SUPABASE_SERVICE_KEY:-${SUPABASE_SERVICE_KEY}}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-    depends_on:
-      - archon-server
-    networks:
-      - borglife-network
+  # Archon Services (external - commented out)
+  # archon-server:
+  #   image: archon/server:latest
+  #   ports:
+  #     - "8181:8181"
+  #   environment:
+  #     - SUPABASE_URL=${ARCHON_SUPABASE_URL:-${SUPABASE_URL}}
+  #     - SUPABASE_SERVICE_KEY=${ARCHON_SUPABASE_SERVICE_KEY:-${SUPABASE_SERVICE_KEY}}
+  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
+  #   volumes:
+  #     - archon_data:/app/data
+  #   networks:
+  #     - borglife-network
+  #
+  # archon-mcp:
+  #   image: archon/mcp:latest
+  #   ports:
+  #     - "8051:8051"
+  #   environment:
+  #     - SUPABASE_URL=${ARCHON_SUPABASE_URL:-${SUPABASE_URL}}
+  #     - SUPABASE_SERVICE_KEY=${ARCHON_SUPABASE_SERVICE_KEY:-${SUPABASE_SERVICE_KEY}}
+  #   # depends_on:
+  #   #   - archon-server
+  #   networks:
+  #     - borglife-network
+  #
+  # archon-agents:
+  #   image: archon/agents:latest
+  #   ports:
+  #     - "8052:8052"
+  #   environment:
+  #     - SUPABASE_URL=${ARCHON_SUPABASE_URL:-${SUPABASE_URL}}
+  #     - SUPABASE_SERVICE_KEY=${ARCHON_SUPABASE_SERVICE_KEY:-${SUPABASE_SERVICE_KEY}}
+  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
+  #   # depends_on:
+  #   #   - archon-server
+  #   networks:
+  #     - borglife-network
 
   # Docker MCP Organs (subset for Phase 1)
   docker-mcp-gmail:

@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 from .borg_address_manager import BorgAddressManager
 from .demo_audit_logger import DemoAuditLogger
 from .economic_validator import EconomicValidator
-from .kusama_adapter import WestendAdapter
+from .westend_adapter import WestendAdapter
 from .transaction_manager import TransactionManager, TransactionType
 
 

@@ -98,86 +98,54 @@ python -m pytest tests/ -v --watch
 python -m pytest tests/ -v -s --pdb
 ```
 
+## 🔄 Post-Archon Decoupling Test Status (2025-11-23)
+
+**Status**: Partial success - Archon decoupled, main flow executes mocks (0/5 success due JAM gaps).
+
+**Latest Report** (ARCHON_ENABLED=false):
+```
+Total Tests: 5
+Successful: 0
+Failed: 5
+Success Rate: 0.0%
+PRP: Fail scenarios/integrity/economic, Pass time/error reporting
+```
+
+**Failures**:
+- demo_flow: JAMInterface no update_wealth (mock incomplete)
+- individual: same
+- usdb_asset: pallet "Assets" not found (substrate config)
+- usdb_dist: dotenv import 'create_client' error
+- inter_borg: jam_mock.kusama_adapter missing (use westend_adapter?)
+- economic_validation: EconomicValidator missing args
+- transaction_manager: TransactionManager missing args
+- teardown: CacheManager no close
+
+**Next Steps**:
+1. Impl JAM mock methods (update_wealth etc.)
+2. Fix substrate pallet (Assets Hub RPC?)
+3. Fix imports/args in phase2a tests
+4. Add CacheManager.close()
+5. Run with ARCHON_ENABLED=true for full validation
+
+**Verification**:
+```bash
+export ARCHON_ENABLED=false
+pytest tests/e2e_test_suite.py -v
+```
+
 ## 📋 Test Categories
 
-### 1. E2E Orchestrator (`e2e_test_suite.py`)
-**Purpose**: Complete demo flow validation
-- Executes all 5 core demo scenarios
-- Validates PRP success criteria
-- Generates comprehensive reports
-- **Runtime**: ~3-5 minutes
-
-**Key Features:**
-- `E2ETestSuite` class with async orchestration
-- `execute_demo_flow()` for individual scenarios
-- `run_all_scenarios()` for complete validation
-- `generate_test_report()` with PRP compliance checking
-
-### 2. Service Integration (`test_service_integration.py`)
-**Purpose**: Archon service connectivity and health
-- MCP server communication
-- API endpoint validation
-- Service discovery testing
-- **Runtime**: ~30 seconds
-
-### 3. DNA Integrity (`test_dna_integrity.py`)
-**Purpose**: DNA parsing, validation, and round-trip integrity
-- YAML parsing validation
-- DNA structure verification
-- Hash calculation accuracy
-- Round-trip encoding/decoding
-- **Runtime**: ~15 seconds
-
-### 4. Economic Model (`test_economic_model.py`)
-**Purpose**: Wealth tracking and cost calculation accuracy
-- DOT balance management
-- Cost calculation precision
-- Economic transaction validation
-- Tolerance checking (0.001 DOT)
-- **Runtime**: ~20 seconds
-
-### 5. Error Handling (`test_error_handling.py`)
-**Purpose**: Error scenarios and recovery mechanisms
-- Circuit breaker validation
-- Service unavailability handling
-- Timeout scenario testing
-- Recovery procedure verification
-- **Runtime**: ~25 seconds
-
-### 6. Fixture Validation (`test_fixtures_setup.py`)
-**Purpose**: Test data integrity and fixture loading
-- JSON/YAML validation
-- Fixture data consistency
-- Configuration loading
-- **Runtime**: ~10 seconds
-
-### 7. Async Initialization (`test_async_initialization.py`)
-**Purpose**: Async lifecycle and context management
-- Service initialization
-- Context manager validation
-- Cleanup procedures
-- **Runtime**: ~15 seconds
-
-### 8. Demo Scenarios (`test_demo_scenarios.py`)
-**Purpose**: End-to-end demo execution validation
-- Individual scenario testing
-- Demo flow completeness
-- Result validation
-- **Runtime**: ~45 seconds
-
-### 9. Concurrent Execution (`test_concurrent_execution.py`)
-**Purpose**: Multi-borg concurrent execution
-- Race condition detection
-- Resource contention testing
-- Concurrent performance validation
-- **Runtime**: ~60 seconds
-
-### 10. Performance (`test_performance.py`)
-**Purpose**: Performance benchmarks and optimization
-- Execution time measurement
-- Memory usage monitoring
-- Scalability testing
-- **Runtime**: ~90 seconds
+1. E2E Orchestrator (`e2e_test_suite.py`)
+2. Service Integration (`test_service_integration.py`)
+3. DNA Integrity (`test_dna_integrity.py`)
+4. Economic Model (`test_economic_model.py`)
+5. Error Handling (`test_error_handling.py`)
+6. Fixture Validation (`test_fixtures_setup.py`)
+7. Async Initialization (`test_async_initialization.py`)
+8. Demo Scenarios (`test_demo_scenarios.py`)
+9. Concurrent Execution (`test_concurrent_execution.py`)
+10. Performance (`test_performance.py`)
 
 ## 🔧 Configuration
 

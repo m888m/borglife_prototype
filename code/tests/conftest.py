@@ -14,6 +14,9 @@ import os
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Dict, Optional
+import sys
+sys.path.insert(0, os.path.dirname(__file__) + '/..')
+print("Added project root to sys.path")
 
 import pytest
 import pytest_asyncio

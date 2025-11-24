@@ -74,15 +74,18 @@ class HealthChecker:
         # Update history
         self._update_health_history(results, details)
 
-        return {
-            "overall": overall,
-            "server": results.get("server", False),
-            "mcp": results.get("mcp", False),
-            "agents": results.get("agents", False),
-            "docker_mcp": results.get("docker_mcp", False),
-            "details": details,
-            "timestamp": datetime.utcnow().isoformat(),
-        }
+        if self.config.archon_enabled:
+            return {
+                "overall": overall,
+                "server": results.get("server", False),
+                "mcp": results.get("mcp", False),
+                "agents": results.get("agents", False),
+                "docker_mcp": results.get("docker_mcp", False),
+                "details": details,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        else:
+            return {"overall": True, "details": {"status": "archon disabled"}}
 
     async def _check_service_health(self, service: str) -> tuple[bool, Dict[str, Any]]:
         """

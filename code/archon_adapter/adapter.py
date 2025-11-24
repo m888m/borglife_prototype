@@ -41,6 +41,7 @@ class ArchonServiceAdapter:
 
     def __init__(self, config: Optional[ArchonConfig] = None):
         self.config = config or ArchonConfig()
+        self.enabled = self.config.archon_enabled
         self.client = httpx.AsyncClient(
             timeout=httpx.Timeout(30.0, connect=10.0),
             limits=httpx.Limits(max_keepalive_connections=20, max_connections=100),
@@ -68,6 +69,8 @@ class ArchonServiceAdapter:
             "agents": {"failures": 0, "last_failure": None, "open": False},
         }
 
+        logger.info(f"Archon adapter initialized (enabled: {self.enabled})")
+
     async def initialize(self) -> bool:
         """
         Initialize adapter and verify service connectivity.
@@ -75,6 +78,10 @@ class ArchonServiceAdapter:
         Returns:
             True if all services are accessible
         """
+        if not self.enabled:
+            logger.info("Archon disabled - skipping initialization")
+            return True
+
         try:
             # Check service health
             health = await self.check_health()
@@ -106,6 +113,14 @@ class ArchonServiceAdapter:
                 'details': {...}
             }
         """
+        if not self.enabled:
+            return {
+                "overall": True,
+                "disabled": True,
+                "details": {"mode": "disabled"},
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+
         return await self.health_checker.check_all_services()
 
     @retry(
@@ -130,7 +145,6 @@ class ArchonServiceAdapter:
         Returns:
             RAG results with sources and relevance scores
         """
-        # Check circuit breaker
         if self._is_circuit_open("server"):
             raise ServiceUnavailableError("Archon server circuit breaker is open")
 
