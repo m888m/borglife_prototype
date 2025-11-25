@@ -14,15 +14,16 @@ import os
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Dict, Optional
-import sys
-sys.path.insert(0, os.path.dirname(__file__) + '/..')
+import sys; sys.path.insert(0, os.path.dirname(__file__) + '/..')
 print("Added project root to sys.path")
 
 import pytest
 import pytest_asyncio
 import yaml
 from dotenv import load_dotenv
+from jam_mock.keypair_manager import KeypairManager
 
+USE_MOCKS = False
 # Load environment variables
 load_dotenv()
 
@@ -40,8 +41,27 @@ else:
 # ============================================================================
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--mock",
+        action="store_true",
+        default=False,
+        help="Use mock implementations instead of live blockchain"
+    )
+    parser.addoption(
+        "--no-ssl-verify",
+        action="store_true",
+        default=False,
+        help="Disable SSL certificate verification for live connections"
+    )
+
+
 def pytest_configure(config):
     """Configure pytest with custom markers."""
+    global USE_MOCKS, NO_SSL_VERIFY
+    USE_MOCKS = config.getoption("--mock")
+    NO_SSL_VERIFY = config.getoption("--no-ssl-verify")
+    
     config.addinivalue_line(
         "markers", "asyncio: mark test as async (deselect with '-m \"not asyncio\"')"
     )
@@ -133,6 +153,35 @@ def expected_results(fixtures_dir: Path) -> Dict[str, Any]:
 # ============================================================================
 
 
+@pytest.fixture(scope="session")
+def dispenser_keypair():
+    """Load dispenser keypair from macOS Keychain service 'borglife-dispenser'."""
+    import keyring
+    from substrateinterface import Keypair
+    
+    service_name = "borglife-dispenser"
+    private_key_hex = keyring.get_password(service_name, "private_key")
+    if private_key_hex is None:
+        pytest.skip("Dispenser private key not found in keychain")
+    
+    keypair = Keypair.create_from_private_key(
+        bytes.fromhex(private_key_hex),
+        ss58_format=42
+    )
+    assert keypair.ss58_address == "5EepNwM98pD9HQsms1RRcJkU3icrKP9M9cjYv1Vc9XSaMkwD", "Wrong dispenser address"
+    return keypair
+
+
+@pytest.fixture
+def random_keypair():
+    """Generate random keypair for testing."""
+    from substrateinterface import Keypair
+    return Keypair.create_from_mnemonic(
+        Keypair.generate_mnemonic(),
+        ss58_format=42
+    )
+
+
 @pytest_asyncio.fixture
 async def archon_adapter(test_config: Dict[str, Any]):
     """Initialize Archon service adapter."""
@@ -213,24 +262,30 @@ async def phenotype_builder(archon_adapter):
 @pytest_asyncio.fixture
 async def jam_interface(test_config: Dict[str, Any]):
     """Initialize JAM mock interface."""
-    jam = None
-    try:
-        from jam_mock import JAMInterface
-
-        jam = JAMInterface(
-            rpc_url=os.getenv("KUSAMA_RPC_URL", "wss://kusama-rpc.polkadot.io"),
-            mock_mode=os.getenv("JAM_MOCK_MODE", "true").lower() == "true",
-        )
-        await jam.initialize()
-
-        return jam
-    except ImportError:
-        pytest.skip("JAM interface not available")
-    except Exception as e:
-        pytest.skip(f"Failed to initialize JAM interface: {e}")
-    finally:
-        # Cleanup will be handled by pytest-asyncio
-        pass
+    global USE_MOCKS
+    if USE_MOCKS:
+        from jam_mock.local_mock import LocalJAMMock
+        jam = LocalJAMMock()
+    else:
+        try:
+            from jam_mock import JAMInterface
+            
+            ssl_verify = not NO_SSL_VERIFY
+            
+            jam = JAMInterface(
+                rpc_url=os.getenv("WESTEND_RPC_URL", "wss://westend-rpc.polkadot.io:443"),
+                ssl_verify=ssl_verify,
+                mock_mode=os.getenv("JAM_MOCK_MODE", "false").lower() == "true",
+            )
+            await asyncio.wait_for(jam.initialize(), timeout=60)
+            assert len(jam.sub_pool) > 0, "Initial sub host pool is empty"
+            
+            # Phase 5: Assert live Westend connection
+            health = await asyncio.wait_for(jam.health_check(), timeout=60)
+            assert health.get("status") == "healthy", f"Cannot connect to live Westend network: {health}"
+        except (ImportError, Exception) as e:
+            pytest.skip(f"JAM interface not available: {e}")
+    return jam
 
 
 # ============================================================================

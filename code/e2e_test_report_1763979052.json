@@ -1,0 +1,240 @@
+{
+  "summary": {
+    "total_tests": 5,
+    "successful_tests": 0,
+    "failed_tests": 5,
+    "success_rate_percent": 0.0,
+    "total_execution_time_seconds": 0.51,
+    "avg_execution_time_seconds": 0.1,
+    "dna_integrity_rate_percent": 100.0,
+    "economic_accuracy_rate_percent": 100.0
+  },
+  "results": [
+    {
+      "borg_id": "e2e_test_basic_funding_task_1763979051335",
+      "scenario": "basic_funding_task",
+      "success": false,
+      "execution_time": 0.1941821575164795,
+      "dna_integrity": true,
+      "economic_accuracy": true,
+      "errors": [],
+      "cost_validation": false,
+      "actual_cost": 1.5663e-05,
+      "expected_cost_range": [
+        0.001,
+        0.005
+      ],
+      "final_balance": 0.099984337,
+      "expected_balance": 0.099984337,
+      "task_result": {
+        "task": "Fund a new borg with 10 DOT for basic operations",
+        "error": "Agent execution failed: [Errno -2] Name or service not known",
+        "cell_used": "basic_agent",
+        "organs_used": [],
+        "timestamp": 611136.144674309,
+        "execution_time": 0.1565721749793738,
+        "cost_info": {
+          "total_cost": "0.00001565721749793738",
+          "organ_costs": {},
+          "cell_costs": {},
+          "execution_cost": "0.00001565721749793738",
+          "execution_time": 0.1565721749793738,
+          "currency": "DOT",
+          "wealth_sufficient": true,
+          "cost_breakdown": {
+            "organs": "0",
+            "cells": "0",
+            "execution": "0.00001565721749793738"
+          }
+        },
+        "borg_id": "test-borg-minimal-001"
+      },
+      "dna_hash": "fc3d2c234df02ed8c70246e2d87a829fabe57ba54126d84367aa205d52792c9f",
+      "stored_hash": "fc3d2c234df02ed8c70246e2d87a829fabe57ba54126d84367aa205d52792c9f"
+    },
+    {
+      "borg_id": "e2e_test_complex_analysis_task_1763979051630",
+      "scenario": "complex_analysis_task",
+      "success": false,
+      "execution_time": 0.09230351448059082,
+      "dna_integrity": true,
+      "economic_accuracy": true,
+      "errors": [],
+      "cost_validation": false,
+      "actual_cost": 3.7190000000000003e-06,
+      "expected_cost_range": [
+        0.005,
+        0.015
+      ],
+      "final_balance": 0.099996281,
+      "expected_balance": 0.099996281,
+      "task_result": {
+        "task": "Analyze the current state of DeFi protocols and recommend investment strategies",
+        "error": "Agent execution failed: [Errno -2] Name or service not known",
+        "cell_used": "basic_agent",
+        "organs_used": [],
+        "timestamp": 611136.332433869,
+        "execution_time": 0.037094315979629755,
+        "cost_info": {
+          "total_cost": "0.0000037094315979629755",
+          "organ_costs": {},
+          "cell_costs": {},
+          "execution_cost": "0.0000037094315979629755",
+          "execution_time": 0.037094315979629755,
+          "currency": "DOT",
+          "wealth_sufficient": true,
+          "cost_breakdown": {
+            "organs": "0",
+            "cells": "0",
+            "execution": "0.0000037094315979629755"
+          }
+        },
+        "borg_id": "test-borg-minimal-001"
+      },
+      "dna_hash": "fc3d2c234df02ed8c70246e2d87a829fabe57ba54126d84367aa205d52792c9f",
+      "stored_hash": "fc3d2c234df02ed8c70246e2d87a829fabe57ba54126d84367aa205d52792c9f"
+    },
+    {
+      "borg_id": "e2e_test_research_task_1763979051822",
+      "scenario": "research_task",
+      "success": false,
+      "execution_time": 0.0707998275756836,
+      "dna_integrity": true,
+      "economic_accuracy": true,
+      "errors": [],
+      "cost_validation": false,
+      "actual_cost": 3.5626e-06,
+      "expected_cost_range": [
+        0.002,
+        0.008
+      ],
+      "final_balance": 0.0999964374,
+      "expected_balance": 0.0999964374,
+      "task_result": {
+        "task": "Research the latest developments in zero-knowledge proofs and their applications",
+        "error": "Agent execution failed: [Errno -2] Name or service not known",
+        "cell_used": "basic_agent",
+        "organs_used": [],
+        "timestamp": 611136.509183023,
+        "execution_time": 0.03555406304076314,
+        "cost_info": {
+          "total_cost": "0.000003555406304076314",
+          "organ_costs": {},
+          "cell_costs": {},
+          "execution_cost": "0.000003555406304076314",
+          "execution_time": 0.03555406304076314,
+          "currency": "DOT",
+          "wealth_sufficient": true,
+          "cost_breakdown": {
+            "organs": "0",
+            "cells": "0",
+            "execution": "0.000003555406304076314"
+          }
+        },
+        "borg_id": "test-borg-minimal-001"
+      },
+      "dna_hash": "fc3d2c234df02ed8c70246e2d87a829fabe57ba54126d84367aa205d52792c9f",
+      "stored_hash": "fc3d2c234df02ed8c70246e2d87a829fabe57ba54126d84367aa205d52792c9f"
+    },
+    {
+      "borg_id": "e2e_test_decision_task_1763979051993",
+      "scenario": "decision_task",
+      "success": false,
+      "execution_time": 0.07818150520324707,
+      "dna_integrity": true,
+      "economic_accuracy": true,
+      "errors": [],
+      "cost_validation": false,
+      "actual_cost": 3.7425e-06,
+      "expected_cost_range": [
+        0.003,
+        0.01
+      ],
+      "final_balance": 0.0999962575,
+      "expected_balance": 0.0999962575,
+      "task_result": {
+        "task": "Decide whether to stake DOT in parachain A or B based on current TVL and risk metrics",
+        "error": "Agent execution failed: [Errno -2] Name or service not known",
+        "cell_used": "basic_agent",
+        "organs_used": [],
+        "timestamp": 611136.687760878,
+        "execution_time": 0.037350904080085456,
+        "cost_info": {
+          "total_cost": "0.0000037350904080085456",
+          "organ_costs": {},
+          "cell_costs": {},
+          "execution_cost": "0.0000037350904080085456",
+          "execution_time": 0.037350904080085456,
+          "currency": "DOT",
+          "wealth_sufficient": true,
+          "cost_breakdown": {
+            "organs": "0",
+            "cells": "0",
+            "execution": "0.0000037350904080085456"
+          }
+        },
+        "borg_id": "test-borg-minimal-001"
+      },
+      "dna_hash": "fc3d2c234df02ed8c70246e2d87a829fabe57ba54126d84367aa205d52792c9f",
+      "stored_hash": "fc3d2c234df02ed8c70246e2d87a829fabe57ba54126d84367aa205d52792c9f"
+    },
+    {
+      "borg_id": "e2e_test_comprehensive_task_1763979052172",
+      "scenario": "comprehensive_task",
+      "success": false,
+      "execution_time": 0.07686972618103027,
+      "dna_integrity": true,
+      "economic_accuracy": true,
+      "errors": [],
+      "cost_validation": false,
+      "actual_cost": 4.0061000000000005e-06,
+      "expected_cost_range": [
+        0.008,
+        0.025
+      ],
+      "final_balance": 0.0999959939,
+      "expected_balance": 0.0999959939,
+      "task_result": {
+        "task": "Create a comprehensive report on Polkadot ecosystem growth, including TVL analysis, new projects, and future predictions",
+        "error": "Agent execution failed: [Errno -2] Name or service not known",
+        "cell_used": "basic_agent",
+        "organs_used": [],
+        "timestamp": 611136.864186568,
+        "execution_time": 0.039964777999557555,
+        "cost_info": {
+          "total_cost": "0.0000039964777999557555",
+          "organ_costs": {},
+          "cell_costs": {},
+          "execution_cost": "0.0000039964777999557555",
+          "execution_time": 0.039964777999557555,
+          "currency": "DOT",
+          "wealth_sufficient": true,
+          "cost_breakdown": {
+            "organs": "0",
+            "cells": "0",
+            "execution": "0.0000039964777999557555"
+          }
+        },
+        "borg_id": "test-borg-minimal-001"
+      },
+      "dna_hash": "fc3d2c234df02ed8c70246e2d87a829fabe57ba54126d84367aa205d52792c9f",
+      "stored_hash": "fc3d2c234df02ed8c70246e2d87a829fabe57ba54126d84367aa205d52792c9f"
+    }
+  ],
+  "validation_status": {
+    "all_5_scenarios_executed": true,
+    "dna_roundtrip_integrity_maintained": true,
+    "economic_accuracy_within_0_001_dot": true,
+    "execution_under_5_minutes": true,
+    "no_service_crashes": true,
+    "comprehensive_error_reporting": true
+  },
+  "prp_success_criteria": {
+    "all_5_core_demo_scenarios_execute_successfully": false,
+    "dna_round_trip_integrity_maintained": true,
+    "economic_calculations_accurate_within_0_001_dot": true,
+    "test_execution_completes_within_5_minutes": true,
+    "no_service_crashes_or_hangs": true,
+    "comprehensive_error_reporting_for_failures": true
+  }
+}

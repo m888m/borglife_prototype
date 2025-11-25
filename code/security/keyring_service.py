@@ -47,6 +47,16 @@ class KeyringService:
                 keyring.set_password(service_name, "metadata", json.dumps(metadata))
                 stored_keys.append("metadata")
 
+            # Post-store verification
+            verified_kp = self.load_keypair(service_name)
+            if not verified_kp:
+                raise KeyringServiceError(f"Verification failed: could not reload keypair for {service_name}")
+            if verified_kp.public_key.hex() != keypair.public_key.hex():
+                raise KeyringServiceError(f"Verification failed: public key mismatch for {service_name}")
+            if verified_kp.ss58_address != keypair.ss58_address:
+                raise KeyringServiceError(f"Verification failed: address mismatch for {service_name}")
+
+            print(f"✅ Keyring verification passed for {service_name}")
             return True
         except (
             Exception

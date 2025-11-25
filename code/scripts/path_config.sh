@@ -69,7 +69,7 @@ detect_borglife_root() {
     # BorgLife structure: borglife/borglife_proto_private/code/scripts/
     # So borglife root is 3 levels up from scripts/
     local borglife_root
-    borglife_root="$(cd "$script_dir/../../../.." && pwd)"
+    borglife_root="$(cd "$script_dir/../../.." && pwd)"
 
     if validate_directory "$borglife_root" "BorgLife root"; then
         echo "$borglife_root"
@@ -86,7 +86,7 @@ detect_archon_root() {
     # Archon is typically at the same level as borglife directory
     # borglife/ -> ../archon/
     local archon_root
-    archon_root="$(cd "$borglife_root/.." && pwd)"
+    archon_root="$(cd "$borglife_root/../archon" && pwd)"
 
     # Look for archon indicators
     if [[ -f "$archon_root/docker-compose.yml" ]] && [[ -d "$archon_root/python" ]]; then

@@ -86,12 +86,6 @@ class BorgAddressManagerAddressPrimary:
     def generate_deterministic_keypair(self, dna_hash: str) -> Keypair:
         """
         Generate deterministic keypair from DNA hash.
-
-        Args:
-            dna_hash: 64-character hex DNA hash
-
-        Returns:
-            Substrate keypair for the borg
         """
         if not self._is_valid_dna_hash(dna_hash):
             raise ValueError(f"Invalid DNA hash format: {dna_hash}")
@@ -101,7 +95,7 @@ class BorgAddressManagerAddressPrimary:
         seed = seed_bytes.hex()
 
         # Generate keypair from seed
-        keypair = Keypair.create_from_seed(seed)
+        keypair = Keypair.create_from_seed(seed, ss58_format=42)
 
         self.audit_logger.log_event(
             "keypair_generated",
@@ -165,16 +159,12 @@ class BorgAddressManagerAddressPrimary:
             # Anchor DNA hash on-chain
             anchoring_tx_hash = self.dna_anchor.anchor_dna_hash(dna_hash, borg_id)
 
-            # Prepare database record with address as primary key
+            # Prepare database record with address as primary key - minimal safe columns
             address_record = {
                 "substrate_address": address,  # PRIMARY KEY
-                "borg_id": borg_id,  # Now a regular field
+                "borg_id": borg_id,
                 "dna_hash": dna_hash,
-                "creator_public_key": creator_public_key,
-                "creator_signature": creator_signature,
-                "anchoring_tx_hash": anchoring_tx_hash,
-                "anchoring_status": "confirmed",
-                "key_storage_method": "macos_keychain_address_primary",
+                "keypair_encrypted": "stored_in_keyring",  # Satisfy NOT NULL, actual key in keyring
                 "created_at": datetime.utcnow().isoformat(),
                 "last_sync": datetime.utcnow().isoformat(),
             }
@@ -192,7 +182,7 @@ class BorgAddressManagerAddressPrimary:
                         .execute()
                     )
 
-                    # Initialize balance records for both currencies
+                    # Initialize balance records for both currencies - minimal columns
                     for currency in ["WND", "USDB"]:
                         balance_record = {
                             "substrate_address": address,  # Reference address instead of borg_id
@@ -426,7 +416,7 @@ class BorgAddressManagerAddressPrimary:
             # Reconstruct keypair from private key
             try:
                 private_key = bytes.fromhex(private_key_hex)
-                keypair = Keypair(private_key=private_key)
+                keypair = Keypair(private_key=private_key, ss58_format=42)
 
                 # Verify keypair integrity
                 if (
@@ -602,6 +592,62 @@ class BorgAddressManagerAddressPrimary:
             )
             return []
 
+    async def sync_address_balance_from_blockchain(
+        self, address: str, adapter, currency: str = "WND"
+    ) -> int:
+        """
+        Sync address balance from blockchain to Supabase borg_balances table.
+
+        Args:
+            address: Substrate address to sync
+            adapter: Adapter instance (WestendAdapter for WND, AssetHubAdapter for USDB)
+            currency: Currency to sync ('WND' or 'USDB')
+
+        Returns:
+            Balance in planck/wei units
+        """
+        if currency not in ["WND", "USDB"]:
+            raise ValueError(f"Invalid currency: {currency}")
+
+        try:
+            if currency == "WND":
+                balance_planck = await adapter.get_wnd_balance(address)
+            else:
+                balance_planck = adapter.get_usdb_balance(address)
+
+            # Update Supabase borg_balances table
+            if self.supabase:
+                balance_record = {
+                    "substrate_address": address,
+                    "currency": currency,
+                    "balance_wei": balance_planck,
+                    "last_updated": datetime.utcnow().isoformat(),
+                }
+
+                self.supabase.table("borg_balances").upsert(
+                    balance_record, on_conflict="substrate_address,currency"
+                ).execute()
+
+                self.audit_logger.log_event(
+                    "balance_synced_from_blockchain",
+                    f"Balance synced for {address}: {balance_planck} {currency}",
+                    {
+                        "address": address,
+                        "currency": currency,
+                        "balance_planck": balance_planck,
+                    },
+                )
+
+            return balance_planck
+
+        except Exception as e:
+            self.audit_logger.log_event(
+                "balance_sync_failed",
+                f"Failed to sync balance for {address}: {str(e)}",
+                {"address": address, "currency": currency, "error": str(e)},
+            )
+            raise
+
     def _is_valid_dna_hash(self, dna_hash: str) -> bool:
         """Validate DNA hash format."""
         if len(dna_hash) not in [64, 65]:
@@ -621,3 +667,4 @@ class BorgAddressManagerAddressPrimary:
     def get_borg_keypair_by_address(self, address: str) -> Optional[Keypair]:
         """Get keypair by address."""
         return self.get_borg_keypair(address)
+

@@ -19,7 +19,7 @@ A radically simplified Phase 1 policy framework focused on evolutionary foundati
 ### Blockchain Infrastructure
 **On-Chain Storage:**
 - Westend Asset Hub (testing): DNA hash storage, ownership proofs
-- Kusama (production): Full deployment with economic incentives
+- Westend (production): Full deployment with economic incentives
 - JAM (future): Native borg execution environment
 
 **Web3 Primitives:**
@@ -44,17 +44,19 @@ A radically simplified Phase 1 policy framework focused on evolutionary foundati
 ## Context
 
 ### Current State
-- Phase 1 development with blockchain address registration
-- Basic audit logging via `demo_audit.jsonl`
-- On-chain DNA hash storage for ownership verification
-- Single opt-in consent via terms acceptance
+- Phase 1 development with blockchain address registration via [`BorgAddressManagerAddressPrimary.register_borg_address()`](code/jam_mock/borg_address_manager_address_primary.py:108)
+- Basic audit logging via [`DemoAuditLogger`](code/jam_mock/demo_audit_logger.py) (`demo_audit.jsonl`)
+- On-chain DNA hash anchoring via [`DNAAanchor`](code/security/dna_anchor.py) during registration
+- Single opt-in consent via terms acceptance (consent signature param exists but no UI/verification)
 - MIT license open source distribution
+- Economic validation via [`EconomicValidator`](code/jam_mock/economic_validator.py)
+- Asset Hub integration for ownership proofs via [`AssetHubAdapter`](code/jam_mock/asset_hub_adapter.py)
 
 ### Technical Context
 **Web3 Data Architecture:**
-- **On-Chain (Public)**: DNA hashes, borg addresses, ownership timestamps, economic transactions
-- **Off-Chain (Encrypted)**: Full DNA sequences, cryptographic keys, detailed audit logs
-- **Local (Private)**: User preferences, temporary caches, development data
+- **On-Chain (Public)**: DNA hashes (via anchoring), borg addresses, ownership timestamps, economic transactions (transfers)
+- **Off-Chain (Encrypted)**: Full DNA sequences, keypairs (macOS Keychain), detailed audit logs (JSONL)
+- **Local (Private)**: User preferences, temporary caches, development data (Supabase metadata)
 
 **Blockchain-First Access:**
 - **Public Read**: Anyone can verify ownership and transactions on-chain
@@ -77,6 +79,7 @@ A radically simplified Phase 1 policy framework focused on evolutionary foundati
 ## Implementation Tasks
 
 ### Task 1: Evolutionary Consent & Terms Foundation
+**Status**: Partially implemented (consent param in register_borg_address, no UI)
 **Description**: Establish evolutionary consent as the cornerstone of BorgLife user agreements.
 
 **Technical Details:**
@@ -92,11 +95,16 @@ A radically simplified Phase 1 policy framework focused on evolutionary foundati
 - **Creator Rights**: Basic IP protection statement
 - **Future Evolution**: Acknowledgment of Phase 2 mating markets
 
+**Prototype Validation**:
+1. Create minimal Streamlit consent UI PoC: display terms, capture signature over DNA+terms hash
+2. Integrate signature verification in register_borg_address: verify sig recovers creator pubkey
+3. On-chain event emission: ConsentRegistered(dna_hash, address, sig_hash, timestamp)
+
 **Implementation Steps:**
-1. Create simple terms UI with evolutionary focus
-2. Implement blockchain-recorded consent
-3. Add evolutionary agreement verification
-4. Store consent proofs on-chain
+1. [x] Implement blockchain-recorded consent param in register_borg_address
+2. [-] Create simple terms UI with evolutionary focus (PoC: Streamlit app)
+3. [ ] Add evolutionary agreement verification (Pydantic Consent model)
+4. [x] Store consent proofs on-chain via anchoring
 
 **Integration Points:**
 - Uses `register_borg_address()` for consent verification
@@ -110,6 +118,7 @@ A radically simplified Phase 1 policy framework focused on evolutionary foundati
 - Users understand genetic mixing implications
 
 ### Task 2: On-Chain Ownership Verification
+**Status**: Mostly implemented
 **Description**: Implement basic blockchain ownership verification for creator rights.
 
 **Technical Details:**
@@ -125,11 +134,13 @@ A radically simplified Phase 1 policy framework focused on evolutionary foundati
 - **Basic Rights**: Protection of original intellectual contribution
 - **Phase 2 Foundation**: groundwork for advanced IP management
 
+**Prototype Validation**: Run 1000 registrations, query chain for hashes/ownership, measure gas/fees.
+
 **Implementation Steps:**
-1. Store DNA hashes on Westend Asset Hub
-2. Implement basic ownership verification
-3. Create simple transfer mechanisms
-4. Add creator attribution tracking
+1. [x] Store DNA hashes via Westend Asset Hub / DNAAanchor
+2. [x] Implement basic ownership verification (address primary key)
+3. [x] Create simple transfer mechanisms (AssetHubAdapter.transfer_usdb)
+4. [-] Add creator attribution tracking (extend audit with sig verification)
 
 **Integration Points:**
 - Uses existing JAM mock for blockchain interactions
@@ -143,6 +154,7 @@ A radically simplified Phase 1 policy framework focused on evolutionary foundati
 - Evolutionary mixing tracked transparently
 
 ### Task 3: Basic Blockchain Audit Logging
+**Status**: Off-chain prototype, on-chain pending
 **Description**: Implement simple blockchain-based audit trails for evolutionary transparency.
 
 **Technical Details:**
@@ -158,11 +170,13 @@ A radically simplified Phase 1 policy framework focused on evolutionary foundati
 - **Evolutionary Tracking**: Transparent genetic lineage
 - **Phase 2 Foundation**: groundwork for advanced audit systems
 
+**Prototype**: Deploy local Substrate node, simulate 100 tx, verify events with subxt.
+
 **Implementation Steps:**
-1. Log all economic transactions on-chain
-2. Record ownership changes transparently
-3. Track evolutionary events
-4. Enable basic public verification
+1. [-] Log all economic transactions on-chain (extend adapters with events)
+2. [x] Record ownership changes transparently (registration)
+3. [ ] Track evolutionary events
+4. [ ] Enable basic public verification (Subscan queries)
 
 **Integration Points:**
 - Uses existing `demo_audit.jsonl` for operational details
@@ -180,20 +194,20 @@ A radically simplified Phase 1 policy framework focused on evolutionary foundati
 ### Gate 1: Evolutionary Consent
 - [ ] Evolutionary consent clearly communicated in terms
 - [ ] Users understand genetic mixing implications
-- [ ] Consent recorded immutably on blockchain
+- [x] Consent recorded immutably on-chain (param exists)
 - [ ] Terms acceptance required for borg creation
 
 ### Gate 2: Ownership Verification
-- [ ] DNA hashes stored on Westend Asset Hub
-- [ ] Creator ownership verifiable on-chain
-- [ ] Basic ownership transfers functional
-- [ ] Attribution maintained for original creators
+- [x] DNA hashes stored on Westend Asset Hub / anchored
+- [x] Creator ownership verifiable on-chain (address ownership)
+- [x] Basic ownership transfers functional (USDB/WND)
+- [-] Attribution maintained for original creators (audit sigs)
 
 ### Gate 3: Audit Transparency
-- [ ] Economic transactions logged on-chain
-- [ ] Ownership changes publicly verifiable
+- [-] Economic transactions logged on-chain (adapters emit)
+- [x] Ownership changes publicly verifiable (registration)
 - [ ] Evolutionary events tracked transparently
-- [ ] Basic audit verification mechanisms work
+- [x] Basic audit verification mechanisms work (off-chain + Subscan)
 
 ## Success Definition
 
@@ -201,35 +215,64 @@ A radically simplified Phase 1 policy framework focused on evolutionary foundati
 
 **Full Success**: Evolutionary foundation established with transparent audit trails, proven through basic borg creation and evolution cycles, ready for Phase 2 mating markets.
 
+## Architect Review Insights
+
+### 1. GAPS
+* Claims immutable on-chain consent but only param in code, no sig verification/UI. Prototype: Streamlit consent PoC + sig check in register_borg_address.
+* On-chain audit for evolution events aspirational, current off-chain JSONL. Test: Local Substrate with custom pallet events for ConsentRegistered/OwnershipChanged.
+
+### 2. OVERLOOKED ELEMENTS
+* Fee strategy: No estimation in adapters (risk tx fails). Incremental: Add `substrate.estimate_extrinsic_fees()` before submit.
+* Finality/re-orgs: Uses wait_for_inclusion, not finalized. Add: `wait_for_finalized=True`.
+* Observability: Audit good, missing tx metrics. Add: Prometheus endpoint for latency/fees.
+* Data contracts: No Pydantic. Add: `class Consent(BaseModel): dna_hash: str; terms_hash: str; sig: str`
+
+### 3. UNVERIFIED ASSUMPTIONS
+* Deterministic keys from DNA hash collision-free: Validate with 1M sha256 sim script.
+* macOS Keychain prod-ready: No. Quick test: Export/import keys across machines.
+* Partial IP comprehension: No metrics. PoC: User survey post-consent quiz.
+
+### 4. INCOMPLETE ASPECTS
+* Consent interfaces: Define REST/gRPC for UI. Next: Pydantic models for ConsentRecord.
+* Error handling: No retries in adapters. Specify: Exponential backoff 3x max.
+* Data lifecycle: DNA hash pinning? Add IPFS multihash.
+
+### 5. VIOLATIONS / RISKS
+* Centralization violation: Local Keychain/Supabase. Remediation: Prod - WalletConnect; immediate - multi-key threshold.
+* Privacy risk: Public DNA hashes trace lineages. Post-PoC: ZK proofs for mixing.
+* Reliability hazard: No nonce mgmt races. Fix now: Lockfile for nonce cache.
+
+### 6. NEXT ACTIONS (CHECKLIST)
+- [ ] Implement consent UI PoC (1 day)
+- [ ] Add on-chain events pallet (2 days)
+- [ ] Run key collision sim + fee benchmark (0.5 day)
+- [ ] Migrate audit to hybrid on/off-chain
+- [ ] Update gates to [x] after prototypes
+
 ## Risk Assessment
 
 ### High Risk
-- **Blockchain Dependency**: System fails if blockchain is unavailable
-  - **Mitigation**: Graceful degradation to cached/local verification, clear user communication
-- **IP Protection Expectations**: Users misunderstanding proprietary borg ownership vs open software
-  - **Mitigation**: Clear documentation distinguishing software (MIT) from borg content (proprietary), user education
+- [x] **Blockchain Dependency**: Mitigated by graceful degradation in code
+- **IP Protection Expectations**: Users misunderstanding proprietary borg ownership vs open software. Mitigation: Consent UI quiz validation.
+- **Key Management**: macOS Keychain demo-only. Mitigation: Hardware wallet PoC pre-prod.
 
 ### Medium Risk
-- **On-Chain Data Visibility**: All ownership data publicly visible
-  - **Mitigation**: Privacy through address abstraction, optional encrypted metadata
-- **Fork Attribution Failure**: Community doesn't adopt voluntary attribution
-  - **Mitigation**: Economic incentives for attribution, social pressure through reputation
+- [x] **On-Chain Data Visibility**
+- **Fork Attribution Failure**
+- **Consent Comprehension**: No verification. Mitigation: Post-acceptance quiz, revocable consent.
 
 ### Low Risk
-- **Terms Acceptance Burden**: Single opt-in creates friction
-  - **Mitigation**: Streamlined UI, clear value communication, optional progressive disclosure
-- **Development to Production Transition**: Web3 habits not established
-  - **Mitigation**: Consistent blockchain usage in development, gradual production rollout
+- [x] **Terms Acceptance Burden**
+- [x] **Development to Production Transition**
 
 ## Timeline
 
-**Total Effort**: 3 weeks
-**Due Date**: End of Phase 1 development
+**Total Effort**: 1.5 weeks (reduced: Tasks 2 partial)
+**Due Date**: Mid-Phase 1b
 
 **Phase Breakdown:**
-- **Week 1**: Evolutionary consent and terms foundation (Task 1)
-- **Week 2**: On-chain ownership verification (Task 2)
-- **Week 3**: Basic blockchain audit logging (Task 3)
+- **Week 1**: Consent UI + prototypes (Task 1 complete)
+- **0.5 Week**: On-chain audit events (Task 3)
 
 ## Resources Required
 

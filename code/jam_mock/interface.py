@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 from decimal import Decimal
 from enum import Enum
 from typing import Any, Dict, Optional, Union
+from substrateinterface import Keypair
 
 
 class JAMMode(Enum):
@@ -209,23 +210,37 @@ class JAMMockInterface(JAMInterface):
     ) -> Dict[str, Any]:
         """
         Verify DNA integrity with cryptographic proof.
+        """
+        pass
 
-        Enhanced version that provides verification proof for on-chain validation.
+    @abstractmethod
+    async def transfer_from_dispenser(
+        self,
+        from_address: str,
+        to_borg_id: str,
+        amount: Decimal,
+        dispenser_keypair: Keypair,
+    ) -> Dict[str, Any]:
+        """
+        Transfer WND from dispenser to borg using dispenser keypair for signing.
 
         Args:
-            borg_id: Unique identifier for the borg
-            expected_hash: Expected DNA hash
+            from_address: Polkadot address of the dispenser
+            to_borg_id: Unique identifier for the borg
+            amount: Amount of WND to transfer
+            dispenser_keypair: Keypair of the dispenser for signing the transaction
 
         Returns:
-            Dict with verification results and proof:
+            Dict with transaction details:
             {
-                'verified': bool,
-                'expected_hash': str,
-                'actual_hash': str,
-                'block_number': int,
-                'transaction_hash': str,
-                'proof_data': Dict[str, Any],  # Cryptographic proof
-                'timestamp': int
+                'from': str,               # Polkadot address of the dispenser
+                'to': str,                 # Polkadot address of the borg's account
+                'amount': int,             # Amount of WND to transfer (in Planck)
+                'transaction_hash': str,   # Hash of the signed transaction
+                'block_number': int,       # Block number the transaction was included in
+                'timestamp': int,          # Timestamp when the transaction was broadcast
+                'status': str,             # Status of the transaction (e.g., 'Pending', 'Confirmed')
+                'fee': str,                # Transaction fee in WND
             }
         """
         pass

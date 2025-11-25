@@ -153,6 +153,68 @@ class BorgPhenotype:
         """List all organ names."""
         return list(self.organs.keys())
 
+    async def _calculate_task_cost(
+        self, result: Dict[str, Any], execution_time: float, wealth: Optional[float]
+    ) -> Dict[str, Any]:
+        """
+        Calculate task execution cost based on organs used and time.
+
+        Args:
+            result: Task execution result
+            execution_time: Time taken to execute
+            wealth: Current borg wealth
+
+        Returns:
+            Cost information dictionary
+        """
+        from decimal import Decimal
+
+        total_cost = Decimal("0")
+        organ_costs = {}
+
+        # Calculate costs for organs used during execution
+        organs_used = result.get("organs_used", [])
+        for organ_name in organs_used:
+            # Get organ price cap from current DNA if available
+            price_cap = Decimal("0.001")  # Default fallback
+            if hasattr(self, "_current_dna") and self._current_dna:
+                for organ in self._current_dna.organs:
+                    if organ.name == organ_name:
+                        price_cap = Decimal(str(organ.price_cap))
+                        break
+
+            # Use price cap as cost estimate (simplified for Phase 1)
+            organ_costs[organ_name] = price_cap
+            total_cost += price_cap
+
+        # Add base execution cost (time-based)
+        base_execution_cost = Decimal("0.0001") * Decimal(str(execution_time))
+        total_cost += base_execution_cost
+
+        # Calculate cell costs from current DNA
+        cell_costs = {}
+        if hasattr(self, "_current_dna") and self._current_dna:
+            for cell in self._current_dna.cells:
+                cell_costs[cell.name] = Decimal(str(cell.cost_estimate))
+                total_cost += cell_costs[cell.name]
+
+        cost_info = {
+            "total_cost": str(total_cost),
+            "organ_costs": {k: str(v) for k, v in organ_costs.items()},
+            "cell_costs": {k: str(v) for k, v in cell_costs.items()},
+            "execution_cost": str(base_execution_cost),
+            "execution_time": execution_time,
+            "currency": "DOT",
+            "wealth_sufficient": wealth is None or float(wealth) >= float(total_cost),
+            "cost_breakdown": {
+                "organs": str(sum(Decimal(str(v)) for v in organ_costs.values())),
+                "cells": str(sum(Decimal(str(v)) for v in cell_costs.values())),
+                "execution": str(base_execution_cost),
+            },
+        }
+
+        return cost_info
+
 
 class PhenotypeBuilder:
     """Builds executable phenotypes from DNA."""
@@ -268,22 +330,16 @@ class PhenotypeBuilder:
     async def _create_archon_cell(self, cell: Cell, agent_type: str) -> Any:
         """
         Create cell using Archon agent service.
-
-        Args:
-            cell: Cell definition
-            agent_type: Archon agent type
-
-        Returns:
-            Cell instance
         """
 
         # This would create a wrapper around Archon agent
         # For now, return a placeholder
         class ArchonCell:
-            def __init__(self, name: str, agent_type: str, parameters: Dict[str, Any]):
+            def __init__(self, name: str, agent_type: str, parameters: Dict[str, Any], adapter: ArchonServiceAdapter):
                 self.name = name
                 self.agent_type = agent_type
                 self.parameters = parameters
+                self.adapter = adapter
 
             async def execute(self, task: str) -> Dict[str, Any]:
                 # Call Archon agent
@@ -291,7 +347,7 @@ class PhenotypeBuilder:
                     agent_type=self.agent_type, prompt=task, context=self.parameters
                 )
 
-        return ArchonCell(cell.name, agent_type, cell.parameters)
+        return ArchonCell(cell.name, agent_type, cell.parameters, self.adapter)
 
     async def _create_custom_cell(self, cell: Cell) -> Any:
         """

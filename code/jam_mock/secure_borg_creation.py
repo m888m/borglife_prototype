@@ -209,7 +209,7 @@ class SecureBorgCreator:
             keypair = self.borg_manager.generate_deterministic_keypair(dna_hash)
 
             # Store keypair in macOS Keychain using dispenser-style atomic storage
-            borg_service_name = f"borglife-borg-{borg_id}"
+            borg_service_name = f"borglife-address-{keypair.ss58_address}"
             if not self._store_borg_keypair_atomic(keypair, borg_service_name):
                 raise Exception("Failed to store borg keypair in macOS Keychain")
 

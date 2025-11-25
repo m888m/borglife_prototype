@@ -33,18 +33,15 @@ class WestendAdapter(JAMInterface):
         rpc_url: str,
         keypair: Optional[Keypair] = None,
         connect_immediately: bool = True,
+        ssl_verify: bool = True,
     ):
         """
         Initialize Kusama adapter.
-
-        Args:
-            rpc_url: Kusama RPC endpoint (e.g., wss://kusama-rpc.polkadot.io)
-            keypair: Substrate keypair for signing transactions (optional)
-            connect_immediately: Whether to connect to RPC immediately (default: True)
         """
         self.rpc_url = rpc_url
         self.keypair = keypair
         self.mode = JAMMode.TESTNET
+        self.ssl_verify = ssl_verify
 
         # Initialize keypair manager
         self.keypair_manager = KeypairManager()
@@ -93,12 +90,17 @@ class WestendAdapter(JAMInterface):
             for endpoint in self.endpoints:
                 try:
                     print(f"🔌 Attempting connection to {endpoint}...")
-
-                    # Try without custom SSL context first (let substrate-interface handle it)
+                    
+                    ws_options = {
+                        "sslopt": {"cert_reqs": ssl.CERT_REQUIRED if self.ssl_verify else ssl.CERT_NONE}
+                    }
+                    
                     self.substrate = SubstrateInterface(
                         url=endpoint,
                         ss58_format=42,  # Westend address format
-                        # Let substrate-interface use its own SSL handling
+                        type_registry_preset="westend",
+                        use_remote_preset=True,
+                        ws_options=ws_options,
                     )
 
                     # Test the connection with proper API call
@@ -650,7 +652,7 @@ class WestendAdapter(JAMInterface):
         }
 
         # Initialize health check results
-        results = {
+        results: Dict[str, Any] = {
             "websocket_connected": False,
             "rpc_responsive": False,
             "chain_name": None,
@@ -760,279 +762,6 @@ class WestendAdapter(JAMInterface):
             results["error"] = str(e)
             return results
 
-    def get_mode(self) -> JAMMode:
-        """Get current JAM mode."""
-        return self.mode
-
-    def set_mode(self, mode: JAMMode) -> bool:
-        """Set JAM mode."""
-        self.mode = mode
-        return True
-
-    async def configure_testnet(
-        self, rpc_url: str, keypair_data: Optional[Dict[str, Any]] = None
-    ) -> bool:
-        """Configure testnet parameters."""
-        try:
-            self.rpc_url = rpc_url
-            self.substrate = SubstrateInterface(
-                url=rpc_url, ssl_context=self.ssl_context
-            )
-
-            if keypair_data:
-                if "seed" in keypair_data:
-                    self.set_keypair_from_seed(keypair_data["seed"])
-                elif "uri" in keypair_data:
-                    self.set_keypair_from_uri(keypair_data["uri"])
-
-            return True
-        except Exception as e:
-            print(f"Error configuring testnet: {e}")
-            return False
-
-    def set_keypair(self, keypair: Keypair):
-        """Set the keypair for signing transactions."""
-        self.keypair = keypair
-
-    def set_keypair_from_seed(self, seed: str):
-        """Set keypair from seed phrase."""
-        self.keypair = Keypair.create_from_seed(seed)
-
-    def set_keypair_from_uri(self, uri: str):
-        """Set keypair from URI (seed or mnemonic)."""
-        self.keypair = Keypair.create_from_uri(uri)
-
-    # Phase 2A: Dual-Currency Support Methods
-
-    async def transfer_wnd(
-        self, from_address: str, to_address: str, amount: int
-    ) -> Dict[str, Any]:
-        """
-        Transfer WND tokens between addresses using balances.transfer extrinsic.
-
-        Args:
-            from_address: Sender's substrate address
-            to_address: Recipient's substrate address
-            amount: Amount to transfer in planck units
-
-        Returns:
-            Transfer result with success status and transaction details
-        """
-        if not self.substrate:
-            return {"success": False, "error": "No substrate connection"}
-
-        if not self.keypair:
-            return {"success": False, "error": "No keypair configured"}
-
-        try:
-            # Compose balances.transfer extrinsic
-            call = self.substrate.compose_call(
-                call_module="Balances",
-                call_function="transfer_keep_alive",
-                call_params={"dest": to_address, "value": amount},
-            )
-
-            # Create signed extrinsic
-            extrinsic = self.substrate.create_signed_extrinsic(
-                call=call, keypair=self.keypair
-            )
-
-            # Submit and wait for inclusion
-            receipt = self.substrate.submit_extrinsic(
-                extrinsic, wait_for_inclusion=True
-            )
-
-            if receipt.is_success:
-                return {
-                    "success": True,
-                    "transaction_hash": receipt.extrinsic_hash,
-                    "block_hash": receipt.block_hash,
-                    "block_number": receipt.block_number,
-                    "from_address": from_address,
-                    "to_address": to_address,
-                    "amount": amount,
-                }
-            else:
-                return {
-                    "success": False,
-                    "error": f"Transfer failed: {receipt.error_message}",
-                    "from_address": from_address,
-                    "to_address": to_address,
-                    "amount": amount,
-                }
-
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "from_address": from_address,
-                "to_address": to_address,
-                "amount": amount,
-            }
-
-    async def transfer_usdb(
-        self, from_address: str, to_address: str, amount: int, asset_id: int
-    ) -> Dict[str, Any]:
-        """
-        Transfer USDB assets between addresses using assets.transfer extrinsic.
-
-        Args:
-            from_address: Sender's substrate address
-            to_address: Recipient's substrate address
-            amount: Amount to transfer in planck units
-            asset_id: USDB asset ID
-
-        Returns:
-            Transfer result with success status and transaction details
-        """
-        if not self.substrate:
-            return {"success": False, "error": "No substrate connection"}
-
-        if not self.keypair:
-            return {"success": False, "error": "No keypair configured"}
-
-        try:
-            # Compose assets.transfer extrinsic
-            call = self.substrate.compose_call(
-                call_module="Assets",
-                call_function="transfer",
-                call_params={"id": asset_id, "target": to_address, "amount": amount},
-            )
-
-            # Create signed extrinsic
-            extrinsic = self.substrate.create_signed_extrinsic(
-                call=call, keypair=self.keypair
-            )
-
-            # Submit and wait for inclusion
-            receipt = self.substrate.submit_extrinsic(
-                extrinsic, wait_for_inclusion=True
-            )
-
-            if receipt.is_success:
-                return {
-                    "success": True,
-                    "transaction_hash": receipt.extrinsic_hash,
-                    "block_hash": receipt.block_hash,
-                    "block_number": receipt.block_number,
-                    "from_address": from_address,
-                    "to_address": to_address,
-                    "amount": amount,
-                    "asset_id": asset_id,
-                }
-            else:
-                return {
-                    "success": False,
-                    "error": f"Transfer failed: {receipt.error_message}",
-                    "from_address": from_address,
-                    "to_address": to_address,
-                    "amount": amount,
-                }
-
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "from_address": from_address,
-                "to_address": to_address,
-                "amount": amount,
-            }
-
-    async def get_usdb_balance(self, address: str, asset_id: int) -> int:
-        """
-        Query USDB balance for an address using Assets.Account storage.
-
-        Args:
-            address: Substrate address to query
-            asset_id: USDB asset ID
-
-        Returns:
-            Balance in planck units
-        """
-        if not self.substrate:
-            return 0
-
-        try:
-            # Query Assets.Account storage
-            account_info = self.substrate.query(
-                module="Assets", storage_function="Account", params=[asset_id, address]
-            )
-
-            if account_info.value:
-                return account_info.value.get("balance", 0)
-            else:
-                return 0
-
-        except Exception as e:
-            print(f"Error querying USDB balance for {address}: {e}")
-            return 0
-
-    async def get_wnd_balance(self, address: str) -> int:
-        """
-        Query WND balance for an address using System.Account storage.
-
-        Args:
-            address: Substrate address to query
-
-        Returns:
-            Balance in planck units (never None, returns 0 on error)
-        """
-        if not self.substrate:
-            return 0
-
-        try:
-            # Query System.Account storage
-            account_info = self.substrate.query(
-                module="System", storage_function="Account", params=[address]
-            )
-
-            if account_info and hasattr(account_info, "value") and account_info.value:
-                if (
-                    isinstance(account_info.value, dict)
-                    and "data" in account_info.value
-                ):
-                    data = account_info.value["data"]
-                    if isinstance(data, dict):
-                        return data.get("free", 0)
-                    else:
-                        # Handle case where data might be a different structure
-                        return getattr(data, "free", 0)
-                else:
-                    # Handle different account_info structures
-                    return (
-                        account_info.value.get("free", 0)
-                        if isinstance(account_info.value, dict)
-                        else 0
-                    )
-            else:
-                return 0
-
-        except Exception as e:
-            print(f"Error querying WND balance for {address}: {e}")
-            return 0
-
-    async def get_dual_balance(
-        self, address: str, asset_id: Optional[int] = None
-    ) -> Dict[str, int]:
-        """
-        Get both WND and USDB balances for an address.
-
-        Args:
-            address: Substrate address to query
-            asset_id: USDB asset ID (if None, will try to get from config)
-
-        Returns:
-            Dict with 'wnd' and 'usdb' balance keys
-        """
-        # Get asset_id from config if not provided
-        if asset_id is None:
-            asset_id = self._get_usdb_asset_id()
-
-        wnd_balance = await self.get_wnd_balance(address)
-        usdb_balance = await self.get_usdb_balance(address, asset_id) if asset_id else 0
-
-        return {"wnd": wnd_balance, "usdb": usdb_balance}
-
     def _get_usdb_asset_id(self) -> Optional[int]:
         """Get USDB asset ID from configuration."""
         try:
@@ -1125,17 +854,90 @@ class WestendAdapter(JAMInterface):
     async def get_wealth_summary(self, borg_id: str) -> Dict[str, Decimal]:
         """
         Get complete wealth summary for a borg.
-
-        Args:
-            borg_id: Borg identifier
-
-        Returns:
-            Dict with WND and USDB balances
         """
         return {
             "WND": await self.get_wealth_balance_dual(borg_id, "WND"),
             "USDB": await self.get_wealth_balance_dual(borg_id, "USDB"),
         }
+
+    async def get_wnd_balance(self, address: str) -> int:
+        """
+        Get WND balance for an address in planck units.
+
+        Args:
+            address: SS58 address to query
+
+        Returns:
+            Balance in planck units (10^-12 WND)
+        """
+        try:
+            account_info = self.substrate.query(
+                module="System",
+                storage_function="Account",
+                params=[address],
+            )
+            balance = account_info.value["data"]["free"]
+            return int(balance)
+        except Exception as e:
+            print(f"Error getting balance for {address}: {e}")
+            return 0
+
+    async def transfer_from_dispenser(
+        self, from_address: str, to_borg_id: str, amount: Decimal, dispenser_keypair: Keypair
+    ) -> Dict[str, Any]:
+        """
+        Transfer WND from dispenser to borg using provided dispenser keypair.
+        """
+        original_keypair = self.keypair
+        self.keypair = dispenser_keypair
+        try:
+            planck_amount = int(amount * 10**12)  # WND decimals
+            result = await self.transfer_wnd(from_address, to_borg_id, planck_amount)
+            return result
+        finally:
+            self.keypair = original_keypair
+
+    async def transfer_wnd(self, from_address: str, to_address: str, amount_planck: int) -> Dict[str, Any]:
+        """
+        Transfer WND using Balances.transfer extrinsic.
+        """
+        try:
+            extrinsic = self.substrate.create_signed_extrinsic(
+                call=self.substrate.compose_call(
+                    call_module='Balances',
+                    call_function='transfer_allow_death',
+                    call_params={
+                        'dest': to_address,
+                        "value": amount_planck,
+                    },
+                ),
+                keypair=self.keypair,
+            )
+
+            # Submit and wait for inclusion
+            receipt = self.substrate.submit_extrinsic(
+                extrinsic, wait_for_inclusion=True
+            )
+
+            if receipt.is_success:
+                return {
+                    "success": True,
+                    "block": receipt.block_hash,
+                    "transaction_hash": receipt.extrinsic_hash,
+                    "cost": amount_planck / 10 ** 12,
+                    "timestamp": time.time(),
+                    "from_address": from_address,
+                    "to_address": to_address,
+                    "westend_block_number": receipt.block_number,
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Transaction failed: {receipt.error_message}",
+                }
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
 
 class KusamaAdapter(WestendAdapter):
