@@ -31,7 +31,6 @@ def load_borglife_config() -> Dict[str, Any]:
             if not line or line.startswith("#"):
                 continue
             if "=" not in line:
-                print(f"Warning: Skipping malformed line {line_num}: {line}")
                 continue
             key, value = line.split("=", 1)
             key = key.strip()

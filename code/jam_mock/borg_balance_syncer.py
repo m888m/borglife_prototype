@@ -97,10 +97,7 @@ class BorgBalanceSyncer:
             Sync results with success/failure counts and details
         """
         if verbose:
-            print("🔄 Starting borg balance synchronization...")
-            print(f"   Batch size: {batch_size}")
-            if max_borgs:
-                print(f"   Max borgs: {max_borgs}")
+            pass  # Progress reporting removed
 
         # Ensure Westend adapter is initialized
         if not self.westend_adapter:
@@ -112,7 +109,7 @@ class BorgBalanceSyncer:
 
         # Get all registered borgs
         if verbose:
-            print("\n📋 Fetching all registered borgs...")
+            pass  # Progress reporting removed
 
         borgs = self.address_manager.list_registered_borgs()
         if not borgs:
@@ -127,7 +124,7 @@ class BorgBalanceSyncer:
             total_borgs = len(borgs)
 
         if verbose:
-            print(f"✅ Found {total_borgs} borg(s) to sync")
+            pass  # Progress reporting removed
 
         # Process borgs in batches
         results = {
@@ -145,7 +142,7 @@ class BorgBalanceSyncer:
             total_batches = (total_borgs + batch_size - 1) // batch_size
 
             if verbose:
-                print(f"\n📦 Processing batch {batch_num}/{total_batches} ({len(batch)} borgs)...")
+                pass  # Progress reporting removed
 
             for borg in batch:
                 address = borg.get("substrate_address")
@@ -165,7 +162,7 @@ class BorgBalanceSyncer:
 
                 try:
                     if verbose:
-                        print(f"   🔄 Syncing {borg_id} ({address[:16]}...)")
+                        pass  # Progress reporting removed
 
                     # Sync WND balance from blockchain
                     balance_planck = await self.address_manager.sync_address_balance_from_blockchain(
@@ -174,7 +171,7 @@ class BorgBalanceSyncer:
 
                     balance_wnd = balance_planck / (10**12)
                     if verbose:
-                        print(f"   ✅ Synced: {balance_planck} planck ({balance_wnd:.6f} WND)")
+                        pass  # Success reporting removed
 
                     results["successful_syncs"] += 1
                     results["details"].append({
@@ -187,7 +184,7 @@ class BorgBalanceSyncer:
 
                 except Exception as e:
                     if verbose:
-                        print(f"   ❌ Failed to sync {borg_id}: {str(e)}")
+                        pass  # Failure reporting removed
                     results["failed_syncs"] += 1
                     results["details"].append({
                         "borg_id": borg_id,
@@ -204,14 +201,7 @@ class BorgBalanceSyncer:
 
         # Summary
         if verbose:
-            print("\n📊 Synchronization Summary:")
-            print(f"   Total borgs: {results['total_borgs']}")
-            print(f"   Processed: {results['processed']}")
-            print(f"   Successful: {results['successful_syncs']}")
-            print(f"   Failed: {results['failed_syncs']}")
-
-            if results["failed_syncs"] > 0:
-                print(f"   ❌ Some syncs failed - check details")
+            pass  # Final summary prints removed
 
         if results["failed_syncs"] > 0:
             results["success"] = False
@@ -230,7 +220,7 @@ class BorgBalanceSyncer:
             Sync result for the specific borg
         """
         if verbose:
-            print(f"🔄 Syncing balance for borg: {borg_id}")
+            pass  # Single sync start removed
 
         # Ensure Westend adapter is initialized
         if not self.westend_adapter:
@@ -256,7 +246,7 @@ class BorgBalanceSyncer:
 
             balance_wnd = balance_planck / (10**12)
             if verbose:
-                print(f"✅ Synced {borg_id}: {balance_planck} planck ({balance_wnd:.6f} WND)")
+                pass  # Success reporting removed
 
             return {
                 "success": True,
@@ -268,7 +258,7 @@ class BorgBalanceSyncer:
 
         except Exception as e:
             if verbose:
-                print(f"❌ Failed to sync {borg_id}: {str(e)}")
+                pass  # Failure reporting removed
             return {
                 "success": False,
                 "borg_id": borg_id,
@@ -325,7 +315,7 @@ class BorgBalanceSyncer:
             Sync result for the specific borg
         """
         if verbose:
-            print(f"🔄 Syncing USDB balance for borg: {borg_id}")
+            pass  # Single sync start removed
 
         # Ensure Asset Hub adapter is initialized
         if not self.asset_hub_adapter:
@@ -357,7 +347,7 @@ class BorgBalanceSyncer:
 
             balance_usdb = balance_planck / (10**12)
             if verbose:
-                print(f"✅ Synced {borg_id}: {balance_planck} planck ({balance_usdb:.6f} USDB)")
+                pass  # Success reporting removed
 
             return {
                 "success": True,
@@ -369,7 +359,7 @@ class BorgBalanceSyncer:
 
         except Exception as e:
             if verbose:
-                print(f"❌ Failed to sync {borg_id}: {str(e)}")
+                pass  # Failure reporting removed
             return {
                 "success": False,
                 "borg_id": borg_id,

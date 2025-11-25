@@ -240,8 +240,6 @@ async def test_phase2a_complete_economic_flow(e2e_suite):
         transfer_result["success"] or "mock" in str(transfer_result).lower()
     ), f"Transfer failed: {transfer_result}"
 
-    print("✅ Phase 2A complete economic flow test passed")
-
 class E2ETestSuite:
     def __init__(self):
         self.arch

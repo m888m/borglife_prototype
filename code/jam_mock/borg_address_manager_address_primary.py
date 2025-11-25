@@ -205,7 +205,6 @@ class BorgAddressManagerAddressPrimary:
                             "error": str(db_error),
                         },
                     )
-                    print(f"⚠️  Supabase storage failed: {db_error}")
 
                 self.audit_logger.log_event(
                     "borg_registered_address_primary",

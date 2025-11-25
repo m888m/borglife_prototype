@@ -14,8 +14,8 @@ import os
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Dict, Optional
-import sys; sys.path.insert(0, os.path.dirname(__file__) + '/..')
-print("Added project root to sys.path")
+import sys;
+sys.path.insert(0, os.path.dirname(__file__) + "/..")
 
 import pytest
 import pytest_asyncio
@@ -31,9 +31,8 @@ load_dotenv()
 test_env_path = Path(__file__).parent / ".env.test"
 if test_env_path.exists():
     load_dotenv(str(test_env_path), override=True)
-    print(f"Loaded test env from {test_env_path}")
 else:
-    print("No code/tests/.env.test found - using root .env (copy .env.test.example)")
+    pass  # No test env, use defaults
 
 
 # ============================================================================
