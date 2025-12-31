@@ -1,6 +1,6 @@
-# BorgLife Proto Private
+# Borglife
 
-BorgLife is a prototype implementation of autonomous digital organisms ("borgs") that synthesize executable phenotypes from DNA configurations using Archon as the off-chain synthesis engine, integrated with Westend blockchain for asset management and JAM mock for on-chain operations.
+Borglife is a prototype implementation of autonomous digital organisms ("borgs") that synthesize executable phenotypes from DNA configurations using Archon as the off-chain synthesis engine, integrated with Westend blockchain for asset management and JAM mock for on-chain operations.
 
 ## 🎯 Current Status
 - ✅ Phase 1: DNA synthesis and phenotype execution
